@@ -59,21 +59,24 @@ function App() {
   }, [customCategories]);
 
   // Check for app updates from version.json
-  useEffect(() => {
-    const checkVersion = async () => {
-      try {
-        const res = await fetch('/version.json?t=' + Date.now());
-        if (res.ok) {
-          const data = await res.json();
-          if (data.version && data.version !== CURRENT_VERSION) {
-            setNewVersionAvailable(true);
-          }
+  const checkVersion = async () => {
+    try {
+      const res = await fetch('/version.json?t=' + Date.now());
+      if (res.ok) {
+        const data = await res.json();
+        if (data.version && data.version !== CURRENT_VERSION) {
+          setNewVersionAvailable(true);
+          return true;
         }
-      } catch (e) {
-        console.error('Error checking version:', e);
       }
-    };
+    } catch (e) {
+      console.error('Error checking version:', e);
+    }
+    return false;
+  };
 
+  // Check for app updates periodically and on tab focus
+  useEffect(() => {
     // Check immediately on load
     checkVersion();
 
@@ -376,6 +379,7 @@ function App() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
+      await checkVersion();
       await fetchTransactions();
     } finally {
       setTimeout(() => {
