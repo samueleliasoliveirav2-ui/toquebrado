@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Wifi, Battery, Search, RefreshCw, LogOut, Loader2 } from 'lucide-react';
+import { Plus, Search, RefreshCw, LogOut, Loader2 } from 'lucide-react';
 import type { Transaction, TransactionStatus } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
@@ -62,7 +62,6 @@ function App() {
       if (error) {
         console.error('Error fetching transactions:', error);
       } else if (data) {
-        // Map snake_case database schema to camelCase front-end interface
         const mapped: Transaction[] = data.map((item: any) => ({
           id: item.id,
           data: item.data,
@@ -138,7 +137,7 @@ function App() {
       newStatus = targetTx.status === 'PAGO' ? 'PENDENTE' : 'PAGO';
     }
 
-    // Optimistic local state update for fast response
+    // Optimistic state update
     setTransactions(prev =>
       prev.map(tx => tx.id === id ? { ...tx, status: newStatus, dataPostergar: undefined } : tx)
     );
@@ -151,7 +150,6 @@ function App() {
 
       if (error) {
         console.error('Error updating status in database:', error);
-        // Rollback state on failure
         fetchTransactions();
       }
     } catch (err) {
@@ -193,7 +191,6 @@ function App() {
         if (error) throw error;
       }
       
-      // Load fresh data from DB
       await fetchTransactions();
     } catch (err) {
       console.error('Error saving transaction to database:', err);
@@ -203,7 +200,6 @@ function App() {
 
   const handleDeleteTransaction = async (id: string) => {
     try {
-      // Optimistic delete
       setTransactions(prev => prev.filter(tx => tx.id !== id));
 
       const { error } = await supabase
@@ -229,7 +225,6 @@ function App() {
     setIsModalOpen(true);
   };
 
-  // Seed mock data into Supabase accounts so they don't see an empty page on start
   const handleSeedMockData = async () => {
     if (!userId) return;
     if (confirm('Deseja copiar todos os dados originais de teste do Tô Quebrado para a sua conta no Supabase?')) {
@@ -272,29 +267,13 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-0 md:p-6 min-h-screen w-full select-none">
-      {/* Outer Phone Shell mockup for demo wrapper */}
-      <div className="relative w-full max-w-md bg-slate-950 border-[8px] border-slate-900 rounded-[40px] shadow-2xl overflow-hidden flex flex-col h-[840px] max-h-[96vh] md:h-[860px]">
+    <div className="w-full min-h-screen flex justify-center bg-slate-100 select-none">
+      {/* Centered responsive container (occupies 100% of mobile view, max-w-md with shadow on desktop) */}
+      <div className="relative w-full max-w-md h-[100dvh] bg-white flex flex-col shadow-xl md:border-x md:border-slate-200 overflow-hidden">
         
-        {/* Simulated Camera Island (Notch) */}
-        <div className="w-28 h-4.5 bg-slate-900 rounded-b-xl absolute top-0 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center">
-          <div className="w-3 h-3 rounded-full bg-slate-950 border border-slate-800" />
-          <div className="w-8 h-1 bg-slate-800 rounded-full ml-2" />
-        </div>
-
-        {/* Simulated Status Bar (Light UI) */}
-        <div className="px-6 pt-3.5 pb-2.5 flex justify-between items-center bg-white text-[10px] text-slate-700 font-bold z-10 select-none border-b border-slate-50">
-          <span>13:52</span>
-          <div className="flex items-center gap-1.5">
-            <Wifi size={11} className="text-slate-600" />
-            <span className="text-[9px] text-slate-600">5G</span>
-            <Battery size={13} className="text-slate-600" />
-          </div>
-        </div>
-
         {/* Conditional rendering based on loading session */}
         {loading ? (
-          <div className="flex-1 bg-white flex flex-col items-center justify-center text-slate-500">
+          <div className="flex-1 bg-white flex flex-col items-center justify-center text-slate-500 h-full">
             <Loader2 className="animate-spin text-[#0e69b2] mb-3" size={32} />
             <span className="text-sm font-semibold">Carregando carteira...</span>
           </div>
@@ -303,7 +282,7 @@ function App() {
         ) : (
           <>
             {/* App Main Header (White Background) */}
-            <header className="px-5 pb-3.5 pt-1.5 border-b border-slate-100 bg-white flex flex-col gap-3">
+            <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center py-0.5">
                   <span className="text-2xl font-black text-[#0e69b2] tracking-tighter lowercase select-none">
@@ -358,7 +337,7 @@ function App() {
             </header>
 
             {/* Scrollable Content Pane */}
-            <main className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin">
+            <main className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28">
               
               {/* Stats Header Summary Cards */}
               <StatsHeader 
@@ -419,7 +398,7 @@ function App() {
               </div>
 
               {/* Weekly Accordion Lists */}
-              <div className="pb-24">
+              <div>
                 <WeeklyAccordion
                   transactions={displayTransactions}
                   onEditTransaction={handleOpenEditModal}
@@ -438,9 +417,6 @@ function App() {
             </button>
           </>
         )}
-
-        {/* Bottom Simulated Indicator Bar */}
-        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-slate-300 rounded-full z-10" />
       </div>
 
       {/* Transaction Modal (BottomSheet) */}
