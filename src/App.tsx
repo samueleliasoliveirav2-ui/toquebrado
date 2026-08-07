@@ -684,44 +684,48 @@ function App() {
               </>
             )}
 
-            {/* Symmetrical Floating Navigation Footer (Voice-mockup style) */}
-            <div className="absolute bottom-5 left-4 right-4 h-16 bg-white/95 border border-slate-200/80 rounded-2xl shadow-lg px-10 flex items-center justify-between z-30 select-none">
+            {/* Symmetrical Floating Navigation Footer (Voice-mockup style, no background bar) */}
+            <div className="absolute bottom-6 left-4 right-4 h-16 bg-transparent flex items-center justify-between px-6 z-30 select-none">
               
-              {/* Left Tab: Início */}
+              {/* Left Button: Início */}
               <button
                 onClick={() => setActiveTab('INICIO')}
-                className={`flex flex-col items-center justify-center transition-colors cursor-pointer py-1 ${
-                  activeTab === 'INICIO' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-650'
+                title="Início"
+                className={`w-12 h-12 rounded-full shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer border ${
+                  activeTab === 'INICIO' 
+                    ? 'bg-[#0e69b2] border-[#0e69b2] text-white shadow-[#0e69b2]/20' 
+                    : 'bg-white border-slate-200/80 text-slate-500 hover:text-slate-700'
                 }`}
               >
-                <Home size={20} />
-                <span className="text-[9px] font-extrabold mt-0.5">Início</span>
+                <Home size={20} className={activeTab === 'INICIO' ? "stroke-[2.5]" : "stroke-[2]"} />
               </button>
 
               {/* Center Raised Highlight Plus Button */}
-              <div className="relative -translate-y-5">
+              <div className="relative">
                 {/* pulsing glow rings to match voice record visual */}
-                <div className="absolute -inset-1.5 rounded-full bg-[#f08622]/15 animate-pulse scale-105" />
+                <div className="absolute -inset-1.5 rounded-full bg-[#f08622]/20 animate-pulse scale-105" />
                 <div className="absolute -inset-3.5 rounded-full bg-[#f08622]/5 scale-110" />
                 
                 <button
                   onClick={handleOpenAddModal}
-                  className="relative w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg shadow-[#f08622]/35 hover:scale-105 active:scale-95 transition-all z-10 border-4 border-white cursor-pointer"
+                  className="relative w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg shadow-[#f08622]/35 hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
                   title="Novo Lançamento"
                 >
-                  <Plus size={24} className="stroke-[3]" />
+                  <Plus size={28} className="stroke-[3]" />
                 </button>
               </div>
 
-              {/* Right Tab: Ajustes (Gear) */}
+              {/* Right Button: Ajustes */}
               <button
                 onClick={() => setActiveTab('PERFIL')}
-                className={`flex flex-col items-center justify-center transition-colors cursor-pointer py-1 ${
-                  activeTab === 'PERFIL' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-650'
+                title="Ajustes"
+                className={`w-12 h-12 rounded-full shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer border ${
+                  activeTab === 'PERFIL' 
+                    ? 'bg-[#0e69b2] border-[#0e69b2] text-white shadow-[#0e69b2]/20' 
+                    : 'bg-white border-slate-200/80 text-slate-500 hover:text-slate-700'
                 }`}
               >
-                <Settings size={20} />
-                <span className="text-[9px] font-extrabold mt-0.5">Ajustes</span>
+                <Settings size={20} className={activeTab === 'PERFIL' ? "stroke-[2.5]" : "stroke-[2]"} />
               </button>
 
             </div>
