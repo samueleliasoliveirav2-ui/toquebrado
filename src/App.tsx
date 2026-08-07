@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings } from 'lucide-react';
+import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X } from 'lucide-react';
 import type { Transaction, TransactionStatus } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
@@ -21,6 +21,9 @@ function App() {
 
   // Active view state
   const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL'>('INICIO');
+
+  // Sidebar Drawer menu state
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // App version alert state
   const [newVersionAvailable, setNewVersionAvailable] = useState(false);
@@ -471,6 +474,103 @@ function App() {
           </div>
         )}
 
+        {/* Left-side Drawer Navigation Menu */}
+        {!loading && currentUser && isDrawerOpen && (
+          <div className="fixed inset-0 z-50 flex animate-fade-in">
+            {/* Backdrop click dismiss */}
+            <div 
+              className="absolute inset-0 bg-black/40 backdrop-blur-xs cursor-pointer" 
+              onClick={() => setIsDrawerOpen(false)} 
+            />
+
+            {/* Drawer container (slides from left) */}
+            <div className="relative w-64 max-w-[80vw] h-full bg-white flex flex-col p-5 shadow-2xl z-10 animate-slide-right">
+              {/* Header section with close and branding */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <span className="text-xl font-black text-[#0e69b2] tracking-tighter lowercase select-none">
+                  tô quebrado
+                </span>
+                <button
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* User Identity info inside drawer */}
+              <div className="py-4 border-b border-slate-100 mb-4">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Logado como</p>
+                <p className="text-xs font-bold text-slate-700 truncate mt-0.5">{currentUser}</p>
+                <p className="text-[10px] text-slate-450 font-semibold truncate">{userEmail}</p>
+              </div>
+
+              {/* Navigation list items */}
+              <nav className="flex-1 space-y-1.5">
+                {/* Início Link */}
+                <button
+                  onClick={() => {
+                    setActiveTab('INICIO');
+                    setIsDrawerOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'INICIO'
+                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
+                      : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+                  }`}
+                >
+                  <Home size={16} />
+                  <span>Início</span>
+                </button>
+
+                {/* Ajustes Link */}
+                <button
+                  onClick={() => {
+                    setActiveTab('PERFIL');
+                    setIsDrawerOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'PERFIL'
+                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
+                      : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+                  }`}
+                >
+                  <Settings size={16} />
+                  <span>Ajustes & Conta</span>
+                </button>
+              </nav>
+
+              {/* Bottom Drawer actions */}
+              <div className="border-t border-slate-100 pt-4 space-y-2">
+                {/* Refresh/Sync button */}
+                <button
+                  onClick={() => {
+                    handleSync();
+                    setIsDrawerOpen(false);
+                  }}
+                  disabled={isSyncing}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-650 hover:bg-slate-50 transition-all disabled:opacity-60 cursor-pointer"
+                >
+                  <RefreshCw size={14} className={isSyncing ? "animate-spin text-[#0e69b2]" : ""} />
+                  <span>Atualizar Dados</span>
+                </button>
+
+                {/* Logout button */}
+                <button
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-550 hover:bg-rose-50/50 transition-all cursor-pointer"
+                >
+                  <LogOut size={14} />
+                  <span>Sair do Sistema</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Conditional rendering based on loading session */}
         {loading ? (
           <div className="flex-1 bg-white flex flex-col items-center justify-center text-slate-500 h-full">
@@ -486,39 +586,26 @@ function App() {
                 {/* App Main Header (White Background) */}
                 <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center py-0.5">
-                      <span className="text-2xl font-black text-[#0e69b2] tracking-tighter lowercase select-none">
-                        tô quebrado
-                      </span>
-                    </div>
-
-                    {/* User Session Info & Actions */}
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-150 p-1 pr-1.5 rounded-xl">
-                      <span className="text-[9px] text-slate-600 font-bold ml-1 block max-w-[80px] truncate font-sans">
-                        {currentUser.split(' ')[0]}
-                      </span>
+                    
+                    {/* Left: Hamburger menu + Greeting */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setIsDrawerOpen(true)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-650 hover:text-slate-800 transition-colors cursor-pointer"
+                        title="Menu"
+                      >
+                        <Menu size={20} />
+                      </button>
                       
-                      {/* Sync/Refresh button */}
-                      <button
-                        onClick={handleSync}
-                        title="Atualizar dados"
-                        disabled={isSyncing}
-                        className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-655 transition-colors disabled:opacity-60 cursor-pointer"
-                      >
-                        <RefreshCw size={10} className={isSyncing ? "animate-spin text-[#0e69b2]" : ""} />
-                      </button>
-
-                      <div className="w-[1px] h-3 bg-slate-250" />
-
-                      {/* Logout button */}
-                      <button
-                        onClick={handleLogout}
-                        title="Sair do aplicativo"
-                        className="p-1 rounded-lg hover:bg-rose-50 text-rose-550 hover:text-rose-700 transition-colors cursor-pointer"
-                      >
-                        <LogOut size={10} />
-                      </button>
+                      <span className="text-sm font-extrabold text-slate-800 font-sans">
+                        Olá, {currentUser.split(' ')[0]}
+                      </span>
                     </div>
+
+                    {/* Right: Subtle sync spinner indicator */}
+                    {isSyncing && (
+                      <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
+                    )}
                   </div>
 
                   {/* Month Selector Slider */}
@@ -666,9 +753,22 @@ function App() {
               <>
                 {/* Header for Settings page */}
                 <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
-                  <span className="text-xl font-bold text-slate-800">Ajustes & Conta</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsDrawerOpen(true)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-650 hover:text-slate-800 transition-colors cursor-pointer"
+                      title="Menu"
+                    >
+                      <Menu size={20} />
+                    </button>
+                    
+                    <span className="text-sm font-extrabold text-slate-800 font-sans">
+                      Ajustes & Conta
+                    </span>
+                  </div>
+                  
                   <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 py-1 px-2.5 rounded-xl text-[9px] text-slate-500 font-bold">
-                    Versão 1.0.0
+                    Versão {CURRENT_VERSION}
                   </div>
                 </header>
 
@@ -684,50 +784,19 @@ function App() {
               </>
             )}
 
-            {/* Symmetrical Floating Navigation Footer (Voice-mockup style, no background bar) */}
-            <div className="absolute bottom-6 left-4 right-4 h-16 bg-transparent flex items-center justify-between px-6 z-30 select-none">
+            {/* Bottom-Right Circular Highlighted FAB Plus Button */}
+            <div className="absolute bottom-6 right-6 z-20">
+              {/* pulsing glow rings to highlight */}
+              <div className="absolute -inset-1.5 rounded-full bg-[#f08622]/20 animate-pulse scale-105" />
+              <div className="absolute -inset-3.5 rounded-full bg-[#f08622]/5 scale-110" />
               
-              {/* Left Button: Início */}
               <button
-                onClick={() => setActiveTab('INICIO')}
-                title="Início"
-                className={`w-12 h-12 rounded-full shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer border ${
-                  activeTab === 'INICIO' 
-                    ? 'bg-[#0e69b2] border-[#0e69b2] text-white shadow-[#0e69b2]/20' 
-                    : 'bg-white border-slate-200/80 text-slate-500 hover:text-slate-700'
-                }`}
+                onClick={handleOpenAddModal}
+                className="relative w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg shadow-[#f08622]/35 hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
+                title="Novo Lançamento"
               >
-                <Home size={20} className={activeTab === 'INICIO' ? "stroke-[2.5]" : "stroke-[2]"} />
+                <Plus size={28} className="stroke-[3]" />
               </button>
-
-              {/* Center Raised Highlight Plus Button */}
-              <div className="relative">
-                {/* pulsing glow rings to match voice record visual */}
-                <div className="absolute -inset-1.5 rounded-full bg-[#f08622]/20 animate-pulse scale-105" />
-                <div className="absolute -inset-3.5 rounded-full bg-[#f08622]/5 scale-110" />
-                
-                <button
-                  onClick={handleOpenAddModal}
-                  className="relative w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg shadow-[#f08622]/35 hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
-                  title="Novo Lançamento"
-                >
-                  <Plus size={28} className="stroke-[3]" />
-                </button>
-              </div>
-
-              {/* Right Button: Ajustes */}
-              <button
-                onClick={() => setActiveTab('PERFIL')}
-                title="Ajustes"
-                className={`w-12 h-12 rounded-full shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer border ${
-                  activeTab === 'PERFIL' 
-                    ? 'bg-[#0e69b2] border-[#0e69b2] text-white shadow-[#0e69b2]/20' 
-                    : 'bg-white border-slate-200/80 text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Settings size={20} className={activeTab === 'PERFIL' ? "stroke-[2.5]" : "stroke-[2]"} />
-              </button>
-
             </div>
           </>
         )}
