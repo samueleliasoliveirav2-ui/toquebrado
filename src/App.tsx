@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2 } from 'lucide-react';
+import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info } from 'lucide-react';
 import type { Transaction, TransactionStatus } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
@@ -13,6 +13,7 @@ function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Custom Dynamic Categories state
   const [customCategories, setCustomCategories] = useState<Record<'ENTRADA' | 'SAIDA', string[]>>(() => {
@@ -170,6 +171,16 @@ function App() {
     return matchesSearch && matchesType;
   });
 
+  // Count mock transactions present in account
+  const mockTransactions = transactions.filter(tx =>
+    INITIAL_TRANSACTIONS.some(mock =>
+      tx.descricao === mock.descricao &&
+      tx.valor === mock.valor &&
+      tx.tipo === mock.tipo
+    )
+  );
+  const mockTransactionsCount = mockTransactions.length;
+
   const handleToggleStatus = async (id: string) => {
     const targetTx = transactions.find(t => t.id === id);
     if (!targetTx) return;
@@ -296,10 +307,22 @@ function App() {
     setIsModalOpen(true);
   };
 
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await fetchTransactions();
+    } finally {
+      setTimeout(() => {
+        setIsSyncing(false);
+      }, 600);
+    }
+  };
+
   const handleSeedMockData = async () => {
     if (!userId) return;
     if (confirm('Deseja copiar todos os dados originais de teste do Tô Quebrado para a sua conta no Supabase?')) {
       try {
+        setIsSyncing(true);
         const dbPayloads = INITIAL_TRANSACTIONS.map(tx => ({
           user_id: userId,
           data: tx.data,
@@ -323,6 +346,42 @@ function App() {
       } catch (err) {
         console.error(err);
         alert('Erro ao realizar carga de teste.');
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
+  const handleDeleteMockData = async () => {
+    if (!userId) return;
+    const mockTxs = transactions.filter(tx =>
+      INITIAL_TRANSACTIONS.some(mock =>
+        tx.descricao === mock.descricao &&
+        tx.valor === mock.valor &&
+        tx.tipo === mock.tipo
+      )
+    );
+    const count = mockTxs.length;
+    if (count === 0) return;
+
+    if (confirm(`Deseja remover todos os ${count} lançamentos fictícios de teste da sua conta? Isso não afetará seus lançamentos originais cadastrados.`)) {
+      try {
+        setIsSyncing(true);
+        const idsToDelete = mockTxs.map(t => t.id);
+        const { error } = await supabase
+          .from('transactions')
+          .delete()
+          .in('id', idsToDelete);
+
+        if (error) throw error;
+        
+        await fetchTransactions();
+        alert('Dados fictícios removidos com sucesso!');
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao remover dados fictícios.');
+      } finally {
+        setIsSyncing(false);
       }
     }
   };
@@ -367,13 +426,14 @@ function App() {
                     {currentUser.split(' ')[0]}
                   </span>
                   
-                  {/* Reset/Seed button */}
+                  {/* Sync/Refresh button */}
                   <button
-                    onClick={handleSeedMockData}
-                    title="Carga de teste (Supabase)"
-                    className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-650 transition-colors"
+                    onClick={handleSync}
+                    title="Atualizar dados"
+                    disabled={isSyncing}
+                    className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-650 transition-colors disabled:opacity-60 cursor-pointer"
                   >
-                    <RefreshCw size={10} />
+                    <RefreshCw size={10} className={isSyncing ? "animate-spin text-[#0e69b2]" : ""} />
                   </button>
 
                   <div className="w-[1px] h-3 bg-slate-250" />
@@ -382,7 +442,7 @@ function App() {
                   <button
                     onClick={handleLogout}
                     title="Sair do aplicativo"
-                    className="p-1 rounded-lg hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-colors"
+                    className="p-1 rounded-lg hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
                   >
                     <LogOut size={10} />
                   </button>
@@ -416,6 +476,58 @@ function App() {
                 totalEntradas={totalEntradasMes}
                 totalSaidas={totalSaidasMes}
               />
+
+              {/* Warning/Cleanup Banner for Mock Data */}
+              {mockTransactionsCount > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 shrink-0">
+                      <AlertTriangle size={18} />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-extrabold text-amber-800">Dados fictícios detectados</h4>
+                      <p className="text-[10px] text-amber-650 font-semibold leading-normal">
+                        Identificamos {mockTransactionsCount} {mockTransactionsCount === 1 ? 'lançamento' : 'lançamentos'} de teste na sua conta. Deseja removê-los e manter apenas seus dados originais?
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={handleDeleteMockData}
+                      disabled={isSyncing}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
+                    >
+                      Limpar dados de teste
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Onboarding Empty State Seeding Card */}
+              {transactions.length === 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
+                      <Info size={18} />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-extrabold text-blue-800">Primeiros passos</h4>
+                      <p className="text-[10px] text-blue-650 font-semibold leading-normal">
+                        Sua carteira está vazia! Deseja carregar alguns lançamentos fictícios para experimentar as funcionalidades do Tô Quebrado?
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={handleSeedMockData}
+                      disabled={isSyncing}
+                      className="px-3 py-1.5 rounded-lg bg-[#0e69b2] hover:bg-[#0c5996] text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
+                    >
+                      Carregar dados de teste
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Filters Bar: Search & Tabs */}
               <div className="space-y-3">
