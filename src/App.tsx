@@ -135,8 +135,11 @@ function App() {
     { key: '2026-10', label: 'OUT' }
   ];
 
-  // Filtered month transactions
-  const monthTransactions = transactions.filter(tx => tx.data.startsWith(selectedMonth));
+  // Filtered month transactions based on active dates (using dataPostergar if postponed)
+  const monthTransactions = transactions.filter(tx => {
+    const activeDate = (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data;
+    return activeDate.startsWith(selectedMonth);
+  });
 
   // Cumulative Balance (All-time actual liquid: RECEIVED entries - PAID exits)
   const saldoAcumulado = transactions.reduce((sum, tx) => {
@@ -172,21 +175,37 @@ function App() {
     if (!targetTx) return;
 
     let newStatus: TransactionStatus;
+    let newDate = targetTx.data;
+
     if (targetTx.tipo === 'ENTRADA') {
       newStatus = targetTx.status === 'RECEBIDO' ? 'PENDENTE' : 'RECEBIDO';
     } else {
       newStatus = targetTx.status === 'PAGO' ? 'PENDENTE' : 'PAGO';
     }
 
+    // Promote postponed date to main date if marked as paid/received
+    if (targetTx.status === 'POSTERGAR' && targetTx.dataPostergar) {
+      newDate = targetTx.dataPostergar;
+    }
+
     // Optimistic state update
     setTransactions(prev =>
-      prev.map(tx => tx.id === id ? { ...tx, status: newStatus, dataPostergar: undefined } : tx)
+      prev.map(tx => tx.id === id ? { 
+        ...tx, 
+        status: newStatus, 
+        data: newDate, 
+        dataPostergar: undefined 
+      } : tx)
     );
 
     try {
       const { error } = await supabase
         .from('transactions')
-        .update({ status: newStatus, data_postergar: null })
+        .update({ 
+          status: newStatus, 
+          data: newDate, 
+          data_postergar: null 
+        })
         .eq('id', id);
 
       if (error) {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Calendar, AlertCircle, Check, Clock } from 'lucide-react';
 import type { Transaction } from '../types';
 
 interface WeeklyAccordionProps {
@@ -58,10 +58,16 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
     };
   };
 
-  // Group transactions by their Monday week key
+  // Helper to determine the date a transaction is currently planned for
+  const getTransactionActiveDate = (tx: Transaction): string => {
+    return (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data;
+  };
+
+  // Group transactions by their active Monday week key
   const weekGroupsMap: Record<string, Transaction[]> = {};
   transactions.forEach((tx) => {
-    const mondayKey = getWeekMonday(tx.data);
+    const activeDate = getTransactionActiveDate(tx);
+    const mondayKey = getWeekMonday(activeDate);
     if (!weekGroupsMap[mondayKey]) {
       weekGroupsMap[mondayKey] = [];
     }
@@ -85,7 +91,9 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
     const { monday, sunday } = getWeekRange(key);
 
     const sortedTxs = [...txs].sort((a, b) => {
-      const dateDiff = new Date(b.data + 'T00:00:00').getTime() - new Date(a.data + 'T00:00:00').getTime();
+      const dateA = getTransactionActiveDate(a);
+      const dateB = getTransactionActiveDate(b);
+      const dateDiff = new Date(dateB + 'T00:00:00').getTime() - new Date(dateA + 'T00:00:00').getTime();
       return dateDiff !== 0 ? dateDiff : a.descricao.localeCompare(b.descricao);
     });
 
@@ -149,16 +157,16 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
         return (
           <span className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-sky-50 text-sky-700 border border-sky-100 flex flex-col items-center shadow-2xs">
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-550" />
               POSTERGADO
             </span>
-            {postDate && <span className="text-[8px] text-sky-600 font-semibold mt-0.5">p/ {postDate}</span>}
+            {postDate && <span className="text-[8px] text-sky-600 font-bold mt-0.5">p/ {postDate}</span>}
           </span>
         );
       case 'PENDENTE':
       default:
         return (
-          <span className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1">
+          <span className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-slate-450" />
             PENDENTE
           </span>
@@ -219,6 +227,9 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
               <div className="p-3 bg-white/50 divide-y divide-slate-100">
                 {group.transactions.map((tx) => {
                   const isEntrada = tx.tipo === 'ENTRADA';
+                  const activeDate = getTransactionActiveDate(tx);
+                  const isPostponed = tx.status === 'POSTERGAR' && tx.dataPostergar;
+                  const isPaid = tx.status === 'PAGO' || tx.status === 'RECEBIDO';
 
                   return (
                     <div 
@@ -226,11 +237,11 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                       onClick={() => onEditTransaction(tx)}
                       className="py-3 px-1 flex items-center justify-between cursor-pointer hover:bg-slate-50/75 active:bg-slate-100/80 rounded-xl transition-colors group"
                     >
-                      {/* Left: Date Indicator */}
+                      {/* Left: Date Indicator (Shows Postponed Date values) */}
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col items-center justify-center w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 text-center shadow-2xs">
-                          <span className="text-[9px] text-slate-400 font-bold uppercase leading-none">{getWeekdayName(tx.data)}</span>
-                          <span className="text-sm text-slate-800 font-extrabold leading-tight mt-0.5">{getDayNumber(tx.data)}</span>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase leading-none">{getWeekdayName(activeDate)}</span>
+                          <span className="text-sm text-slate-800 font-extrabold leading-tight mt-0.5">{getDayNumber(activeDate)}</span>
                         </div>
 
                         {/* Mid: Description and Category */}
@@ -238,6 +249,14 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                           <span className="text-sm font-bold text-slate-800 group-hover:text-blue-900 transition-colors line-clamp-1 max-w-[150px]">
                             {tx.descricao}
                           </span>
+                          
+                          {/* Original Date Label crossed out if postponed */}
+                          {isPostponed && (
+                            <span className="text-[8px] text-slate-450 font-bold line-through">
+                              Antes: {tx.data.split('-').reverse().slice(0, 2).join('/')}
+                            </span>
+                          )}
+
                           <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider mt-0.5">
                             {tx.categoria}
                           </span>
@@ -264,13 +283,17 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                             e.stopPropagation();
                             onToggleStatus(tx.id);
                           }}
-                          title="Clique para alternar status rápido"
+                          title={isPaid ? "Marcar como pendente" : "Marcar como pago/recebido"}
                           className="hover:scale-105 active:scale-95 transition-transform relative group/badge flex items-center justify-center cursor-pointer"
                         >
                           {getStatusBadge(tx)}
-                          {/* Quick swap hover overlay icon */}
-                          <div className="absolute inset-0 bg-white/80 opacity-0 group-hover/badge:opacity-100 flex items-center justify-center rounded-lg transition-opacity border border-slate-200">
-                            <RefreshCw size={11} className="text-blue-600 animate-spin-slow font-bold" />
+                          {/* Smart hover overlay icon matching action context */}
+                          <div className="absolute inset-0 bg-white/90 opacity-0 group-hover/badge:opacity-100 flex items-center justify-center rounded-lg transition-opacity border border-slate-200">
+                            {isPaid ? (
+                              <Clock size={12} className="text-slate-500 font-bold" />
+                            ) : (
+                              <Check size={12} className="text-emerald-600 font-bold" />
+                            )}
                           </div>
                         </button>
                       </div>
