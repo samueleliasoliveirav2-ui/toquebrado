@@ -14,6 +14,22 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
+  // Custom Dynamic Categories state
+  const [customCategories, setCustomCategories] = useState<Record<'ENTRADA' | 'SAIDA', string[]>>(() => {
+    const saved = localStorage.getItem('toquebrado_custom_categories');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error parsing custom categories', e);
+      }
+    }
+    return {
+      ENTRADA: ['Pró-Labore', 'Salário', 'Investimentos', 'Freelance', 'Outros'],
+      SAIDA: ['Aluguel', 'Supermercado', 'Assinaturas', 'Transporte', 'Lazer', 'Saúde', 'Cartão', 'Empréstimo', 'Outros']
+    };
+  });
+
   // Filtering and Searching states
   const [selectedMonth, setSelectedMonth] = useState('2026-08'); // Default to August 2026
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,9 +39,13 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
+  // Sync custom categories to localStorage
+  useEffect(() => {
+    localStorage.setItem('toquebrado_custom_categories', JSON.stringify(customCategories));
+  }, [customCategories]);
+
   // 1. Session check and listener
   useEffect(() => {
-    // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setCurrentUser(session.user.user_metadata?.nome || session.user.email || 'Usuário');
@@ -34,7 +54,6 @@ function App() {
       setLoading(false);
     });
 
-    // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setCurrentUser(session.user.user_metadata?.nome || session.user.email || 'Usuário');
@@ -74,6 +93,28 @@ function App() {
           juros: item.juros !== null && item.juros !== undefined ? Number(item.juros) : undefined
         }));
         setTransactions(mapped);
+
+        // Intelligently scan and append any unique categories from Supabase transactions to the selector lists!
+        const uniqueEntradas = new Set(customCategories.ENTRADA);
+        const uniqueSaidas = new Set(customCategories.SAIDA);
+        let updated = false;
+
+        mapped.forEach(tx => {
+          if (tx.tipo === 'ENTRADA' && !uniqueEntradas.has(tx.categoria)) {
+            uniqueEntradas.add(tx.categoria);
+            updated = true;
+          } else if (tx.tipo === 'SAIDA' && !uniqueSaidas.has(tx.categoria)) {
+            uniqueSaidas.add(tx.categoria);
+            updated = true;
+          }
+        });
+
+        if (updated) {
+          setCustomCategories({
+            ENTRADA: Array.from(uniqueEntradas),
+            SAIDA: Array.from(uniqueSaidas)
+          });
+        }
       }
     } catch (err) {
       console.error('Unexpected error loading database data', err);
@@ -215,6 +256,17 @@ function App() {
     }
   };
 
+  const handleAddNewCategory = (tipo: 'ENTRADA' | 'SAIDA', category: string) => {
+    setCustomCategories(prev => {
+      const list = prev[tipo];
+      if (list.includes(category)) return prev;
+      return {
+        ...prev,
+        [tipo]: [...list, category]
+      };
+    });
+  };
+
   const handleOpenEditModal = (tx: Transaction) => {
     setEditingTransaction(tx);
     setIsModalOpen(true);
@@ -268,7 +320,7 @@ function App() {
 
   return (
     <div className="w-full min-h-screen flex justify-center bg-slate-100 select-none">
-      {/* Centered responsive container (occupies 100% of mobile view, max-w-md with shadow on desktop) */}
+      {/* Centered responsive container */}
       <div className="relative w-full max-w-md h-[100dvh] bg-white flex flex-col shadow-xl md:border-x md:border-slate-200 overflow-hidden">
         
         {/* Conditional rendering based on loading session */}
@@ -426,6 +478,8 @@ function App() {
         onSave={handleSaveTransaction}
         onDelete={handleDeleteTransaction}
         editingTransaction={editingTransaction}
+        categoriesList={customCategories}
+        onAddNewCategory={handleAddNewCategory}
       />
     </div>
   );

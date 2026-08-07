@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
 import type { Transaction, TransactionType, TransactionStatus } from '../types';
-import { CATEGORIES } from '../types';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -9,6 +8,8 @@ interface TransactionModalProps {
   onSave: (transaction: Omit<Transaction, 'id'> & { id?: string }) => void;
   onDelete?: (id: string) => void;
   editingTransaction?: Transaction | null;
+  categoriesList: Record<TransactionType, string[]>;
+  onAddNewCategory: (tipo: TransactionType, category: string) => void;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -16,7 +17,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   onClose,
   onSave,
   onDelete,
-  editingTransaction
+  editingTransaction,
+  categoriesList,
+  onAddNewCategory
 }) => {
   const [tipo, setTipo] = useState<TransactionType>('SAIDA');
   const [descricao, setDescricao] = useState('');
@@ -26,6 +29,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [status, setStatus] = useState<TransactionStatus>('PENDENTE');
   const [dataPostergar, setDataPostergar] = useState('');
   const [juros, setJuros] = useState<number | ''>('');
+
+  // Local state for dynamic category creation
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   // Pre-populate if editing
   useEffect(() => {
@@ -38,6 +45,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setStatus(editingTransaction.status);
       setDataPostergar(editingTransaction.dataPostergar || '');
       setJuros(editingTransaction.juros || '');
+      setIsAddingNew(false);
+      setNewCategoryName('');
     } else {
       setTipo('SAIDA');
       setDescricao('');
@@ -48,16 +57,18 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setStatus('PENDENTE');
       setDataPostergar('');
       setJuros('');
+      setIsAddingNew(false);
+      setNewCategoryName('');
     }
   }, [editingTransaction, isOpen]);
 
   // Adjust categories list when tipo changes
-  const availableCategories = CATEGORIES[tipo];
+  const availableCategories = categoriesList[tipo];
   useEffect(() => {
-    if (!editingTransaction && availableCategories.length > 0) {
+    if (!editingTransaction && availableCategories.length > 0 && !isAddingNew) {
       setCategoria(availableCategories[0]);
     }
-  }, [tipo, editingTransaction]);
+  }, [tipo, editingTransaction, categoriesList, isAddingNew]);
 
   // Adjust status if invalid for the type
   useEffect(() => {
@@ -70,6 +81,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleCategoryChange = (val: string) => {
+    if (val === 'ADD_NEW_CAT') {
+      setIsAddingNew(true);
+      setNewCategoryName('');
+    } else {
+      setIsAddingNew(false);
+      setCategoria(val);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!descricao.trim()) return alert('Insira uma descrição');
@@ -79,10 +100,25 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       return alert('Informe a data de postergação');
     }
 
+    let finalCategory = categoria;
+    if (isAddingNew) {
+      const trimmedNewCat = newCategoryName.trim();
+      if (!trimmedNewCat) {
+        return alert('Digite o nome da nova categoria');
+      }
+      // Call parent callback to save category globally
+      onAddNewCategory(tipo, trimmedNewCat);
+      finalCategory = trimmedNewCat;
+    }
+
+    if (!finalCategory) {
+      return alert('Selecione ou cadastre uma categoria');
+    }
+
     const payload: Omit<Transaction, 'id'> & { id?: string } = {
       tipo,
       descricao: descricao.trim(),
-      categoria,
+      categoria: finalCategory,
       valor: Number(valor),
       data,
       status,
@@ -129,7 +165,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
             <button
               type="button"
-              onClick={() => setTipo('SAIDA')}
+              onClick={() => {
+                setTipo('SAIDA');
+                setIsAddingNew(false);
+              }}
               className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 ${
                 tipo === 'SAIDA'
                   ? 'bg-rose-500/10 text-rose-700 shadow-xs border border-rose-250'
@@ -141,7 +180,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setTipo('ENTRADA')}
+              onClick={() => {
+                setTipo('ENTRADA');
+                setIsAddingNew(false);
+              }}
               className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 ${
                 tipo === 'ENTRADA'
                   ? 'bg-emerald-500/10 text-emerald-700 shadow-xs border border-emerald-250'
@@ -189,8 +231,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             <div>
               <label className="block text-slate-500 text-xs font-bold uppercase mb-1.5">Categoria</label>
               <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
+                value={isAddingNew ? 'ADD_NEW_CAT' : categoria}
+                onChange={(e) => handleCategoryChange(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-slate-800 focus:outline-none focus:border-blue-500 text-sm font-semibold cursor-pointer shadow-2xs"
               >
                 {availableCategories.map((cat) => (
@@ -198,7 +240,23 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     {cat}
                   </option>
                 ))}
+                <option value="ADD_NEW_CAT">+ Cadastrar Nova...</option>
               </select>
+
+              {/* Dynamic Sub-Input to Register New Category */}
+              {isAddingNew && (
+                <div className="mt-2.5 space-y-1 animate-fade-in">
+                  <label className="block text-slate-400 text-[9px] font-bold uppercase">Nome da Nova Categoria</label>
+                  <input
+                    type="text"
+                    placeholder="Nova categoria..."
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="w-full bg-white border border-slate-250 rounded-lg px-2.5 py-1.5 text-slate-800 text-xs font-semibold focus:outline-none focus:border-blue-500 shadow-3xs"
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             <div>
