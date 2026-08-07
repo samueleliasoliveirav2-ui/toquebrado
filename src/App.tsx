@@ -9,6 +9,8 @@ import { LoginScreen } from './components/LoginScreen';
 import { ProfileSettings } from './components/ProfileSettings';
 import { supabase } from './lib/supabaseClient';
 
+const CURRENT_VERSION = '1.0.1';
+
 function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
@@ -19,6 +21,9 @@ function App() {
 
   // Active view state
   const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL'>('INICIO');
+
+  // App version alert state
+  const [newVersionAvailable, setNewVersionAvailable] = useState(false);
 
   // Custom Dynamic Categories state
   const [customCategories, setCustomCategories] = useState<Record<'ENTRADA' | 'SAIDA', string[]>>(() => {
@@ -49,6 +54,42 @@ function App() {
   useEffect(() => {
     localStorage.setItem('toquebrado_custom_categories', JSON.stringify(customCategories));
   }, [customCategories]);
+
+  // Check for app updates from version.json
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const res = await fetch('/version.json?t=' + Date.now());
+        if (res.ok) {
+          const data = await res.json();
+          if (data.version && data.version !== CURRENT_VERSION) {
+            setNewVersionAvailable(true);
+          }
+        }
+      } catch (e) {
+        console.error('Error checking version:', e);
+      }
+    };
+
+    // Check immediately on load
+    checkVersion();
+
+    // Check every 60 seconds
+    const interval = setInterval(checkVersion, 60000);
+
+    // Check when user returns to app tab / visibility changes
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkVersion();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // 1. Session check and listener
   useEffect(() => {
@@ -409,6 +450,27 @@ function App() {
       {/* Centered responsive container */}
       <div className="relative w-full max-w-md h-[100dvh] bg-white flex flex-col shadow-xl md:border-x md:border-slate-200 overflow-hidden">
         
+        {/* Dynamic New Version Available Alert Banner */}
+        {newVersionAvailable && (
+          <div className="absolute top-4 left-4 right-4 z-50 bg-[#0e69b2]/95 backdrop-blur-md border border-blue-400/20 rounded-2xl p-3.5 shadow-xl animate-slide-down flex items-center justify-between gap-3 text-white">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-white/10 shrink-0 text-amber-300">
+                <Info size={16} />
+              </div>
+              <div className="text-left">
+                <p className="text-[11px] font-extrabold leading-none">Novas melhorias disponíveis!</p>
+                <p className="text-[9px] text-white/85 font-bold mt-1">Atualize o aplicativo para carregar a nova versão.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-3 py-1.5 rounded-lg bg-white text-[#0e69b2] text-[10px] font-extrabold hover:bg-slate-100 transition-colors shadow-sm cursor-pointer shrink-0"
+            >
+              Atualizar
+            </button>
+          </div>
+        )}
+
         {/* Conditional rendering based on loading session */}
         {loading ? (
           <div className="flex-1 bg-white flex flex-col items-center justify-center text-slate-500 h-full">
@@ -622,38 +684,46 @@ function App() {
               </>
             )}
 
-            {/* Unified Floating Navigation Footer */}
-            <div className="absolute bottom-5 left-4 right-4 h-16 bg-white/95 border border-slate-200/80 rounded-2xl shadow-lg px-6 flex items-center justify-between z-30 select-none">
-              <div className="flex items-center gap-6">
-                <button
-                  onClick={() => setActiveTab('INICIO')}
-                  className={`flex flex-col items-center justify-center transition-colors cursor-pointer py-1 ${
-                    activeTab === 'INICIO' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-650'
-                  }`}
-                >
-                  <Home size={18} />
-                  <span className="text-[9px] font-extrabold mt-0.5">Início</span>
-                </button>
+            {/* Symmetrical Floating Navigation Footer (Voice-mockup style) */}
+            <div className="absolute bottom-5 left-4 right-4 h-16 bg-white/95 border border-slate-200/80 rounded-2xl shadow-lg px-10 flex items-center justify-between z-30 select-none">
+              
+              {/* Left Tab: Início */}
+              <button
+                onClick={() => setActiveTab('INICIO')}
+                className={`flex flex-col items-center justify-center transition-colors cursor-pointer py-1 ${
+                  activeTab === 'INICIO' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-650'
+                }`}
+              >
+                <Home size={20} />
+                <span className="text-[9px] font-extrabold mt-0.5">Início</span>
+              </button>
 
+              {/* Center Raised Highlight Plus Button */}
+              <div className="relative -translate-y-5">
+                {/* pulsing glow rings to match voice record visual */}
+                <div className="absolute -inset-1.5 rounded-full bg-[#f08622]/15 animate-pulse scale-105" />
+                <div className="absolute -inset-3.5 rounded-full bg-[#f08622]/5 scale-110" />
+                
                 <button
-                  onClick={() => setActiveTab('PERFIL')}
-                  className={`flex flex-col items-center justify-center transition-colors cursor-pointer py-1 ${
-                    activeTab === 'PERFIL' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-650'
-                  }`}
+                  onClick={handleOpenAddModal}
+                  className="relative w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg shadow-[#f08622]/35 hover:scale-105 active:scale-95 transition-all z-10 border-4 border-white cursor-pointer"
+                  title="Novo Lançamento"
                 >
-                  <Settings size={18} />
-                  <span className="text-[9px] font-extrabold mt-0.5">Ajustes</span>
+                  <Plus size={24} className="stroke-[3]" />
                 </button>
               </div>
 
-              {/* Raised Plus Button */}
+              {/* Right Tab: Ajustes (Gear) */}
               <button
-                onClick={handleOpenAddModal}
-                className="w-12 h-12 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0"
-                title="Novo Lançamento"
+                onClick={() => setActiveTab('PERFIL')}
+                className={`flex flex-col items-center justify-center transition-colors cursor-pointer py-1 ${
+                  activeTab === 'PERFIL' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-650'
+                }`}
               >
-                <Plus size={20} />
+                <Settings size={20} />
+                <span className="text-[9px] font-extrabold mt-0.5">Ajustes</span>
               </button>
+
             </div>
           </>
         )}
