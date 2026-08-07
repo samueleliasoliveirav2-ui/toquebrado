@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X } from 'lucide-react';
+import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Transaction, TransactionStatus } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
@@ -181,12 +181,26 @@ function App() {
   }, [userId]);
 
   const months = [
-    { key: '2026-06', label: 'JUN' },
-    { key: '2026-07', label: 'JUL' },
-    { key: '2026-08', label: 'AGO' },
-    { key: '2026-09', label: 'SET' },
-    { key: '2026-10', label: 'OUT' }
+    { key: '2026-06', label: 'Junho de 2026' },
+    { key: '2026-07', label: 'Julho de 2026' },
+    { key: '2026-08', label: 'Agosto de 2026' },
+    { key: '2026-09', label: 'Setembro de 2026' },
+    { key: '2026-10', label: 'Outubro de 2026' }
   ];
+
+  const currentIndex = months.findIndex(m => m.key === selectedMonth);
+
+  const handlePrevMonth = () => {
+    if (currentIndex > 0) {
+      setSelectedMonth(months[currentIndex - 1].key);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentIndex < months.length - 1) {
+      setSelectedMonth(months[currentIndex + 1].key);
+    }
+  };
 
   // Filtered month transactions based on active dates (using dataPostergar if postponed)
   const monthTransactions = transactions.filter(tx => {
@@ -608,21 +622,29 @@ function App() {
                     )}
                   </div>
 
-                  {/* Month Selector Slider */}
-                  <div className="flex items-center justify-between bg-slate-100 p-1 rounded-xl border border-slate-200">
-                    {months.map((m) => (
-                      <button
-                        key={m.key}
-                        onClick={() => setSelectedMonth(m.key)}
-                        className={`flex-1 py-1.5 text-center text-xs font-extrabold rounded-lg transition-all ${
-                          selectedMonth === m.key
-                            ? 'bg-[#0e69b2] text-white shadow-xs'
-                            : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
+                  {/* Month Selector Slider with Left and Right Arrows */}
+                  <div className="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
+                    <button
+                      onClick={handlePrevMonth}
+                      disabled={currentIndex === 0}
+                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      title="Mês Anterior"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    
+                    <span className="text-xs font-black text-[#0e69b2] uppercase tracking-wider select-none font-sans">
+                      {months[currentIndex]?.label}
+                    </span>
+
+                    <button
+                      onClick={handleNextMonth}
+                      disabled={currentIndex === months.length - 1}
+                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      title="Próximo Mês"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
                   </div>
                 </header>
 
