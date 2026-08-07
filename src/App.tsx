@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info } from 'lucide-react';
+import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings } from 'lucide-react';
 import type { Transaction, TransactionStatus } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
 import { WeeklyAccordion } from './components/WeeklyAccordion';
 import { TransactionModal } from './components/TransactionModal';
 import { LoginScreen } from './components/LoginScreen';
+import { ProfileSettings } from './components/ProfileSettings';
 import { supabase } from './lib/supabaseClient';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string>('');
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Active view state
+  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL'>('INICIO');
 
   // Custom Dynamic Categories state
   const [customCategories, setCustomCategories] = useState<Record<'ENTRADA' | 'SAIDA', string[]>>(() => {
@@ -50,6 +55,7 @@ function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setCurrentUser(session.user.user_metadata?.nome || session.user.email || 'Usuário');
+        setUserEmail(session.user.email || '');
         setUserId(session.user.id);
       }
       setLoading(false);
@@ -58,9 +64,11 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setCurrentUser(session.user.user_metadata?.nome || session.user.email || 'Usuário');
+        setUserEmail(session.user.email || '');
         setUserId(session.user.id);
       } else {
         setCurrentUser(null);
+        setUserEmail('');
         setUserId(null);
         setTransactions([]);
       }
@@ -411,193 +419,242 @@ function App() {
           <LoginScreen onLoginSuccess={handleLoginSuccess} />
         ) : (
           <>
-            {/* App Main Header (White Background) */}
-            <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center py-0.5">
-                  <span className="text-2xl font-black text-[#0e69b2] tracking-tighter lowercase select-none">
-                    tô quebrado
-                  </span>
-                </div>
+            {activeTab === 'INICIO' ? (
+              <>
+                {/* App Main Header (White Background) */}
+                <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center py-0.5">
+                      <span className="text-2xl font-black text-[#0e69b2] tracking-tighter lowercase select-none">
+                        tô quebrado
+                      </span>
+                    </div>
 
-                {/* User Session Info & Actions */}
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-150 p-1 pr-1.5 rounded-xl">
-                  <span className="text-[9px] text-slate-600 font-bold ml-1 block max-w-[80px] truncate">
-                    {currentUser.split(' ')[0]}
-                  </span>
+                    {/* User Session Info & Actions */}
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-150 p-1 pr-1.5 rounded-xl">
+                      <span className="text-[9px] text-slate-600 font-bold ml-1 block max-w-[80px] truncate font-sans">
+                        {currentUser.split(' ')[0]}
+                      </span>
+                      
+                      {/* Sync/Refresh button */}
+                      <button
+                        onClick={handleSync}
+                        title="Atualizar dados"
+                        disabled={isSyncing}
+                        className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-655 transition-colors disabled:opacity-60 cursor-pointer"
+                      >
+                        <RefreshCw size={10} className={isSyncing ? "animate-spin text-[#0e69b2]" : ""} />
+                      </button>
+
+                      <div className="w-[1px] h-3 bg-slate-250" />
+
+                      {/* Logout button */}
+                      <button
+                        onClick={handleLogout}
+                        title="Sair do aplicativo"
+                        className="p-1 rounded-lg hover:bg-rose-50 text-rose-550 hover:text-rose-700 transition-colors cursor-pointer"
+                      >
+                        <LogOut size={10} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Month Selector Slider */}
+                  <div className="flex items-center justify-between bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    {months.map((m) => (
+                      <button
+                        key={m.key}
+                        onClick={() => setSelectedMonth(m.key)}
+                        className={`flex-1 py-1.5 text-center text-xs font-extrabold rounded-lg transition-all ${
+                          selectedMonth === m.key
+                            ? 'bg-[#0e69b2] text-white shadow-xs'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </header>
+
+                {/* Scrollable Content Pane */}
+                <main className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28">
                   
-                  {/* Sync/Refresh button */}
-                  <button
-                    onClick={handleSync}
-                    title="Atualizar dados"
-                    disabled={isSyncing}
-                    className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-650 transition-colors disabled:opacity-60 cursor-pointer"
-                  >
-                    <RefreshCw size={10} className={isSyncing ? "animate-spin text-[#0e69b2]" : ""} />
-                  </button>
-
-                  <div className="w-[1px] h-3 bg-slate-250" />
-
-                  {/* Logout button */}
-                  <button
-                    onClick={handleLogout}
-                    title="Sair do aplicativo"
-                    className="p-1 rounded-lg hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
-                  >
-                    <LogOut size={10} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Month Selector Slider */}
-              <div className="flex items-center justify-between bg-slate-100 p-1 rounded-xl border border-slate-200">
-                {months.map((m) => (
-                  <button
-                    key={m.key}
-                    onClick={() => setSelectedMonth(m.key)}
-                    className={`flex-1 py-1.5 text-center text-xs font-extrabold rounded-lg transition-all ${
-                      selectedMonth === m.key
-                        ? 'bg-[#0e69b2] text-white shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            </header>
-
-            {/* Scrollable Content Pane */}
-            <main className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28">
-              
-              {/* Stats Header Summary Cards */}
-              <StatsHeader 
-                saldoAcumulado={saldoAcumulado}
-                totalEntradas={totalEntradasMes}
-                totalSaidas={totalSaidasMes}
-              />
-
-              {/* Warning/Cleanup Banner for Mock Data */}
-              {mockTransactionsCount > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 shrink-0">
-                      <AlertTriangle size={18} />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-extrabold text-amber-800">Dados fictícios detectados</h4>
-                      <p className="text-[10px] text-amber-650 font-semibold leading-normal">
-                        Identificamos {mockTransactionsCount} {mockTransactionsCount === 1 ? 'lançamento' : 'lançamentos'} de teste na sua conta. Deseja removê-los e manter apenas seus dados originais?
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={handleDeleteMockData}
-                      disabled={isSyncing}
-                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
-                    >
-                      Limpar dados de teste
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Onboarding Empty State Seeding Card */}
-              {transactions.length === 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
-                      <Info size={18} />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-extrabold text-blue-800">Primeiros passos</h4>
-                      <p className="text-[10px] text-blue-650 font-semibold leading-normal">
-                        Sua carteira está vazia! Deseja carregar alguns lançamentos fictícios para experimentar as funcionalidades do Tô Quebrado?
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={handleSeedMockData}
-                      disabled={isSyncing}
-                      className="px-3 py-1.5 rounded-lg bg-[#0e69b2] hover:bg-[#0c5996] text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
-                    >
-                      Carregar dados de teste
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Filters Bar: Search & Tabs */}
-              <div className="space-y-3">
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                    <Search size={14} />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Buscar por descrição ou categoria..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white border border-slate-250 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0e69b2] focus:bg-white transition-all font-semibold shadow-2xs"
+                  {/* Stats Header Summary Cards */}
+                  <StatsHeader 
+                    saldoAcumulado={saldoAcumulado}
+                    totalEntradas={totalEntradasMes}
+                    totalSaidas={totalSaidasMes}
                   />
-                </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setFilterType('TODOS')}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
-                      filterType === 'TODOS'
-                        ? 'bg-slate-200 text-slate-800 border-slate-350 shadow-2xs'
-                        : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
-                    }`}
-                  >
-                    Todos
-                  </button>
-                  <button
-                    onClick={() => setFilterType('ENTRADA')}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1 ${
-                      filterType === 'ENTRADA'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs'
-                        : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
-                    }`}
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Receitas
-                  </button>
-                  <button
-                    onClick={() => setFilterType('SAIDA')}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1 ${
-                      filterType === 'SAIDA'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-2xs'
-                        : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
-                    }`}
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                    Despesas
-                  </button>
-                </div>
-              </div>
+                  {/* Warning/Cleanup Banner for Mock Data */}
+                  {mockTransactionsCount > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 shrink-0">
+                          <AlertTriangle size={18} />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-extrabold text-amber-800">Dados fictícios detectados</h4>
+                          <p className="text-[10px] text-amber-650 font-semibold leading-normal">
+                            Identificamos {mockTransactionsCount} {mockTransactionsCount === 1 ? 'lançamento' : 'lançamentos'} de teste na sua conta. Deseja removê-los e manter apenas seus dados originais?
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={handleDeleteMockData}
+                          disabled={isSyncing}
+                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
+                        >
+                          Limpar dados de teste
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-              {/* Weekly Accordion Lists */}
-              <div>
-                <WeeklyAccordion
-                  transactions={displayTransactions}
-                  onEditTransaction={handleOpenEditModal}
-                  onToggleStatus={handleToggleStatus}
+                  {/* Onboarding Empty State Seeding Card */}
+                  {transactions.length === 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
+                          <Info size={18} />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-extrabold text-blue-800">Primeiros passos</h4>
+                          <p className="text-[10px] text-blue-650 font-semibold leading-normal">
+                            Sua carteira está vazia! Deseja carregar alguns lançamentos fictícios para experimentar as funcionalidades do Tô Quebrado?
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={handleSeedMockData}
+                          disabled={isSyncing}
+                          className="px-3 py-1.5 rounded-lg bg-[#0e69b2] hover:bg-[#0c5996] text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
+                        >
+                          Carregar dados de teste
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Filters Bar: Search & Tabs */}
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                        <Search size={14} />
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Buscar por descrição ou categoria..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-white border border-slate-250 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0e69b2] focus:bg-white transition-all font-semibold shadow-2xs"
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setFilterType('TODOS')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                          filterType === 'TODOS'
+                            ? 'bg-slate-200 text-slate-800 border-slate-350 shadow-2xs'
+                            : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
+                        }`}
+                      >
+                        Todos
+                      </button>
+                      <button
+                        onClick={() => setFilterType('ENTRADA')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1 ${
+                          filterType === 'ENTRADA'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs'
+                            : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
+                        }`}
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Receitas
+                      </button>
+                      <button
+                        onClick={() => setFilterType('SAIDA')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1 ${
+                          filterType === 'SAIDA'
+                            ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-2xs'
+                            : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
+                        }`}
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                        Despesas
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Weekly Accordion Lists */}
+                  <div>
+                    <WeeklyAccordion
+                      transactions={displayTransactions}
+                      onEditTransaction={handleOpenEditModal}
+                      onToggleStatus={handleToggleStatus}
+                    />
+                  </div>
+                </main>
+              </>
+            ) : (
+              <>
+                {/* Header for Settings page */}
+                <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
+                  <span className="text-xl font-bold text-slate-800">Ajustes & Conta</span>
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 py-1 px-2.5 rounded-xl text-[9px] text-slate-500 font-bold">
+                    Versão 1.0.0
+                  </div>
+                </header>
+
+                <ProfileSettings
+                  userName={currentUser}
+                  userEmail={userEmail}
+                  onLogout={handleLogout}
+                  onSeedData={handleSeedMockData}
+                  onDeleteMockData={handleDeleteMockData}
+                  mockTransactionsCount={mockTransactionsCount}
+                  isSyncing={isSyncing}
                 />
-              </div>
-            </main>
+              </>
+            )}
 
-            {/* Floating Action Button (FAB) */}
-            <button
-              onClick={handleOpenAddModal}
-              className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-20 cursor-pointer animate-pulse-slow"
-              title="Novo Lançamento"
-            >
-              <Plus size={24} />
-            </button>
+            {/* Unified Floating Navigation Footer */}
+            <div className="absolute bottom-5 left-4 right-4 h-16 bg-white/95 border border-slate-200/80 rounded-2xl shadow-lg px-6 flex items-center justify-between z-30 select-none">
+              <div className="flex items-center gap-6">
+                <button
+                  onClick={() => setActiveTab('INICIO')}
+                  className={`flex flex-col items-center justify-center transition-colors cursor-pointer py-1 ${
+                    activeTab === 'INICIO' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-650'
+                  }`}
+                >
+                  <Home size={18} />
+                  <span className="text-[9px] font-extrabold mt-0.5">Início</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('PERFIL')}
+                  className={`flex flex-col items-center justify-center transition-colors cursor-pointer py-1 ${
+                    activeTab === 'PERFIL' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-650'
+                  }`}
+                >
+                  <Settings size={18} />
+                  <span className="text-[9px] font-extrabold mt-0.5">Ajustes</span>
+                </button>
+              </div>
+
+              {/* Raised Plus Button */}
+              <button
+                onClick={handleOpenAddModal}
+                className="w-12 h-12 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0"
+                title="Novo Lançamento"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
           </>
         )}
       </div>
