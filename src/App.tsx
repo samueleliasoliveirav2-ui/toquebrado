@@ -192,9 +192,9 @@ function App() {
       }
       
       await fetchTransactions();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving transaction to database:', err);
-      alert('Ocorreu um erro ao salvar o lançamento no banco de dados.');
+      alert('Ocorreu um erro ao salvar o lançamento no banco de dados: ' + (err.message || err.details || JSON.stringify(err)));
     }
   };
 
@@ -208,9 +208,9 @@ function App() {
         .eq('id', id);
 
       if (error) throw error;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting transaction from database:', err);
-      alert('Erro ao excluir lançamento do banco.');
+      alert('Erro ao excluir lançamento do banco: ' + (err.message || err.details || JSON.stringify(err)));
       fetchTransactions();
     }
   };
