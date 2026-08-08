@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, CreditCard, Lock } from 'lucide-react';
 import type { Transaction, TransactionStatus } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
@@ -7,6 +7,9 @@ import { WeeklyAccordion } from './components/WeeklyAccordion';
 import { TransactionModal } from './components/TransactionModal';
 import { LoginScreen } from './components/LoginScreen';
 import { ProfileSettings } from './components/ProfileSettings';
+import { DashboardHeader } from './components/DashboardHeader';
+import { SimplifitoChart } from './components/SimplifitoChart';
+import { CategoryScroll } from './components/CategoryScroll';
 import { supabase } from './lib/supabaseClient';
 
 const CURRENT_VERSION = '1.0.1';
@@ -19,8 +22,8 @@ function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Active view state
-  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL'>('INICIO');
+  // Active navigation view state
+  const [activeTab, setActiveTab] = useState<'INICIO' | 'CARTEIRA' | 'NOTIFICACOES' | 'PERFIL'>('INICIO');
 
   // Sidebar Drawer menu state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -52,6 +55,60 @@ function App() {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  // Date picker states for quick calendar navigation overlay
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(2026);
+  const [pickerMonth, setPickerMonth] = useState(8); // 1-indexed (1 to 12)
+
+  // Helper to format year-month YYYY-MM to Portuguese full label
+  const getMonthLabel = (yearMonthStr: string) => {
+    const [year, month] = yearMonthStr.split('-');
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const monthIdx = parseInt(month, 10) - 1;
+    return `${monthNames[monthIdx]} de ${year}`;
+  };
+
+  // Safe month increment/decrement handling year boundaries dynamically
+  const adjustMonth = (yearMonthStr: string, increment: number): string => {
+    const [year, month] = yearMonthStr.split('-').map(Number);
+    const date = new Date(year, month - 1 + increment, 15);
+    const newYear = date.getFullYear();
+    const newMonth = String(date.getMonth() + 1).padStart(2, '0');
+    return `${newYear}-${newMonth}`;
+  };
+
+  const handlePrevMonth = () => {
+    setSelectedMonth(prev => adjustMonth(prev, -1));
+  };
+
+  const handleNextMonth = () => {
+    setSelectedMonth(prev => adjustMonth(prev, 1));
+  };
+
+  const handleOpenDatePicker = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    setPickerYear(year);
+    setPickerMonth(month);
+    setIsDatePickerOpen(true);
+  };
+
+  const handleConfirmDatePicker = () => {
+    const monthStr = String(pickerMonth).padStart(2, '0');
+    setSelectedMonth(`${pickerYear}-${monthStr}`);
+    setIsDatePickerOpen(false);
+  };
+
+  const handleSetToday = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    setSelectedMonth(`${year}-${month}`);
+    setIsDatePickerOpen(false);
+  };
 
   // Sync custom categories to localStorage
   useEffect(() => {
@@ -183,60 +240,6 @@ function App() {
     }
   }, [userId]);
 
-  // Date picker states for quick calendar navigation overlay
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [pickerYear, setPickerYear] = useState(2026);
-  const [pickerMonth, setPickerMonth] = useState(8); // 1-indexed (1 to 12)
-
-  // Helper to format year-month YYYY-MM to Portuguese full label
-  const getMonthLabel = (yearMonthStr: string) => {
-    const [year, month] = yearMonthStr.split('-');
-    const monthNames = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    const monthIdx = parseInt(month, 10) - 1;
-    return `${monthNames[monthIdx]} de ${year}`;
-  };
-
-  // Safe month increment/decrement handling year boundaries dynamically
-  const adjustMonth = (yearMonthStr: string, increment: number): string => {
-    const [year, month] = yearMonthStr.split('-').map(Number);
-    const date = new Date(year, month - 1 + increment, 15);
-    const newYear = date.getFullYear();
-    const newMonth = String(date.getMonth() + 1).padStart(2, '0');
-    return `${newYear}-${newMonth}`;
-  };
-
-  const handlePrevMonth = () => {
-    setSelectedMonth(prev => adjustMonth(prev, -1));
-  };
-
-  const handleNextMonth = () => {
-    setSelectedMonth(prev => adjustMonth(prev, 1));
-  };
-
-  const handleOpenDatePicker = () => {
-    const [year, month] = selectedMonth.split('-').map(Number);
-    setPickerYear(year);
-    setPickerMonth(month);
-    setIsDatePickerOpen(true);
-  };
-
-  const handleConfirmDatePicker = () => {
-    const monthStr = String(pickerMonth).padStart(2, '0');
-    setSelectedMonth(`${pickerYear}-${monthStr}`);
-    setIsDatePickerOpen(false);
-  };
-
-  const handleSetToday = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    setSelectedMonth(`${year}-${month}`);
-    setIsDatePickerOpen(false);
-  };
-
   // Filtered month transactions based on active dates (using dataPostergar if postponed)
   const monthTransactions = transactions.filter(tx => {
     const activeDate = (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data;
@@ -281,6 +284,11 @@ function App() {
     )
   );
   const mockTransactionsCount = mockTransactions.length;
+
+  // Filter bills due ("Contas a Pagar") -> Saídas which are not paid yet (Pendente or Postergar)
+  const contasAPagarList = transactions.filter(tx => 
+    tx.tipo === 'SAIDA' && (tx.status === 'PENDENTE' || tx.status === 'POSTERGAR')
+  );
 
   const handleToggleStatus = async (id: string) => {
     const targetTx = transactions.find(t => t.id === id);
@@ -498,6 +506,30 @@ function App() {
     setCurrentUser(name);
   };
 
+  // Callback to handle filter redirection when clicking categories scroll
+  const handleCategoryFilterSelect = (catName: string) => {
+    if (catName === 'TODOS') {
+      setSearchQuery('');
+    } else {
+      setSearchQuery(catName);
+    }
+    setActiveTab('CARTEIRA');
+  };
+
+  // Helper mapping category icons for Bills Cards
+  const getBillCategoryIcon = (category: string) => {
+    const catLower = category.toLowerCase();
+    if (catLower.includes('aluguel') || catLower.includes('moradia')) {
+      return { icon: Home, color: 'text-purple-600 bg-purple-50' };
+    } else if (catLower.includes('cartão') || catLower.includes('crédito') || catLower.includes('empréstimo')) {
+      return { icon: CreditCard, color: 'text-rose-500 bg-rose-50' };
+    } else if (catLower.includes('mercado') || catLower.includes('market') || catLower.includes('compras')) {
+      return { icon: Search, color: 'text-blue-500 bg-blue-50' }; // Shopping icon
+    } else {
+      return { icon: Lock, color: 'text-amber-500 bg-amber-50' };
+    }
+  };
+
   return (
     <div className="w-full min-h-screen flex justify-center bg-slate-100 select-none">
       {/* Centered responsive container */}
@@ -573,6 +605,25 @@ function App() {
                   <span>Início</span>
                 </button>
 
+                {/* Histórico/Carteira Link */}
+                <button
+                  onClick={() => {
+                    setActiveTab('CARTEIRA');
+                    setIsDrawerOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'CARTEIRA'
+                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
+                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                  }`}
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="20" height="14" x="2" y="5" rx="2" />
+                    <line x1="2" x2="22" y1="10" y2="10" />
+                  </svg>
+                  <span>Carteira & Histórico</span>
+                </button>
+
                 {/* Ajustes Link */}
                 <button
                   onClick={() => {
@@ -631,9 +682,95 @@ function App() {
           <LoginScreen onLoginSuccess={handleLoginSuccess} />
         ) : (
           <>
-            {activeTab === 'INICIO' ? (
-              <>
-                {/* App Main Header (White Background) */}
+            {/* VIEW 0: INÍCIO (Premium image_3.png mockup replica) */}
+            {activeTab === 'INICIO' && (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Top Rounded Gradient Panel Header with summary nested */}
+                <DashboardHeader 
+                  userName={currentUser} 
+                  saldoAcumulado={saldoAcumulado} 
+                  onAvatarClick={() => setActiveTab('PERFIL')} 
+                />
+
+                {/* Dashboard Main Cards Widgets Container */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-6 bg-slate-50/30 pb-28 scrollbar-none">
+                  
+                  {/* Category Scroll Component */}
+                  <CategoryScroll onCategorySelect={handleCategoryFilterSelect} />
+
+                  {/* Simplifito speedometer dial chart */}
+                  <SimplifitoChart 
+                    totalEntradas={totalEntradasMes} 
+                    totalSaidas={totalSaidasMes} 
+                  />
+
+                  {/* Contas a Pagar horizontal list cards */}
+                  <div className="space-y-2 text-left">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                        Contas a Pagar
+                      </span>
+                      <button 
+                        onClick={() => {
+                          setFilterType('SAIDA');
+                          setSearchQuery('');
+                          setActiveTab('CARTEIRA');
+                        }}
+                        className="text-[10px] font-bold text-sky-600 hover:text-sky-700 transition-colors cursor-pointer"
+                      >
+                        Vem all
+                      </button>
+                    </div>
+
+                    {contasAPagarList.length === 0 ? (
+                      <div className="w-full bg-white border border-slate-200/50 rounded-2xl p-4 py-6 text-center shadow-3xs flex flex-col items-center justify-center">
+                        <span className="text-lg">🥳</span>
+                        <p className="text-slate-700 text-xs font-bold mt-1.5">Todas as contas em dia!</p>
+                        <p className="text-[9px] text-slate-450 font-semibold mt-0.5">Nenhuma despesa pendente cadastrada.</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3.5 overflow-x-auto scrollbar-none py-1.5 px-0.5 scroll-smooth">
+                        {contasAPagarList.map((tx) => {
+                          const badge = getBillCategoryIcon(tx.categoria);
+                          const Icon = badge.icon;
+                          return (
+                            <div
+                              key={tx.id}
+                              onClick={() => handleOpenEditModal(tx)}
+                              className="w-36 h-28 bg-white border border-slate-200/55 rounded-2xl p-3 shadow-3xs flex flex-col justify-between shrink-0 hover:scale-102 active:scale-98 transition-all cursor-pointer group"
+                            >
+                              {/* Top card row: icon badge + chevron arrow */}
+                              <div className="flex items-center justify-between">
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${badge.color}`}>
+                                  <Icon size={14} className="stroke-[2.2]" />
+                                </div>
+                                <ChevronRight size={13} className="text-slate-350 group-hover:text-slate-500 transition-colors" />
+                              </div>
+
+                              {/* Bottom card values */}
+                              <div className="text-left mt-2">
+                                <p className="text-[9px] font-bold text-slate-500 truncate leading-none">
+                                  {tx.descricao}
+                                </p>
+                                <p className="text-xs font-black text-rose-550 leading-tight mt-1">
+                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tx.valor)}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* VIEW 1: CARTEIRA (Full weekly list history, searches and filters) */}
+            {activeTab === 'CARTEIRA' && (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Header for Wallet list page */}
                 <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
                   <div className="flex items-center justify-between">
                     
@@ -648,7 +785,7 @@ function App() {
                       </button>
                       
                       <span className="text-sm font-extrabold text-slate-800 font-sans">
-                        Olá, {currentUser.split(' ')[0]}
+                        Histórico & Lançamentos
                       </span>
                     </div>
 
@@ -808,15 +945,105 @@ function App() {
                     />
                   </div>
                 </main>
-              </>
-            ) : (
-              <>
-                {/* Header for Settings page */}
+              </div>
+            )}
+
+            {/* VIEW 2: NOTIFICAÇÕES (Bell / System updates & Alerts) */}
+            {activeTab === 'NOTIFICACOES' && (
+              <div className="flex-1 flex flex-col overflow-hidden">
                 <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setIsDrawerOpen(true)}
                       className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-650 hover:text-slate-800 transition-colors cursor-pointer"
+                      title="Menu"
+                    >
+                      <Menu size={20} />
+                    </button>
+                    <span className="text-sm font-extrabold text-slate-800 font-sans">
+                      Notificações & Alertas
+                    </span>
+                  </div>
+                </header>
+
+                <div className="w-full flex-1 flex flex-col p-4 pb-28 space-y-4 animate-fade-in bg-slate-50 overflow-y-auto scrollbar-none">
+                  {/* PWA Update Banner inside list */}
+                  {newVersionAvailable && (
+                    <div className="bg-[#0e69b2]/10 border border-[#0e69b2]/20 rounded-2xl p-4 flex flex-col gap-3 shadow-xs animate-fade-in">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-xl bg-[#0e69b2]/25 text-[#0e69b2] shrink-0">
+                          <Info size={18} />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-extrabold text-[#0e69b2]">Nova versão de melhorias disponível!</h4>
+                          <p className="text-[10px] text-slate-500 font-semibold leading-normal">
+                            Acabamos de publicar atualizações críticas na Vercel. Recomendamos carregar agora.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => window.location.reload()}
+                          className="px-3.5 py-1.5 rounded-lg bg-[#0e69b2] hover:bg-[#0c5996] text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer"
+                        >
+                          Carregar Nova Versão
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Static Diagnostic Alerts */}
+                  <div className="space-y-3">
+                    <div className="glass rounded-2xl p-4 bg-white/95 border border-slate-200/60 shadow-3xs flex gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                      <div className="text-left flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-800">Conectado ao Supabase</p>
+                        <p className="text-[10px] text-slate-500 font-semibold leading-snug mt-0.5">Sincronização de lançamentos em nuvem estabelecida com sucesso.</p>
+                      </div>
+                    </div>
+
+                    <div className="glass rounded-2xl p-4 bg-white/95 border border-slate-200/60 shadow-3xs flex gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                        <Lock size={16} />
+                      </div>
+                      <div className="text-left flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-800">Segurança de Linha Ativa (RLS)</p>
+                        <p className="text-[10px] text-slate-500 font-semibold leading-snug mt-0.5">Políticas de privacidade ativas. Seus dados estão completamente isolados e seguros.</p>
+                      </div>
+                    </div>
+
+                    <div className="glass rounded-2xl p-4 bg-white/95 border border-slate-200/60 shadow-3xs flex gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                          <line x1="9" x2="9.01" y1="9" y2="9" />
+                          <line x1="15" x2="15.01" y1="9" y2="9" />
+                        </svg>
+                      </div>
+                      <div className="text-left flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-800">Boas-vindas ao Novo Tô Quebrado</p>
+                        <p className="text-[10px] text-slate-500 font-semibold leading-snug mt-0.5">Sua carteira de despesas inteligentes foi gerada. Cadastre seus lançamentos diários.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* VIEW 3: AJUSTES (ProfileSettings / Diagnostics / Logout) */}
+            {activeTab === 'PERFIL' && (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Header for Settings page */}
+                <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsDrawerOpen(true)}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-655 hover:text-slate-800 transition-colors cursor-pointer"
                       title="Menu"
                     >
                       <Menu size={20} />
@@ -841,22 +1068,88 @@ function App() {
                   mockTransactionsCount={mockTransactionsCount}
                   isSyncing={isSyncing}
                 />
-              </>
+              </div>
             )}
 
-            {/* Bottom-Right Circular Highlighted FAB Plus Button */}
-            <div className="absolute bottom-6 right-6 z-20">
-              {/* pulsing glow rings to highlight */}
-              <div className="absolute -inset-1.5 rounded-full bg-[#f08622]/20 animate-pulse scale-105" />
-              <div className="absolute -inset-3.5 rounded-full bg-[#f08622]/5 scale-110" />
+            {/* Symmetrical Bottom Navigation Bar with Curved Style Cutout FAB */}
+            <div className="absolute bottom-0 left-0 right-0 h-20 bg-white border-t border-slate-150 flex items-center justify-between px-6 pb-3 z-30 select-none shadow-[0_-4px_16px_rgba(0,0,0,0.03)]">
               
-              <button
-                onClick={handleOpenAddModal}
-                className="relative w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg shadow-[#f08622]/35 hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
-                title="Novo Lançamento"
-              >
-                <Plus size={28} className="stroke-[3]" />
-              </button>
+              {/* Left Side Tabs */}
+              <div className="flex items-center gap-8 flex-1 justify-start">
+                {/* Tab 0: Início */}
+                <button
+                  onClick={() => setActiveTab('INICIO')}
+                  className={`flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                    activeTab === 'INICIO' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <Home size={20} className={activeTab === 'INICIO' ? "stroke-[2.5]" : "stroke-[2]"} />
+                  <span className="text-[9px] font-extrabold mt-0.5">Início</span>
+                </button>
+
+                {/* Tab 1: Carteira (Wallet list drawer) */}
+                <button
+                  onClick={() => setActiveTab('CARTEIRA')}
+                  className={`flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                    activeTab === 'CARTEIRA' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={activeTab === 'CARTEIRA' ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="20" height="14" x="2" y="5" rx="2" />
+                    <line x1="2" x2="22" y1="10" y2="10" />
+                  </svg>
+                  <span className="text-[9px] font-extrabold mt-0.5">Carteira</span>
+                </button>
+              </div>
+
+              {/* Center: Raised Cyan/Blue FAB with pulsing highlight */}
+              <div className="relative shrink-0 w-16 flex justify-center -translate-y-4">
+                {/* Accent glow rings */}
+                <div className="absolute -inset-1.5 rounded-full bg-[#0e69b2]/15 animate-pulse scale-105" />
+                <button
+                  onClick={handleOpenAddModal}
+                  className="relative w-13 h-13 rounded-full bg-[#0e69b2] hover:bg-[#0b548f] text-white flex items-center justify-center shadow-lg shadow-[#0e69b2]/30 border-4 border-white cursor-pointer hover:scale-105 active:scale-95 transition-all z-10"
+                  title="Novo Lançamento"
+                >
+                  <Plus size={22} className="stroke-[3.5]" />
+                </button>
+              </div>
+
+              {/* Right Side Tabs */}
+              <div className="flex items-center gap-8 flex-1 justify-end">
+                {/* Tab 2: Notificações */}
+                <button
+                  onClick={() => setActiveTab('NOTIFICACOES')}
+                  className={`flex flex-col items-center justify-center cursor-pointer transition-colors relative ${
+                    activeTab === 'NOTIFICACOES' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={activeTab === 'NOTIFICACOES' ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                  </svg>
+                  {/* Alert badge indicator */}
+                  {newVersionAvailable && (
+                    <span className="absolute top-0 right-1 w-2.5 h-2.5 rounded-full bg-rose-500 border border-white" />
+                  )}
+                  <span className="text-[9px] font-extrabold mt-0.5">Alertas</span>
+                </button>
+
+                {/* Tab 3: Perfil */}
+                <button
+                  onClick={() => setActiveTab('PERFIL')}
+                  className={`flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                    activeTab === 'PERFIL' ? 'text-[#0e69b2]' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={activeTab === 'PERFIL' ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <span className="text-[9px] font-extrabold mt-0.5">Perfil</span>
+                </button>
+              </div>
+
             </div>
           </>
         )}
@@ -887,7 +1180,7 @@ function App() {
               <h4 className="text-sm font-extrabold text-slate-800 font-sans">Escolher Período</h4>
               <button
                 onClick={() => setIsDatePickerOpen(false)}
-                className="p-1 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                className="p-1 rounded-full bg-slate-100 text-slate-400 hover:text-slate-655 hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 <X size={14} />
               </button>
@@ -953,7 +1246,7 @@ function App() {
               <button
                 type="button"
                 onClick={handleSetToday}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-650 font-bold text-xs cursor-pointer transition-colors font-sans"
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-655 font-bold text-xs cursor-pointer transition-colors font-sans"
               >
                 Hoje
               </button>
