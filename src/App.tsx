@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, Briefcase } from 'lucide-react';
+import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, Briefcase, BarChart2 } from 'lucide-react';
 import type { Transaction, TransactionStatus, WorkShiftEntry } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
@@ -9,6 +9,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { ProfileSettings } from './components/ProfileSettings';
 import { WorkShiftDashboard } from './components/WorkShiftDashboard';
 import { WorkShiftModal } from './components/WorkShiftModal';
+import { ReportsDashboard } from './components/ReportsDashboard';
 import { supabase } from './lib/supabaseClient';
 
 const CURRENT_VERSION = '1.0.1';
@@ -23,7 +24,7 @@ function App() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Active view state: INICIO, PERFIL, or DIARIAS
-  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL' | 'DIARIAS'>('INICIO');
+  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL' | 'DIARIAS' | 'RELATORIOS'>('INICIO');
 
   // Sidebar Drawer menu state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -786,6 +787,22 @@ function App() {
                   <span>Controle de Diárias</span>
                 </button>
 
+                {/* Relatórios Link */}
+                <button
+                  onClick={() => {
+                    setActiveTab('RELATORIOS');
+                    setIsDrawerOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'RELATORIOS'
+                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
+                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                  }`}
+                >
+                  <BarChart2 size={16} />
+                  <span>Relatórios</span>
+                </button>
+
                 {/* Ajustes Link */}
                 <button
                   onClick={() => {
@@ -1081,6 +1098,12 @@ function App() {
                   onMarkAsPaid={handleMarkShiftAsPaid}
                 />
               </>
+            ) : activeTab === 'RELATORIOS' ? (
+              <ReportsDashboard
+                transactions={transactions}
+                workShifts={workShifts}
+                onOpenDrawer={() => setIsDrawerOpen(true)}
+              />
             ) : (
               <>
                 {/* Header for Settings page */}
@@ -1116,20 +1139,22 @@ function App() {
               </>
             )}
 
-            {/* Bottom-Right Circular Highlighted FAB Plus Button (Context Aware) */}
-            <div className="absolute bottom-6 right-6 z-20">
-              {/* pulsing glow rings to highlight */}
-              <div className="absolute -inset-1.5 rounded-full bg-[#f08622]/20 animate-pulse scale-105" />
-              <div className="absolute -inset-3.5 rounded-full bg-[#f08622]/5 scale-110" />
-              
-              <button
-                onClick={handleFABClick}
-                className="relative w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg shadow-[#f08622]/35 hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
-                title={activeTab === 'DIARIAS' ? 'Novo Lançamento Diário' : 'Novo Lançamento Pessoal'}
-              >
-                <Plus size={28} className="stroke-[3]" />
-              </button>
-            </div>
+            {/* Bottom-Right Circular Highlighted FAB Plus Button (Context Aware - Only for INICIO/DIARIAS) */}
+            {(activeTab === 'INICIO' || activeTab === 'DIARIAS') && (
+              <div className="absolute bottom-6 right-6 z-20">
+                {/* pulsing glow rings to highlight */}
+                <div className="absolute -inset-1.5 rounded-full bg-[#f08622]/20 animate-pulse scale-105" />
+                <div className="absolute -inset-3.5 rounded-full bg-[#f08622]/5 scale-110" />
+                
+                <button
+                  onClick={handleFABClick}
+                  className="relative w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg shadow-[#f08622]/35 hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
+                  title={activeTab === 'DIARIAS' ? 'Novo Lançamento Diário' : 'Novo Lançamento Pessoal'}
+                >
+                  <Plus size={28} className="stroke-[3]" />
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
