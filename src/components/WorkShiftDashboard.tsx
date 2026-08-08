@@ -1,17 +1,19 @@
 import React from 'react';
-import { ArrowUpRight, ArrowDownRight, Briefcase, Car, Calendar, DollarSign, Send, Edit3 } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Briefcase, Car, Calendar, DollarSign, Send, Edit3, CheckCircle, Clock } from 'lucide-react';
 import type { WorkShiftEntry } from '../types';
 
 interface WorkShiftDashboardProps {
   entries: WorkShiftEntry[];
   onEditEntry: (entry: WorkShiftEntry) => void;
   onSendToWallet: (date: string, activity: string, amount: number) => void;
+  onMarkAsPaid: (id: string) => void;
 }
 
 export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   entries,
   onEditEntry,
-  onSendToWallet
+  onSendToWallet,
+  onMarkAsPaid
 }) => {
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -32,15 +34,34 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   };
 
   // 1. Calculations for KPIs
-  const ganhoBruto = entries
+  // Ganhos totais (RECEBIDOS + A_RECEBER)
+  const totalGanhos = entries
     .filter(e => e.tipo === 'ENTRADA')
     .reduce((sum, e) => sum + e.valor, 0);
 
+  // Ganhos confirmados (apenas RECEBIDOS)
+  const ganhosConfirmados = entries
+    .filter(e => e.tipo === 'ENTRADA' && e.status === 'RECEBIDO')
+    .reduce((sum, e) => sum + e.valor, 0);
+
+  // Ganhos a receber (apenas A_RECEBER)
+  const totalAReceber = entries
+    .filter(e => e.tipo === 'ENTRADA' && e.status === 'A_RECEBER')
+    .reduce((sum, e) => sum + e.valor, 0);
+
+  // Custos totais
   const custosRua = entries
     .filter(e => e.tipo === 'SAIDA')
     .reduce((sum, e) => sum + e.valor, 0);
 
-  const lucroLiquido = ganhoBruto - custosRua;
+  // Lucro Líquido Realizado (Ganhos recebidos - Custos)
+  const lucroRealizado = ganhosConfirmados - custosRua;
+
+  // Lucro Líquido Projetado (Ganhos totais - Custos)
+  const lucroProjetado = totalGanhos - custosRua;
+
+  // Count pending events
+  const pendingCount = entries.filter(e => e.tipo === 'ENTRADA' && e.status === 'A_RECEBER').length;
 
   // 2. Group entries by date
   const groupedByDate: Record<string, WorkShiftEntry[]> = {};
@@ -57,59 +78,102 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   return (
     <div className="w-full flex-1 flex flex-col p-4 space-y-5 bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
       
-      {/* KPIs Summary Cards */}
-      <div className="grid grid-cols-3 gap-2">
-        {/* Ganho Bruto */}
-        <div className="glass bg-white/95 border border-slate-200/60 p-3 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left">
+      {/* 2x2 Grid of KPIs */}
+      <div className="grid grid-cols-2 gap-2.5">
+        
+        {/* Ganho Bruto do Mês */}
+        <div className="glass bg-white/95 border border-slate-200/60 p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left">
           <div className="flex items-center justify-between">
             <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">Ganho Bruto</span>
-            <div className="w-5 h-5 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center">
+            <div className="w-5 h-5 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
               <ArrowUpRight size={12} className="stroke-[3]" />
             </div>
           </div>
-          <span className="text-xs font-black text-slate-800 truncate mt-1">
-            {formatCurrency(ganhoBruto)}
+          <span className="text-sm font-black text-slate-800 truncate mt-1">
+            {formatCurrency(totalGanhos)}
           </span>
         </div>
 
-        {/* Custos da Rua */}
-        <div className="glass bg-white/95 border border-slate-200/60 p-3 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left">
+        {/* A Receber (Eventos) */}
+        <div className={`glass border p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left transition-colors ${
+          totalAReceber > 0 
+            ? 'bg-amber-50/20 border-amber-200/50' 
+            : 'bg-white/95 border-slate-200/60'
+        }`}>
           <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">Custos Rua</span>
-            <div className="w-5 h-5 rounded-lg bg-rose-50 text-rose-550 flex items-center justify-center">
-              <ArrowDownRight size={12} className="stroke-[3]" />
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">A Receber</span>
+              {pendingCount > 0 && (
+                <span className="bg-amber-500 text-white text-[7px] font-black px-1 py-0.5 rounded-md leading-none">
+                  {pendingCount}
+                </span>
+              )}
+            </div>
+            <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
+              totalAReceber > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-400'
+            }`}>
+              <Clock size={11} className="stroke-[3]" />
             </div>
           </div>
-          <span className="text-xs font-black text-slate-800 truncate mt-1">
-            {formatCurrency(custosRua)}
+          <span className={`text-sm font-black truncate mt-1 ${
+            totalAReceber > 0 ? 'text-amber-650' : 'text-slate-800'
+          }`}>
+            {formatCurrency(totalAReceber)}
           </span>
         </div>
 
-        {/* Lucro Líquido */}
-        <div className={`glass border p-3 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left transition-colors ${
-          lucroLiquido >= 0 
+        {/* Lucro Líquido Realizado */}
+        <div className={`glass border p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left transition-colors ${
+          lucroRealizado >= 0 
             ? 'bg-emerald-50/20 border-emerald-150/70' 
             : 'bg-rose-55/10 border-rose-150/70'
         }`}>
           <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-450">Lucro Líq.</span>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-450">Lucro Líq. Realizado</span>
             <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
-              lucroLiquido >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+              lucroRealizado >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+            }`}>
+              <CheckCircle size={11} className="stroke-[3]" />
+            </div>
+          </div>
+          <span className={`text-sm font-black truncate mt-1 ${
+            lucroRealizado >= 0 ? 'text-emerald-600' : 'text-rose-600'
+          }`}>
+            {formatCurrency(lucroRealizado)}
+          </span>
+        </div>
+
+        {/* Lucro Líquido Projetado */}
+        <div className={`glass border p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left transition-colors ${
+          lucroProjetado >= 0 
+            ? 'bg-blue-50/20 border-blue-150/70' 
+            : 'bg-rose-55/10 border-rose-150/70'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-455">Lucro Líq. Projetado</span>
+            <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
+              lucroProjetado >= 0 ? 'bg-blue-500/10 text-blue-600' : 'bg-rose-500/10 text-rose-600'
             }`}>
               <DollarSign size={11} className="stroke-[3]" />
             </div>
           </div>
-          <span className={`text-xs font-black truncate mt-1 ${
-            lucroLiquido >= 0 ? 'text-emerald-600' : 'text-rose-600'
+          <span className={`text-sm font-black truncate mt-1 ${
+            lucroProjetado >= 0 ? 'text-blue-600' : 'text-rose-600'
           }`}>
-            {formatCurrency(lucroLiquido)}
+            {formatCurrency(lucroProjetado)}
           </span>
         </div>
+
       </div>
 
       {/* Main List Section */}
       <div className="space-y-4">
-        <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider pl-1">Histórico de Turnos</h3>
+        <div className="flex items-center justify-between pl-1 pr-1">
+          <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Histórico de Turnos</h3>
+          <span className="text-[10px] text-slate-400 font-semibold uppercase">
+            Custo total de rua: <span className="font-extrabold text-rose-550">{formatCurrency(custosRua)}</span>
+          </span>
+        </div>
         
         {sortedDates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center glass rounded-3xl border border-slate-200/80 bg-white/60">
@@ -122,7 +186,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
             {sortedDates.map(dateKey => {
               const dayEntries = groupedByDate[dateKey];
               
-              // Calculate day details
+              // Calculate day details (For diárias we sum only RECEIVED ones in "Líquido Realizado", but let's show overall net balance of the day as projected or actual)
               const ganhoDia = dayEntries
                 .filter(e => e.tipo === 'ENTRADA')
                 .reduce((sum, e) => sum + e.valor, 0);
@@ -133,6 +197,13 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
 
               const saldoDia = ganhoDia - custoDia;
               const isPositive = saldoDia >= 0;
+              
+              // Only allow repasse to wallet if the net balance is received and positive!
+              const ganhoDiaConfirmado = dayEntries
+                .filter(e => e.tipo === 'ENTRADA' && e.status === 'RECEBIDO')
+                .reduce((sum, e) => sum + e.valor, 0);
+              const saldoDiaRealizado = ganhoDiaConfirmado - custoDia;
+
               const primaryActivity = dayEntries.find(e => e.tipo === 'ENTRADA')?.atividade || 'Trabalho';
 
               return (
@@ -148,7 +219,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                     </div>
 
                     <div className="text-right">
-                      <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">Saldo Diário</span>
+                      <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">Líquido Projetado</span>
                       <span className={`text-xs font-black ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {formatCurrency(saldoDia)}
                       </span>
@@ -159,17 +230,21 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                   <div className="p-3 divide-y divide-slate-100">
                     {dayEntries.map(entry => {
                       const isGanho = entry.tipo === 'ENTRADA';
+                      const isPending = isGanho && entry.status === 'A_RECEBER';
+                      
                       return (
                         <div 
                           key={entry.id}
                           onClick={() => onEditEntry(entry)}
-                          className="py-2.5 flex items-center justify-between hover:bg-slate-50/50 active:bg-slate-100/50 rounded-lg px-1.5 transition-colors cursor-pointer group"
+                          className="py-2.5 flex items-center justify-between hover:bg-slate-55/40 active:bg-slate-100/50 rounded-lg px-1.5 transition-colors cursor-pointer group"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             {/* Icon Indicator */}
                             <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
                               isGanho 
-                                ? 'bg-emerald-50/60 border-emerald-100 text-emerald-600' 
+                                ? isPending
+                                  ? 'bg-amber-50/50 border-amber-100 text-amber-600'
+                                  : 'bg-emerald-50/60 border-emerald-100 text-emerald-600' 
                                 : 'bg-rose-55/10 border-rose-100/50 text-rose-550'
                             }`}>
                               {isGanho ? <Car size={14} /> : <ArrowDownRight size={14} />}
@@ -177,9 +252,30 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
 
                             {/* Details text */}
                             <div className="text-left min-w-0">
-                              <p className="text-xs font-extrabold text-slate-700 truncate">
-                                {isGanho ? `Ganho - ${entry.atividade}` : `Custo - ${entry.categoria}`}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-extrabold text-slate-700 truncate">
+                                  {isGanho ? `Ganho - ${entry.atividade}` : `Custo - ${entry.categoria}`}
+                                </span>
+                                
+                                {/* Status Badge */}
+                                {isGanho && (
+                                  <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-md leading-none ${
+                                    isPending 
+                                      ? 'bg-amber-100 text-amber-700' 
+                                      : 'bg-emerald-100 text-emerald-700'
+                                  }`}>
+                                    {isPending ? 'A RECEBER' : 'RECEBIDO'}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Observation and due dates */}
+                              {isPending && entry.dataRecebimento && (
+                                <p className="text-[9px] text-amber-600 font-extrabold mt-0.5 flex items-center gap-0.5">
+                                  <Clock size={9} />
+                                  Previsão: {formatDate(entry.dataRecebimento)}
+                                </p>
+                              )}
                               {entry.observacao && (
                                 <p className="text-[10px] text-slate-450 truncate font-semibold mt-0.5">
                                   {entry.observacao}
@@ -188,26 +284,47 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            {/* Value */}
                             <span className={`text-xs font-extrabold ${isGanho ? 'text-emerald-650' : 'text-rose-550'}`}>
                               {isGanho ? '+' : '-'} {formatCurrency(entry.valor)}
                             </span>
-                            <Edit3 size={10} className="text-slate-350 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+
+                            {/* Baixa Rápida de pagamento action button */}
+                            {isPending ? (
+                              <button
+                                type="button"
+                                onClick={() => onMarkAsPaid(entry.id)}
+                                className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-3xs cursor-pointer ml-1"
+                                title="Marcar como Recebido"
+                              >
+                                <CheckCircle size={11} className="stroke-[2.5]" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => onEditEntry(entry)}
+                                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-650 transition-colors ml-1 cursor-pointer"
+                                title="Editar"
+                              >
+                                <Edit3 size={11} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* Quick closing balance integration button */}
-                  {saldoDia > 0 && (
+                  {/* Quick closing balance integration button (only allowed for positive liquid/received balances) */}
+                  {saldoDiaRealizado > 0 && (
                     <div className="p-2.5 bg-slate-50/40 border-t border-slate-100 flex justify-end">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Deseja lançar o lucro de ${formatCurrency(saldoDia)} do dia ${formatDate(dateKey)} como uma receita na sua Carteira Pessoal?`)) {
-                            onSendToWallet(dateKey, primaryActivity, saldoDia);
+                          if (confirm(`Deseja lançar o lucro líquido já recebido de ${formatCurrency(saldoDiaRealizado)} do dia ${formatDate(dateKey)} como uma receita na sua Carteira Pessoal?`)) {
+                            onSendToWallet(dateKey, primaryActivity, saldoDiaRealizado);
                           }
                         }}
                         className="py-1.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[9px] font-bold tracking-wide transition-all shadow-3xs flex items-center gap-1.5 cursor-pointer"

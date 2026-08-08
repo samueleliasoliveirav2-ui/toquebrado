@@ -125,7 +125,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     tipo: 'SAIDA',
     valor: 450.00,
     status: 'PENDENTE',
-    juros: 15.50 // Atrasada
+    juros: 15.50
   },
   {
     id: 'tx-12',
@@ -145,6 +145,10 @@ export interface WorkShiftEntry {
   tipo: 'ENTRADA' | 'SAIDA';
   categoria?: string; // 'Combustível' | 'Alimentação/Lanche' | 'Pedágio/Estacionamento' | 'Manutenção' | 'Outros'
   valor: number;
+  valorDiaria?: number;
+  quantidadeDias?: number;
+  status?: 'RECEBIDO' | 'A_RECEBER';
+  dataRecebimento?: string; // YYYY-MM-DD
   observacao?: string;
 }
 

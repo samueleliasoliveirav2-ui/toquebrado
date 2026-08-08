@@ -204,6 +204,10 @@ function App() {
           tipo: item.tipo,
           categoria: item.categoria || undefined,
           valor: Number(item.valor),
+          valorDiaria: item.valor_diaria !== null && item.valor_diaria !== undefined ? Number(item.valor_diaria) : undefined,
+          quantidadeDias: item.quantidade_dias !== null && item.quantidade_dias !== undefined ? Number(item.quantidade_dias) : undefined,
+          status: item.status || 'RECEBIDO',
+          dataRecebimento: item.data_recebimento || undefined,
           observacao: item.observacao || undefined
         }));
         setWorkShifts(mapped);
@@ -396,38 +400,103 @@ function App() {
   };
 
   // CRUD for Work Shifts
-  const handleSaveWorkShift = async (payload: Omit<WorkShiftEntry, 'id'> & { id?: string }) => {
+  const handleSaveWorkShift = async (payload: Omit<WorkShiftEntry, 'id'> & { 
+    id?: string;
+    modoLancamento?: 'UNICO' | 'INDIVIDUAL';
+  }) => {
     if (!userId) return;
 
-    const dbPayload = {
-      user_id: userId,
-      data: payload.data,
-      atividade: payload.atividade,
-      tipo: payload.tipo,
-      categoria: payload.categoria || null,
-      valor: payload.valor,
-      observacao: payload.observacao || null
-    };
-
     try {
-      if (payload.id) {
+      // Bulk inserts for multiple individual days
+      if (!payload.id && payload.modoLancamento === 'INDIVIDUAL' && payload.quantidadeDias && payload.quantidadeDias > 1) {
+        const rows = [];
+        for (let i = 0; i < payload.quantidadeDias; i++) {
+          const startDateObj = new Date(payload.data + 'T12:00:00');
+          startDateObj.setDate(startDateObj.getDate() + i);
+          const targetDateStr = startDateObj.toISOString().split('T')[0];
+
+          rows.push({
+            user_id: userId,
+            data: targetDateStr,
+            atividade: payload.atividade,
+            tipo: payload.tipo,
+            categoria: null,
+            valor: payload.valorDiaria || (payload.valor / payload.quantidadeDias),
+            valor_diaria: payload.valorDiaria || null,
+            quantidade_dias: 1,
+            status: payload.status || 'RECEBIDO',
+            data_recebimento: payload.dataRecebimento || null,
+            observacao: payload.observacao 
+              ? `${payload.observacao} (Dia ${i + 1}/${payload.quantidadeDias})`
+              : `Diária ${i + 1}/${payload.quantidadeDias}`
+          });
+        }
+
         const { error } = await supabase
           .from('diarias_trabalho')
-          .update(dbPayload)
-          .eq('id', payload.id);
+          .insert(rows);
 
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('diarias_trabalho')
-          .insert(dbPayload);
+        // Normal single row insert or update
+        const dbPayload = {
+          user_id: userId,
+          data: payload.data,
+          atividade: payload.atividade,
+          tipo: payload.tipo,
+          categoria: payload.categoria || null,
+          valor: payload.valor,
+          valor_diaria: payload.valorDiaria || null,
+          quantidade_dias: payload.quantidadeDias || 1,
+          status: payload.status || 'RECEBIDO',
+          data_recebimento: payload.dataRecebimento || null,
+          observacao: payload.observacao || null
+        };
 
-        if (error) throw error;
+        if (payload.id) {
+          const { error } = await supabase
+            .from('diarias_trabalho')
+            .update(dbPayload)
+            .eq('id', payload.id);
+
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('diarias_trabalho')
+            .insert(dbPayload);
+
+          if (error) throw error;
+        }
       }
       await fetchWorkShifts();
     } catch (err: any) {
       console.error('Error saving work shift to database:', err);
       alert('Erro ao salvar lançamento de diária: ' + (err.message || err.details || JSON.stringify(err)));
+    }
+  };
+
+  const handleMarkShiftAsPaid = async (id: string) => {
+    // Optimistic state update
+    setWorkShifts(prev =>
+      prev.map(e => e.id === id ? { ...e, status: 'RECEBIDO', dataRecebimento: undefined } : e)
+    );
+
+    try {
+      const { error } = await supabase
+        .from('diarias_trabalho')
+        .update({ 
+          status: 'RECEBIDO',
+          data_recebimento: null
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error marking work shift as paid:', error);
+        await fetchWorkShifts();
+      }
+    } catch (err) {
+      console.error(err);
+      await fetchWorkShifts();
     }
   };
 
@@ -968,6 +1037,7 @@ function App() {
                     setIsShiftModalOpen(true);
                   }}
                   onSendToWallet={handleSendToWallet}
+                  onMarkAsPaid={handleMarkShiftAsPaid}
                 />
               </>
             ) : (
