@@ -183,26 +183,58 @@ function App() {
     }
   }, [userId]);
 
-  const months = [
-    { key: '2026-06', label: 'Junho de 2026' },
-    { key: '2026-07', label: 'Julho de 2026' },
-    { key: '2026-08', label: 'Agosto de 2026' },
-    { key: '2026-09', label: 'Setembro de 2026' },
-    { key: '2026-10', label: 'Outubro de 2026' }
-  ];
+  // Date picker states for quick calendar navigation overlay
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(2026);
+  const [pickerMonth, setPickerMonth] = useState(8); // 1-indexed (1 to 12)
 
-  const currentIndex = months.findIndex(m => m.key === selectedMonth);
+  // Helper to format year-month YYYY-MM to Portuguese full label
+  const getMonthLabel = (yearMonthStr: string) => {
+    const [year, month] = yearMonthStr.split('-');
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const monthIdx = parseInt(month, 10) - 1;
+    return `${monthNames[monthIdx]} de ${year}`;
+  };
+
+  // Safe month increment/decrement handling year boundaries dynamically
+  const adjustMonth = (yearMonthStr: string, increment: number): string => {
+    const [year, month] = yearMonthStr.split('-').map(Number);
+    const date = new Date(year, month - 1 + increment, 15);
+    const newYear = date.getFullYear();
+    const newMonth = String(date.getMonth() + 1).padStart(2, '0');
+    return `${newYear}-${newMonth}`;
+  };
 
   const handlePrevMonth = () => {
-    if (currentIndex > 0) {
-      setSelectedMonth(months[currentIndex - 1].key);
-    }
+    setSelectedMonth(prev => adjustMonth(prev, -1));
   };
 
   const handleNextMonth = () => {
-    if (currentIndex < months.length - 1) {
-      setSelectedMonth(months[currentIndex + 1].key);
-    }
+    setSelectedMonth(prev => adjustMonth(prev, 1));
+  };
+
+  const handleOpenDatePicker = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    setPickerYear(year);
+    setPickerMonth(month);
+    setIsDatePickerOpen(true);
+  };
+
+  const handleConfirmDatePicker = () => {
+    const monthStr = String(pickerMonth).padStart(2, '0');
+    setSelectedMonth(`${pickerYear}-${monthStr}`);
+    setIsDatePickerOpen(false);
+  };
+
+  const handleSetToday = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    setSelectedMonth(`${year}-${month}`);
+    setIsDatePickerOpen(false);
   };
 
   // Filtered month transactions based on active dates (using dataPostergar if postponed)
@@ -630,21 +662,23 @@ function App() {
                   <div className="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
                     <button
                       onClick={handlePrevMonth}
-                      disabled={currentIndex === 0}
-                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
                       title="Mês Anterior"
                     >
                       <ChevronLeft size={16} />
                     </button>
                     
-                    <span className="text-xs font-black text-[#0e69b2] uppercase tracking-wider select-none font-sans">
-                      {months[currentIndex]?.label}
-                    </span>
+                    <button
+                      onClick={handleOpenDatePicker}
+                      className="text-xs font-black text-[#0e69b2] hover:text-[#0b548f] uppercase tracking-wider select-none font-sans cursor-pointer hover:underline transition-all"
+                      title="Clique para escolher mês e ano"
+                    >
+                      {getMonthLabel(selectedMonth)}
+                    </button>
 
                     <button
                       onClick={handleNextMonth}
-                      disabled={currentIndex === months.length - 1}
-                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all cursor-pointer"
                       title="Próximo Mês"
                     >
                       <ChevronRight size={16} />
@@ -838,6 +872,103 @@ function App() {
         categoriesList={customCategories}
         onAddNewCategory={handleAddNewCategory}
       />
+
+      {/* Month & Year Picker Modal (Quick Selection) */}
+      {isDatePickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs animate-fade-in p-4">
+          {/* Backdrop click dismiss */}
+          <div className="absolute inset-0" onClick={() => setIsDatePickerOpen(false)} />
+
+          {/* Modal Content Card */}
+          <div className="relative w-full max-w-xs bg-white border border-slate-200 rounded-3xl p-5 shadow-2xl z-10 animate-scale-up flex flex-col gap-4">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-extrabold text-slate-800 font-sans">Escolher Período</h4>
+              <button
+                onClick={() => setIsDatePickerOpen(false)}
+                className="p-1 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Year selector row */}
+            <div className="flex items-center justify-between bg-slate-50 p-1.5 rounded-xl border border-slate-200/60">
+              <button
+                type="button"
+                onClick={() => setPickerYear(prev => prev - 1)}
+                className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              
+              <span className="text-xs font-black text-slate-800 font-sans">{pickerYear}</span>
+
+              <button
+                type="button"
+                onClick={() => setPickerYear(prev => prev + 1)}
+                className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+
+            {/* Months grid selection */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { val: 1, label: 'Jan' },
+                { val: 2, label: 'Fev' },
+                { val: 3, label: 'Mar' },
+                { val: 4, label: 'Abr' },
+                { val: 5, label: 'Mai' },
+                { val: 6, label: 'Jun' },
+                { val: 7, label: 'Jul' },
+                { val: 8, label: 'Ago' },
+                { val: 9, label: 'Set' },
+                { val: 10, label: 'Out' },
+                { val: 11, label: 'Nov' },
+                { val: 12, label: 'Dez' }
+              ].map((m) => {
+                const isSelected = pickerMonth === m.val;
+                return (
+                  <button
+                    key={m.val}
+                    type="button"
+                    onClick={() => setPickerMonth(m.val)}
+                    className={`py-2 rounded-xl text-xs font-extrabold text-center border transition-all cursor-pointer font-sans ${
+                      isSelected
+                        ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-2xs'
+                        : 'bg-slate-50 text-slate-650 border-slate-150 hover:bg-slate-100'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleSetToday}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-650 font-bold text-xs cursor-pointer transition-colors font-sans"
+              >
+                Hoje
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDatePicker}
+                className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer transition-colors shadow-sm font-sans"
+              >
+                Confirmar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
