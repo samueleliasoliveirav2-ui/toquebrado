@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, RefreshCw } from 'lucide-react';
 import type { Transaction, TransactionType, TransactionStatus, BankAccount } from '../types';
 
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (transaction: Omit<Transaction, 'id'> & { id?: string }) => void;
-  onDelete?: (id: string) => void;
+  onSave: (
+    transaction: Omit<Transaction, 'id'> & { id?: string },
+    scope?: 'ONLY_THIS' | 'THIS_AND_FUTURE'
+  ) => void;
+  onDelete?: (id: string, scope?: 'ONLY_THIS' | 'THIS_AND_FUTURE') => void;
   editingTransaction?: Transaction | null;
   categoriesList: Record<TransactionType, string[]>;
   onAddNewCategory: (tipo: TransactionType, category: string) => void;
@@ -33,6 +36,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [juros, setJuros] = useState<number | ''>('');
   const [contaId, setContaId] = useState('');
 
+  // Frequency/Billing States (Only for new entries)
+  const [frequencia, setFrequencia] = useState<'AVULSO' | 'RECORRENTE' | 'PARCELADO'>('AVULSO');
+  const [periodicidade, setPeriodicidade] = useState<'SEMANAL' | 'MENSAL' | 'ANUAL'>('MENSAL');
+  const [totalParcelas, setTotalParcelas] = useState<number | ''>('');
+  const [tipoCalculoParcela, setTipoCalculoParcela] = useState<'TOTAL' | 'PARCELA'>('PARCELA');
+
+  // Confirmation Overlays states
+  const [showSaveScopeDialog, setShowSaveScopeDialog] = useState(false);
+  const [showDeleteScopeDialog, setShowDeleteScopeDialog] = useState(false);
+
   // Local state for dynamic category creation
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -49,8 +62,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setDataPostergar(editingTransaction.dataPostergar || '');
       setJuros(editingTransaction.juros || '');
       setContaId(editingTransaction.contaId || (accounts[0]?.id || ''));
+      setFrequencia(editingTransaction.frequencia || 'AVULSO');
+      setPeriodicidade(editingTransaction.periodicidade || 'MENSAL');
+      setTotalParcelas(editingTransaction.totalParcelas || '');
+      setTipoCalculoParcela('PARCELA');
       setIsAddingNew(false);
       setNewCategoryName('');
+      setShowSaveScopeDialog(false);
+      setShowDeleteScopeDialog(false);
     } else {
       setTipo('SAIDA');
       setDescricao('');
@@ -62,8 +81,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setDataPostergar('');
       setJuros('');
       setContaId(accounts[0]?.id || '');
+      setFrequencia('AVULSO');
+      setPeriodicidade('MENSAL');
+      setTotalParcelas('');
+      setTipoCalculoParcela('PARCELA');
       setIsAddingNew(false);
       setNewCategoryName('');
+      setShowSaveScopeDialog(false);
+      setShowDeleteScopeDialog(false);
     }
   }, [editingTransaction, isOpen, accounts]);
 
@@ -96,6 +121,31 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   };
 
+  const getPayload = (): Omit<Transaction, 'id'> & { id?: string } => {
+    let finalCategory = categoria;
+    if (isAddingNew) {
+      finalCategory = newCategoryName.trim();
+    }
+
+    return {
+      tipo,
+      descricao: descricao.trim(),
+      categoria: finalCategory,
+      valor: Number(valor),
+      data,
+      status,
+      dataPostergar: status === 'POSTERGAR' ? dataPostergar : undefined,
+      juros: tipo === 'SAIDA' && juros !== '' ? Number(juros) : undefined,
+      contaId: contaId || undefined,
+      frequencia,
+      periodicidade: frequencia === 'RECORRENTE' ? periodicidade : undefined,
+      totalParcelas: frequencia === 'PARCELADO' ? (Number(totalParcelas) || undefined) : undefined,
+      parcelaAtual: editingTransaction?.parcelaAtual || (frequencia === 'PARCELADO' ? 1 : undefined),
+      grupoRecorrenciaId: editingTransaction?.grupoRecorrenciaId || undefined
+    };
+  };
+
+  // Submit Handler
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!descricao.trim()) return alert('Insira uma descrição');
@@ -106,6 +156,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
     if (!contaId && accounts.length > 0) {
       return alert('Selecione uma conta ou carteira para esta movimentação');
+    }
+    if (frequencia === 'PARCELADO' && (!totalParcelas || Number(totalParcelas) <= 1)) {
+      return alert('O número total de parcelas deve ser maior que 1');
     }
 
     let finalCategory = categoria;
@@ -122,28 +175,46 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       return alert('Selecione ou cadastre uma categoria');
     }
 
-    const payload: Omit<Transaction, 'id'> & { id?: string } = {
-      tipo,
-      descricao: descricao.trim(),
-      categoria: finalCategory,
-      valor: Number(valor),
-      data,
-      status,
-      dataPostergar: status === 'POSTERGAR' ? dataPostergar : undefined,
-      juros: tipo === 'SAIDA' && juros !== '' ? Number(juros) : undefined,
-      contaId: contaId || undefined
-    };
+    // Check if this is an edit of a recurring/installment item
+    if (editingTransaction && editingTransaction.grupoRecorrenciaId) {
+      setShowSaveScopeDialog(true);
+    } else {
+      // Normal save
+      const payload = getPayload();
+      // Add tipoCalculoParcela parameter dynamically for new installments
+      const savePayload = {
+        ...payload,
+        ...(frequencia === 'PARCELADO' ? { tipoCalculoParcela } : {})
+      };
 
+      if (editingTransaction) {
+        savePayload.id = editingTransaction.id;
+      }
+      onSave(savePayload);
+      onClose();
+    }
+  };
+
+  const handleConfirmSave = (scope: 'ONLY_THIS' | 'THIS_AND_FUTURE') => {
+    const payload = getPayload();
     if (editingTransaction) {
       payload.id = editingTransaction.id;
     }
-
-    onSave(payload);
+    onSave(payload, scope);
+    setShowSaveScopeDialog(false);
     onClose();
   };
 
+  const handleConfirmDelete = (scope: 'ONLY_THIS' | 'THIS_AND_FUTURE') => {
+    if (editingTransaction && onDelete) {
+      onDelete(editingTransaction.id, scope);
+      setShowDeleteScopeDialog(false);
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-xs animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-xs animate-fade-in font-sans">
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Modal Bottom Sheet Container */}
@@ -154,12 +225,22 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-slate-800">
-            {editingTransaction ? 'Editar Lançamento' : 'Novo Lançamento'}
-          </h3>
+          <div className="text-left">
+            <h3 className="text-xl font-bold text-slate-800">
+              {editingTransaction ? 'Editar Lançamento' : 'Novo Lançamento'}
+            </h3>
+            {editingTransaction?.grupoRecorrenciaId && (
+              <span className="text-[10px] bg-blue-50 text-blue-600 font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider block mt-1">
+                {editingTransaction.frequencia === 'PARCELADO' 
+                  ? `Parcelado • Parcela ${editingTransaction.parcelaAtual}/${editingTransaction.totalParcelas}`
+                  : `Recorrente • ${editingTransaction.periodicidade}`}
+              </span>
+            )}
+          </div>
           <button 
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-650 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-655 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -172,15 +253,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
             <button
               type="button"
+              disabled={!!editingTransaction}
               onClick={() => {
                 setTipo('SAIDA');
                 setIsAddingNew(false);
               }}
               className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'SAIDA'
-                  ? 'bg-rose-500/10 text-rose-700 shadow-xs border border-rose-250'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
+                  ? 'bg-rose-500/10 text-rose-700 shadow-xs border border-rose-250 font-black'
+                  : 'text-slate-500 hover:text-slate-705'
+              } ${editingTransaction ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               <div className="w-2 h-2 rounded-full bg-rose-500" />
               Despesa
@@ -188,15 +270,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             
             <button
               type="button"
+              disabled={!!editingTransaction}
               onClick={() => {
                 setTipo('ENTRADA');
                 setIsAddingNew(false);
               }}
               className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'ENTRADA'
-                  ? 'bg-emerald-500/10 text-emerald-700 shadow-xs border border-emerald-250'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
+                  ? 'bg-emerald-500/10 text-emerald-700 shadow-xs border border-emerald-250 font-black'
+                  : 'text-slate-500 hover:text-slate-705'
+              } ${editingTransaction ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
               Receita
@@ -205,7 +288,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
           {/* Amount input in big font */}
           <div className="flex flex-col items-center justify-center py-2 border-y border-slate-100">
-            <label className="text-slate-400 text-xs uppercase font-bold mb-1">Valor do Lançamento</label>
+            <label className="text-slate-400 text-xs uppercase font-bold mb-1">
+              {frequencia === 'PARCELADO' && tipoCalculoParcela === 'TOTAL' ? 'Valor Total das Parcelas' : 'Valor do Lançamento'}
+            </label>
             <div className="flex items-center text-slate-800 font-extrabold text-3xl">
               <span className={`mr-1.5 text-2xl ${tipo === 'SAIDA' ? 'text-rose-550' : 'text-emerald-550'}`}>R$</span>
               <input
@@ -233,6 +318,157 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               required
             />
           </div>
+
+          {/* Frequência / Recorrência (Leitura em edição) */}
+          {editingTransaction && editingTransaction.grupoRecorrenciaId && (
+            <div className="bg-blue-50/60 border border-blue-100 p-3.5 rounded-2xl space-y-1.5 shadow-2xs">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-blue-700">
+                <RefreshCw size={13} />
+                Lançamento em Série
+              </div>
+              {editingTransaction.frequencia === 'RECORRENTE' && (
+                <p className="text-[11px] text-blue-800 font-bold">
+                  Recorrência {editingTransaction.periodicidade === 'SEMANAL' ? 'Semanal' : editingTransaction.periodicidade === 'MENSAL' ? 'Mensal' : 'Anual'}
+                  {editingTransaction.data && editingTransaction.periodicidade === 'MENSAL' && ` • Todo dia ${new Date(editingTransaction.data + 'T12:00:00').getDate().toString().padStart(2, '0')}`}
+                  {editingTransaction.data && editingTransaction.periodicidade === 'SEMANAL' && ` • Toda ${['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][new Date(editingTransaction.data + 'T12:00:00').getDay()]}`}
+                  {editingTransaction.data && editingTransaction.periodicidade === 'ANUAL' && ` • Todo dia ${new Date(editingTransaction.data + 'T12:00:00').getDate().toString().padStart(2, '0')}/${(new Date(editingTransaction.data + 'T12:00:00').getMonth() + 1).toString().padStart(2, '0')}`}
+                </p>
+              )}
+              {editingTransaction.frequencia === 'PARCELADO' && (
+                <p className="text-[11px] text-blue-800 font-bold leading-relaxed">
+                  Parcelado em {editingTransaction.totalParcelas}x
+                  <span className="ml-2 bg-blue-600 text-white px-2 py-0.5 rounded-full font-black text-[10px]">
+                    {editingTransaction.parcelaAtual}ª de {editingTransaction.totalParcelas}
+                  </span>
+                </p>
+              )}
+              <p className="text-[9px] text-blue-600/90 font-semibold leading-tight">
+                Ao alterar ou excluir, você decidirá se aplica somente a este ou a todos os próximos.
+              </p>
+            </div>
+          )}
+
+          {/* Frequência / Recorrência (Apenas para NOVOS lançamentos) */}
+          {!editingTransaction && (
+            <div className="space-y-3.5 bg-slate-50/50 p-3.5 border border-slate-200/50 rounded-2xl">
+              <div>
+                <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1.5">Frequência / Cobrança</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['AVULSO', 'RECORRENTE', 'PARCELADO'] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setFrequencia(opt)}
+                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border text-center transition-all cursor-pointer ${
+                        frequencia === opt
+                          ? 'bg-slate-900 border-slate-950 text-white shadow-2xs font-extrabold'
+                          : 'bg-white text-slate-500 border-slate-200 hover:text-slate-800'
+                      }`}
+                    >
+                      {opt === 'AVULSO' ? 'Avulso / Único' : opt === 'RECORRENTE' ? 'Recorrente (Fixo)' : 'Parcelado'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Condicional: Recorrente - Periodicidade + Dia de Repetição */}
+              {frequencia === 'RECORRENTE' && (
+                <div className="animate-fade-in space-y-3 border-t border-slate-200/50 pt-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Periodicidade</label>
+                      <select
+                        value={periodicidade}
+                        onChange={(e: any) => setPeriodicidade(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-3xs"
+                      >
+                        <option value="SEMANAL">Semanal</option>
+                        <option value="MENSAL">Mensal</option>
+                        <option value="ANUAL">Anual</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">
+                        Dia de Repetição
+                      </label>
+                      {(() => {
+                        const d = data ? new Date(data + 'T12:00:00') : null;
+                        if (!d || isNaN(d.getTime())) return <p className="text-[10px] text-slate-400 font-semibold py-2">Selecione uma data</p>;
+                        let text = '';
+                        if (periodicidade === 'MENSAL') {
+                          text = `Todo dia ${d.getDate().toString().padStart(2, '0')}`;
+                        } else if (periodicidade === 'SEMANAL') {
+                          text = `Toda ${['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][d.getDay()]}`;
+                        } else {
+                          text = `Todo dia ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+                        }
+                        return <p className="text-[11px] text-slate-800 font-black py-2 bg-white border border-slate-200 rounded-lg px-2.5 shadow-3xs">{text}</p>;
+                      })()}
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-slate-400 font-semibold leading-normal">
+                    {periodicidade === 'MENSAL' && 'O sistema projetará 12 meses futuros como PENDENTE.'}
+                    {periodicidade === 'SEMANAL' && 'O sistema projetará 24 semanas futuras como PENDENTE.'}
+                    {periodicidade === 'ANUAL' && 'O sistema projetará 5 anos futuros como PENDENTE.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Condicional: Parcelado */}
+              {frequencia === 'PARCELADO' && (
+                <div className="animate-fade-in space-y-3 border-t border-slate-200/50 pt-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Total de Parcelas</label>
+                      <input
+                        type="number"
+                        min="2"
+                        placeholder="Ex: 12, 360, 420"
+                        value={totalParcelas}
+                        onChange={(e) => setTotalParcelas(e.target.value === '' ? '' : Math.max(2, parseInt(e.target.value) || 2))}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-blue-500 shadow-3xs"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Método de Cálculo</label>
+                      <select
+                        value={tipoCalculoParcela}
+                        onChange={(e: any) => setTipoCalculoParcela(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-3xs"
+                      >
+                        <option value="PARCELA">Valor de cada Parcela</option>
+                        <option value="TOTAL">Dividir o Valor Total</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Resumo do Parcelamento com Nomenclatura */}
+                  {totalParcelas !== '' && valor !== '' && (
+                    <div className="bg-white border border-slate-200 p-2.5 rounded-xl space-y-1.5 text-[11px] shadow-3xs text-left">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-500">Nomenclatura:</span>
+                        <span className="font-extrabold text-slate-800 text-right truncate">
+                          &ldquo;{descricao.trim() || 'Descrição'} (1/{totalParcelas})&rdquo;
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-1.5">
+                        <span className="font-bold text-slate-500">Valores:</span>
+                        <span className="font-extrabold text-slate-800 text-right">
+                          {tipoCalculoParcela === 'PARCELA'
+                            ? `${totalParcelas}x de R$ ${Number(valor).toFixed(2)}  •  Total: R$ ${(Number(valor) * Number(totalParcelas)).toFixed(2)}`
+                            : `${totalParcelas}x de R$ ${(Number(valor) / Number(totalParcelas)).toFixed(2)}  •  Total: R$ ${Number(valor).toFixed(2)}`
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+          )}
 
           {/* Conta / Carteira Selector */}
           {accounts.length > 0 && (
@@ -397,12 +633,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  if (confirm('Tem certeza de que deseja deletar este lançamento?')) {
-                    onDelete(editingTransaction.id);
-                    onClose();
+                  if (editingTransaction.grupoRecorrenciaId) {
+                    setShowDeleteScopeDialog(true);
+                  } else {
+                    if (confirm('Tem certeza de que deseja deletar este lançamento?')) {
+                      onDelete(editingTransaction.id);
+                      onClose();
+                    }
                   }
                 }}
-                className="flex-1 py-3.5 rounded-xl bg-rose-50 border border-rose-150 hover:bg-rose-100/50 text-rose-600 font-bold text-xs transition-all cursor-pointer"
+                className="flex-1 py-3.5 rounded-xl bg-rose-50 border border-rose-150 hover:bg-rose-100/50 text-rose-600 font-bold text-xs transition-all cursor-pointer animate-fade-in"
               >
                 Excluir
               </button>
@@ -421,6 +661,87 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
         </form>
       </div>
+
+      {/* CONFIRMATION POPUP 1: SAVE DIALOG (ONLY THIS vs THIS & NEXT) */}
+      {showSaveScopeDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
+            <div className="flex items-center gap-3 text-blue-650">
+              <RefreshCw size={24} className="animate-spin text-[#0e69b2] select-none" style={{ animationDuration: '3s' }} />
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alterar Lançamento Fixo/Parcela</h4>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Você está alterando um lançamento que pertence a uma recorrência ou parcelamento. Deseja aplicar as alterações apenas a este registro ou estendê-las para todos os lançamentos futuros deste grupo?
+            </p>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => handleConfirmSave('ONLY_THIS')}
+                className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer text-center"
+              >
+                Alterar apenas este lançamento
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmSave('THIS_AND_FUTURE')}
+                className="w-full py-3 rounded-xl bg-[#0e69b2] hover:bg-[#0c5996] text-white font-bold text-xs cursor-pointer text-center shadow-3xs"
+              >
+                Alterar este e todos os próximos
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSaveScopeDialog(false)}
+                className="w-full py-2.5 text-center text-xs text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION POPUP 2: DELETE DIALOG (ONLY THIS vs THIS & NEXT) */}
+      {showDeleteScopeDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
+            <div className="flex items-center gap-3 text-rose-600">
+              <X size={24} className="text-rose-500" />
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Excluir Lançamento Fixo/Parcela</h4>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Você deseja excluir apenas esta parcela/lançamento específico ou prefere remover esta ocorrência e todas as futuras deste grupo de recorrência?
+            </p>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => handleConfirmDelete('ONLY_THIS')}
+                className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer text-center"
+              >
+                Excluir apenas este lançamento
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmDelete('THIS_AND_FUTURE')}
+                className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer text-center shadow-3xs"
+              >
+                Excluir este e todos os próximos
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteScopeDialog(false)}
+                className="w-full py-2.5 text-center text-xs text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

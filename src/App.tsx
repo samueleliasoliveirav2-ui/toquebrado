@@ -159,7 +159,12 @@ function App() {
           status: item.status,
           dataPostergar: item.data_postergar || undefined,
           juros: item.juros !== null && item.juros !== undefined ? Number(item.juros) : undefined,
-          contaId: item.conta_id || undefined
+          contaId: item.conta_id || undefined,
+          frequencia: item.frequencia || 'AVULSO',
+          periodicidade: item.periodicidade || undefined,
+          parcelaAtual: item.parcela_atual || undefined,
+          totalParcelas: item.total_parcelas || undefined,
+          grupoRecorrenciaId: item.grupo_recorrencia_id || undefined
         }));
         setTransactions(mapped);
 
@@ -442,39 +447,234 @@ function App() {
     }
   };
 
-  const handleSaveTransaction = async (payload: Omit<Transaction, 'id'> & { id?: string }) => {
+  // ---------- HELPERS: Date Math & UUID ----------
+  const generateUuid = (): string => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+
+  const addDays = (dateStr: string, n: number): string => {
+    const d = new Date(dateStr + 'T12:00:00');
+    d.setDate(d.getDate() + n);
+    return d.toISOString().split('T')[0];
+  };
+
+  const addMonths = (dateStr: string, n: number): string => {
+    const d = new Date(dateStr + 'T12:00:00');
+    const targetDay = d.getDate();
+    d.setMonth(d.getMonth() + n);
+    if (d.getDate() !== targetDay) d.setDate(0);
+    return d.toISOString().split('T')[0];
+  };
+
+  const addYears = (dateStr: string, n: number): string => {
+    const d = new Date(dateStr + 'T12:00:00');
+    const targetDay = d.getDate();
+    const targetMonth = d.getMonth();
+    d.setFullYear(d.getFullYear() + n);
+    if (d.getMonth() !== targetMonth || d.getDate() !== targetDay) d.setDate(0);
+    return d.toISOString().split('T')[0];
+  };
+
+  // ---------- MAIN: Save Transaction ----------
+  const handleSaveTransaction = async (
+    payload: Omit<Transaction, 'id'> & {
+      id?: string;
+      tipoCalculoParcela?: 'TOTAL' | 'PARCELA';
+    },
+    scope?: 'ONLY_THIS' | 'THIS_AND_FUTURE'
+  ) => {
     if (!userId) return;
 
-    const dbPayload = {
-      user_id: userId,
-      data: payload.data,
-      descricao: payload.descricao,
-      categoria: payload.categoria,
-      tipo: payload.tipo,
-      valor: payload.valor,
-      status: payload.status,
-      data_postergar: payload.dataPostergar || null,
-      juros: payload.juros || 0
-    };
-
     try {
+      // ==============================
+      // CASO 1: EDIÇÃO (payload.id existe)
+      // ==============================
       if (payload.id) {
-        // Edit mode
-        const { error } = await supabase
-          .from('transactions')
-          .update(dbPayload)
-          .eq('id', payload.id);
+        const baseDbPayload = {
+          user_id: userId,
+          data: payload.data,
+          descricao: payload.descricao,
+          categoria: payload.categoria,
+          tipo: payload.tipo,
+          valor: payload.valor,
+          status: payload.status,
+          data_postergar: payload.dataPostergar || null,
+          juros: payload.juros || 0,
+          conta_id: payload.contaId || null,
+          frequencia: payload.frequencia || 'AVULSO',
+          periodicidade: payload.periodicidade || null,
+          parcela_atual: payload.parcelaAtual || null,
+          total_parcelas: payload.totalParcelas || null,
+          grupo_recorrencia_id: payload.grupoRecorrenciaId || null
+        };
 
-        if (error) throw error;
-      } else {
-        // Create mode
-        const { error } = await supabase
-          .from('transactions')
-          .insert(dbPayload);
+        // Sub-caso A: Edição com grupo_recorrenciaId e scope THIS_AND_FUTURE
+        if (payload.grupoRecorrenciaId && scope === 'THIS_AND_FUTURE') {
+          const currentDate = payload.data;
 
-        if (error) throw error;
+          const { error } = await supabase
+            .from('transactions')
+            .update({
+              categoria: baseDbPayload.categoria,
+              tipo: baseDbPayload.tipo,
+              valor: baseDbPayload.valor,
+              conta_id: baseDbPayload.conta_id,
+              frequencia: baseDbPayload.frequencia,
+              periodicidade: baseDbPayload.periodicidade
+            })
+            .eq('grupo_recorrencia_id', payload.grupoRecorrenciaId)
+            .gte('data', currentDate);
+
+          if (error) throw error;
+
+          const { error: errorSingle } = await supabase
+            .from('transactions')
+            .update(baseDbPayload)
+            .eq('id', payload.id);
+
+          if (errorSingle) throw errorSingle;
+
+        } else {
+          // Sub-caso B: Apenas este lançamento (ou avulso)
+          const { error } = await supabase
+            .from('transactions')
+            .update(baseDbPayload)
+            .eq('id', payload.id);
+
+          if (error) throw error;
+        }
+
+        await fetchTransactions();
+        return;
       }
-      
+
+      // ==============================
+      // CASO 2: CRIAÇÃO (novo lançamento)
+      // ==============================
+      const frequencia = payload.frequencia || 'AVULSO';
+
+      // ----- 2A: Lançamento Avulso / Único -----
+      if (frequencia === 'AVULSO') {
+        const dbPayload = {
+          user_id: userId,
+          data: payload.data,
+          descricao: payload.descricao,
+          categoria: payload.categoria,
+          tipo: payload.tipo,
+          valor: payload.valor,
+          status: payload.status,
+          data_postergar: payload.dataPostergar || null,
+          juros: payload.juros || 0,
+          conta_id: payload.contaId || null,
+          frequencia: 'AVULSO',
+          periodicidade: null,
+          parcela_atual: null,
+          total_parcelas: null,
+          grupo_recorrencia_id: null
+        };
+
+        const { error } = await supabase.from('transactions').insert(dbPayload);
+        if (error) throw error;
+
+      // ----- 2B: Lançamento Recorrente (Fixo) -----
+      } else if (frequencia === 'RECORRENTE') {
+        const periodicidade = payload.periodicidade || 'MENSAL';
+        const grupoId = generateUuid();
+
+        const totalOcorrencias =
+          periodicidade === 'SEMANAL' ? 24
+          : periodicidade === 'MENSAL' ? 12
+          : 5; // ANUAL
+
+        const rows = [];
+        for (let i = 0; i < totalOcorrencias; i++) {
+          let targetDate = payload.data;
+          if (periodicidade === 'SEMANAL') targetDate = addDays(payload.data, i * 7);
+          else if (periodicidade === 'MENSAL') targetDate = addMonths(payload.data, i);
+          else targetDate = addYears(payload.data, i);
+
+          const statusInicial = i === 0 ? payload.status : 'PENDENTE';
+
+          rows.push({
+            user_id: userId,
+            data: targetDate,
+            descricao: payload.descricao,
+            categoria: payload.categoria,
+            tipo: payload.tipo,
+            valor: payload.valor,
+            status: statusInicial,
+            data_postergar: i === 0 ? (payload.dataPostergar || null) : null,
+            juros: i === 0 ? (payload.juros || 0) : 0,
+            conta_id: payload.contaId || null,
+            frequencia: 'RECORRENTE',
+            periodicidade,
+            parcela_atual: null,
+            total_parcelas: null,
+            grupo_recorrencia_id: grupoId
+          });
+        }
+
+        const { error } = await supabase.from('transactions').insert(rows);
+        if (error) throw error;
+
+      // ----- 2C: Lançamento Parcelado -----
+      } else if (frequencia === 'PARCELADO') {
+        const totalParcelas = Number(payload.totalParcelas) || 1;
+        const grupoId = generateUuid();
+
+        let valorParcela: number;
+        if (payload.tipoCalculoParcela === 'TOTAL') {
+          valorParcela = Number((Number(payload.valor) / totalParcelas).toFixed(2));
+        } else {
+          valorParcela = Number(payload.valor.toFixed(2));
+        }
+
+        const BATCH_SIZE = 100;
+        const rows = [];
+        for (let i = 1; i <= totalParcelas; i++) {
+          const targetDate = addMonths(payload.data, i - 1);
+          const statusInicial = i === 1 ? payload.status : 'PENDENTE';
+          const sufixo = `(${i}/${totalParcelas})`;
+          const descricaoCompleta = `${payload.descricao} ${sufixo}`;
+
+          rows.push({
+            user_id: userId,
+            data: targetDate,
+            descricao: descricaoCompleta,
+            categoria: payload.categoria,
+            tipo: payload.tipo,
+            valor: valorParcela,
+            status: statusInicial,
+            data_postergar: i === 1 ? (payload.dataPostergar || null) : null,
+            juros: i === 1 ? (payload.juros || 0) : 0,
+            conta_id: payload.contaId || null,
+            frequencia: 'PARCELADO',
+            periodicidade: null,
+            parcela_atual: i,
+            total_parcelas: totalParcelas,
+            grupo_recorrencia_id: grupoId
+          });
+        }
+
+        if (rows.length <= BATCH_SIZE) {
+          const { error } = await supabase.from('transactions').insert(rows);
+          if (error) throw error;
+        } else {
+          for (let b = 0; b < rows.length; b += BATCH_SIZE) {
+            const batch = rows.slice(b, b + BATCH_SIZE);
+            const { error } = await supabase.from('transactions').insert(batch);
+            if (error) throw error;
+          }
+        }
+      }
+
       await fetchTransactions();
     } catch (err: any) {
       console.error('Error saving transaction to database:', err);
@@ -482,16 +682,46 @@ function App() {
     }
   };
 
-  const handleDeleteTransaction = async (id: string) => {
+  // ---------- MAIN: Delete Transaction ----------
+  const handleDeleteTransaction = async (
+    id: string,
+    scope?: 'ONLY_THIS' | 'THIS_AND_FUTURE'
+  ) => {
     try {
-      setTransactions(prev => prev.filter(tx => tx.id !== id));
+      const targetTx = transactions.find(tx => tx.id === id);
 
-      const { error } = await supabase
-        .from('transactions')
-        .delete()
-        .eq('id', id);
+      if (targetTx && targetTx.grupoRecorrenciaId && scope === 'THIS_AND_FUTURE') {
+        const currentDate = targetTx.status === 'POSTERGAR' && targetTx.dataPostergar
+          ? targetTx.dataPostergar
+          : targetTx.data;
 
-      if (error) throw error;
+        setTransactions(prev =>
+          prev.filter(tx =>
+            !(tx.grupoRecorrenciaId === targetTx.grupoRecorrenciaId &&
+              (tx.status === 'POSTERGAR' && tx.dataPostergar
+                ? tx.dataPostergar >= currentDate
+                : tx.data >= currentDate))
+          )
+        );
+
+        const { error } = await supabase
+          .from('transactions')
+          .delete()
+          .eq('grupo_recorrencia_id', targetTx.grupoRecorrenciaId)
+          .gte('data', currentDate);
+
+        if (error) throw error;
+
+      } else {
+        setTransactions(prev => prev.filter(tx => tx.id !== id));
+
+        const { error } = await supabase
+          .from('transactions')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+      }
     } catch (err: any) {
       console.error('Error deleting transaction from database:', err);
       alert('Erro ao excluir lançamento do banco: ' + (err.message || err.details || JSON.stringify(err)));

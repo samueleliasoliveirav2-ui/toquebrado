@@ -12,6 +12,11 @@ export interface Transaction {
   dataPostergar?: string; // YYYY-MM-DD, required if status === 'POSTERGAR'
   juros?: number; // Optional, only for SAIDA
   contaId?: string; // Links transaction to a specific BankAccount
+  frequencia?: 'AVULSO' | 'RECORRENTE' | 'PARCELADO';
+  periodicidade?: 'SEMANAL' | 'MENSAL' | 'ANUAL';
+  parcelaAtual?: number;
+  totalParcelas?: number;
+  grupoRecorrenciaId?: string;
 }
 
 export const CATEGORIES = {
