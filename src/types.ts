@@ -11,6 +11,7 @@ export interface Transaction {
   status: TransactionStatus;
   dataPostergar?: string; // YYYY-MM-DD, required if status === 'POSTERGAR'
   juros?: number; // Optional, only for SAIDA
+  contaId?: string; // Links transaction to a specific BankAccount
 }
 
 export const CATEGORIES = {
@@ -151,6 +152,26 @@ export interface WorkShiftEntry {
   dataRecebimento?: string; // YYYY-MM-DD
   observacao?: string;
   vinculoId?: string; // Links SAIDA (costs) to an ENTRADA event or activity
+  contaId?: string; // Links shift or operational cost to a specific BankAccount
+}
+
+export interface BankAccount {
+  id: string;
+  nome: string;
+  banco?: string;
+  tipo: 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO' | 'DINHEIRO';
+  tipoPessoa: 'PF' | 'PJ';
+  saldoInicial: number;
+  cor?: string;
+}
+
+export interface AccountTransfer {
+  id: string;
+  contaOrigemId: string;
+  contaDestinoId: string;
+  valor: number;
+  data: string; // YYYY-MM-DD
+  observacao?: string;
 }
 
 export const ACTIVITIES = ['Motorista de App', 'Evento', 'Outro'];

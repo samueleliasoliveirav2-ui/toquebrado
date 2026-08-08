@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
-import type { Transaction, TransactionType, TransactionStatus } from '../types';
+import type { Transaction, TransactionType, TransactionStatus, BankAccount } from '../types';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface TransactionModalProps {
   editingTransaction?: Transaction | null;
   categoriesList: Record<TransactionType, string[]>;
   onAddNewCategory: (tipo: TransactionType, category: string) => void;
+  accounts?: BankAccount[];
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -19,7 +20,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   onDelete,
   editingTransaction,
   categoriesList,
-  onAddNewCategory
+  onAddNewCategory,
+  accounts = []
 }) => {
   const [tipo, setTipo] = useState<TransactionType>('SAIDA');
   const [descricao, setDescricao] = useState('');
@@ -29,6 +31,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [status, setStatus] = useState<TransactionStatus>('PENDENTE');
   const [dataPostergar, setDataPostergar] = useState('');
   const [juros, setJuros] = useState<number | ''>('');
+  const [contaId, setContaId] = useState('');
 
   // Local state for dynamic category creation
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -45,6 +48,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setStatus(editingTransaction.status);
       setDataPostergar(editingTransaction.dataPostergar || '');
       setJuros(editingTransaction.juros || '');
+      setContaId(editingTransaction.contaId || (accounts[0]?.id || ''));
       setIsAddingNew(false);
       setNewCategoryName('');
     } else {
@@ -57,10 +61,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setStatus('PENDENTE');
       setDataPostergar('');
       setJuros('');
+      setContaId(accounts[0]?.id || '');
       setIsAddingNew(false);
       setNewCategoryName('');
     }
-  }, [editingTransaction, isOpen]);
+  }, [editingTransaction, isOpen, accounts]);
 
   // Adjust categories list when tipo changes
   const availableCategories = categoriesList[tipo];
@@ -99,6 +104,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     if (status === 'POSTERGAR' && !dataPostergar) {
       return alert('Informe a data de postergação');
     }
+    if (!contaId && accounts.length > 0) {
+      return alert('Selecione uma conta ou carteira para esta movimentação');
+    }
 
     let finalCategory = categoria;
     if (isAddingNew) {
@@ -106,7 +114,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       if (!trimmedNewCat) {
         return alert('Digite o nome da nova categoria');
       }
-      // Call parent callback to save category globally
       onAddNewCategory(tipo, trimmedNewCat);
       finalCategory = trimmedNewCat;
     }
@@ -123,7 +130,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       data,
       status,
       dataPostergar: status === 'POSTERGAR' ? dataPostergar : undefined,
-      juros: tipo === 'SAIDA' && juros !== '' ? Number(juros) : undefined
+      juros: tipo === 'SAIDA' && juros !== '' ? Number(juros) : undefined,
+      contaId: contaId || undefined
     };
 
     if (editingTransaction) {
@@ -136,7 +144,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-xs animate-fade-in">
-      {/* Background click dismiss */}
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Modal Bottom Sheet Container */}
@@ -152,14 +159,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </h3>
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-650 hover:bg-slate-200 transition-colors"
+            className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-650 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 text-left">
           
           {/* Toggle Entrada / Saída */}
           <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
@@ -169,7 +176,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 setTipo('SAIDA');
                 setIsAddingNew(false);
               }}
-              className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 ${
+              className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'SAIDA'
                   ? 'bg-rose-500/10 text-rose-700 shadow-xs border border-rose-250'
                   : 'text-slate-500 hover:text-slate-700'
@@ -178,13 +185,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <div className="w-2 h-2 rounded-full bg-rose-500" />
               Despesa
             </button>
+            
             <button
               type="button"
               onClick={() => {
                 setTipo('ENTRADA');
                 setIsAddingNew(false);
               }}
-              className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 ${
+              className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'ENTRADA'
                   ? 'bg-emerald-500/10 text-emerald-700 shadow-xs border border-emerald-250'
                   : 'text-slate-500 hover:text-slate-700'
@@ -195,8 +203,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </button>
           </div>
 
-          {/* Valor Input (Display Big size) */}
-          <div className="relative flex flex-col items-center py-2">
+          {/* Amount input in big font */}
+          <div className="flex flex-col items-center justify-center py-2 border-y border-slate-100">
             <label className="text-slate-400 text-xs uppercase font-bold mb-1">Valor do Lançamento</label>
             <div className="flex items-center text-slate-800 font-extrabold text-3xl">
               <span className={`mr-1.5 text-2xl ${tipo === 'SAIDA' ? 'text-rose-550' : 'text-emerald-550'}`}>R$</span>
@@ -225,6 +233,25 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               required
             />
           </div>
+
+          {/* Conta / Carteira Selector */}
+          {accounts.length > 0 && (
+            <div>
+              <label className="block text-slate-500 text-xs font-bold uppercase mb-1.5">Conta / Carteira</label>
+              <select
+                value={contaId}
+                onChange={(e) => setContaId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-slate-800 focus:outline-none focus:border-blue-500 text-sm font-semibold cursor-pointer shadow-2xs"
+                required
+              >
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.nome} ({acc.tipoPessoa})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Categoria & Data Row */}
           <div className="grid grid-cols-2 gap-3">
@@ -278,7 +305,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => setStatus('PENDENTE')}
-                className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all ${
+                className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
                   status === 'PENDENTE'
                     ? 'bg-slate-200 text-slate-800 border-slate-350 shadow-2xs font-extrabold'
                     : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600'
@@ -291,7 +318,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setStatus('RECEBIDO')}
-                  className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all ${
+                  className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
                     status === 'RECEBIDO'
                       ? 'bg-emerald-500/10 text-emerald-700 border-emerald-300 shadow-2xs font-extrabold'
                       : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600'
@@ -303,7 +330,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setStatus('PAGO')}
-                  className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all ${
+                  className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
                     status === 'PAGO'
                       ? 'bg-amber-500/10 text-amber-700 border-amber-300 shadow-2xs font-extrabold'
                       : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600'
@@ -316,7 +343,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => setStatus('POSTERGAR')}
-                className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all ${
+                className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
                   status === 'POSTERGAR'
                     ? 'bg-sky-500/10 text-sky-700 border-sky-300 shadow-2xs font-extrabold'
                     : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600'
@@ -350,23 +377,21 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 <span className="text-[10px] text-slate-400 font-bold">Opcional</span>
               </div>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 text-xs font-bold">
-                  R$
-                </div>
+                <span className="absolute left-3 top-2 text-sm font-bold text-slate-450">R$</span>
                 <input
                   type="number"
                   step="0.01"
-                  placeholder="0,00 (Opcional)"
+                  placeholder="0,00"
                   value={juros}
                   onChange={(e) => setJuros(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-slate-800 text-sm font-semibold focus:outline-none focus:border-blue-500"
+                  className="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-slate-800 font-semibold focus:outline-none focus:border-blue-500"
                 />
               </div>
-              <p className="text-[10px] text-slate-450 font-medium">Se preenchido, os juros serão adicionados ao total de saídas e saldos correspondentes.</p>
+              <p className="text-[10px] text-slate-400 font-medium">Os juros acumulados serão adicionados ao total pago da despesa.</p>
             </div>
           )}
 
-          {/* Actions */}
+          {/* Modal Actions */}
           <div className="pt-3 flex gap-2">
             {editingTransaction && onDelete && (
               <button
@@ -377,22 +402,23 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     onClose();
                   }
                 }}
-                className="flex-1 py-3.5 px-4 rounded-2xl bg-rose-50 border border-rose-150 hover:bg-rose-100/50 text-rose-600 font-bold text-sm transition-all"
+                className="flex-1 py-3.5 rounded-xl bg-rose-50 border border-rose-150 hover:bg-rose-100/50 text-rose-600 font-bold text-xs transition-all cursor-pointer"
               >
-                Deletar
+                Excluir
               </button>
             )}
 
             <button
               type="submit"
-              className={`py-3.5 px-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${
-                editingTransaction ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' : 'bg-slate-900 hover:bg-slate-800 text-white shadow-md'
+              className={`py-3.5 rounded-xl text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                editingTransaction ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900 hover:bg-slate-800'
               } ${editingTransaction && onDelete ? 'flex-[2]' : 'w-full'}`}
             >
               <Check size={16} />
-              {editingTransaction ? 'Salvar Alterações' : 'Confirmar Lançamento'}
+              {editingTransaction ? 'Salvar Lançamento' : 'Confirmar Lançamento'}
             </button>
           </div>
+
         </form>
       </div>
     </div>

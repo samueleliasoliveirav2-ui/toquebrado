@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, Calendar, Link } from 'lucide-react';
-import type { WorkShiftEntry } from '../types';
+import type { WorkShiftEntry, BankAccount } from '../types';
 import { ACTIVITIES, SHIFT_EXPENSE_CATEGORIES } from '../types';
 
 interface WorkShiftModalProps {
@@ -15,6 +15,7 @@ interface WorkShiftModalProps {
   onDelete?: (id: string) => void;
   editingEntry?: WorkShiftEntry | null;
   activeEvents?: WorkShiftEntry[]; // Active Event entries to link despesas to
+  accounts?: BankAccount[];
 }
 
 export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
@@ -23,7 +24,8 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
   onSave,
   onDelete,
   editingEntry,
-  activeEvents = []
+  activeEvents = [],
+  accounts = []
 }) => {
   const [data, setData] = useState('');
   const [atividade, setAtividade] = useState('Motorista de App');
@@ -43,6 +45,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
   const [vinculoId, setVinculoId] = useState<string>('motorista-app');
   const [lancarCarteiraPrincipal, setLancarCarteiraPrincipal] = useState<boolean>(false);
   const [formaPagamento, setFormaPagamento] = useState<string>('Cartão de Crédito Pessoal');
+  const [contaId, setContaId] = useState('');
 
   // Sync state on open/edit
   useEffect(() => {
@@ -61,6 +64,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       setObservacao(editingEntry.observacao || '');
       setVinculoId(editingEntry.vinculoId || 'motorista-app');
       setLancarCarteiraPrincipal(false); // Do not support mirror changes in edit mode to avoid duplicates
+      setContaId(editingEntry.contaId || (accounts[0]?.id || ''));
     } else {
       const today = new Date().toISOString().split('T')[0];
       setData(today);
@@ -81,8 +85,9 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       setVinculoId('motorista-app');
       setLancarCarteiraPrincipal(false);
       setFormaPagamento('Cartão de Crédito Pessoal');
+      setContaId(accounts[0]?.id || '');
     }
-  }, [editingEntry, isOpen]);
+  }, [editingEntry, isOpen, accounts]);
 
   // Adjust defaults when activity changes
   useEffect(() => {
@@ -106,6 +111,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
     e.preventDefault();
     if (!data) return alert('Selecione uma data');
     if (!atividade) return alert('Selecione uma atividade');
+    if (!contaId && accounts.length > 0) return alert('Selecione uma conta / carteira');
     
     let finalValor = 0;
     if (tipo === 'ENTRADA' && atividade === 'Evento') {
@@ -132,6 +138,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       modoLancamento?: 'UNICO' | 'INDIVIDUAL';
       lancarCarteiraPrincipal?: boolean;
       formaPagamento?: string;
+      contaId?: string;
     } = {
       data,
       atividade,
@@ -146,7 +153,8 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       modoLancamento: !editingEntry && tipo === 'ENTRADA' && atividade === 'Evento' ? modoLancamento : undefined,
       vinculoId: tipo === 'SAIDA' ? vinculoId : undefined,
       lancarCarteiraPrincipal: tipo === 'SAIDA' && !editingEntry ? lancarCarteiraPrincipal : undefined,
-      formaPagamento: tipo === 'SAIDA' && !editingEntry && lancarCarteiraPrincipal ? formaPagamento : undefined
+      formaPagamento: tipo === 'SAIDA' && !editingEntry && lancarCarteiraPrincipal ? formaPagamento : undefined,
+      contaId: contaId || undefined
     };
 
     if (editingEntry) {
@@ -252,6 +260,25 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
             </div>
           </div>
 
+          {/* Conta / Carteira Dropdown Selection */}
+          {accounts.length > 0 && (
+            <div>
+              <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Conta / Carteira</label>
+              <select
+                value={contaId}
+                onChange={(e) => setContaId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-semibold cursor-pointer shadow-3xs"
+                required
+              >
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.nome} ({acc.tipoPessoa})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Conditional Input Layouts */}
 
           {/* 1. ENTRADA para EVENTO */}
@@ -293,7 +320,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
                 <div className="space-y-1.5 pt-1">
                   <label className="block text-slate-500 text-[10px] font-bold uppercase">Como criar os lançamentos?</label>
                   <div className="flex gap-4">
-                    <label className="flex items-center gap-1.5 text-xs text-slate-650 font-semibold cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-655 font-semibold cursor-pointer">
                       <input
                         type="radio"
                         name="modoLancamento"
@@ -515,7 +542,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
                     onClose();
                   }
                 }}
-                className="flex-1 py-3 px-4 rounded-xl bg-rose-50 border border-rose-150 hover:bg-rose-100/50 text-rose-600 font-bold text-xs transition-all cursor-pointer"
+                className="flex-1 py-3 px-4 rounded-xl bg-rose-50 border border-rose-150 hover:bg-rose-100/55 text-rose-600 font-bold text-xs transition-all cursor-pointer"
               >
                 Deletar
               </button>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, Briefcase, BarChart2 } from 'lucide-react';
-import type { Transaction, TransactionStatus, WorkShiftEntry } from './types';
+import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, Briefcase, BarChart2, Wallet } from 'lucide-react';
+import type { Transaction, TransactionStatus, WorkShiftEntry, BankAccount, AccountTransfer } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
 import { WeeklyAccordion } from './components/WeeklyAccordion';
@@ -10,6 +10,7 @@ import { ProfileSettings } from './components/ProfileSettings';
 import { WorkShiftDashboard } from './components/WorkShiftDashboard';
 import { WorkShiftModal } from './components/WorkShiftModal';
 import { ReportsDashboard } from './components/ReportsDashboard';
+import { AccountsDashboard } from './components/AccountsDashboard';
 import { supabase } from './lib/supabaseClient';
 
 const CURRENT_VERSION = '1.0.1';
@@ -21,10 +22,12 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [workShifts, setWorkShifts] = useState<WorkShiftEntry[]>([]);
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [transfers, setTransfers] = useState<AccountTransfer[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Active view state: INICIO, PERFIL, or DIARIAS
-  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL' | 'DIARIAS' | 'RELATORIOS'>('INICIO');
+  // Active view state
+  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL' | 'DIARIAS' | 'RELATORIOS' | 'CONTAS'>('INICIO');
 
   // Sidebar Drawer menu state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -155,7 +158,8 @@ function App() {
           valor: Number(item.valor),
           status: item.status,
           dataPostergar: item.data_postergar || undefined,
-          juros: item.juros !== null && item.juros !== undefined ? Number(item.juros) : undefined
+          juros: item.juros !== null && item.juros !== undefined ? Number(item.juros) : undefined,
+          contaId: item.conta_id || undefined
         }));
         setTransactions(mapped);
 
@@ -210,7 +214,8 @@ function App() {
           status: item.status || 'RECEBIDO',
           dataRecebimento: item.data_recebimento || undefined,
           observacao: item.observacao || undefined,
-          vinculoId: item.vinculo_id || undefined
+          vinculoId: item.vinculo_id || undefined,
+          contaId: item.conta_id || undefined
         }));
         setWorkShifts(mapped);
       }
@@ -219,10 +224,103 @@ function App() {
     }
   };
 
+  const seedDefaultAccounts = async () => {
+    if (!userId) return;
+    try {
+      const defaults = [
+        { user_id: userId, nome: 'Carteira Dinheiro', tipo: 'DINHEIRO', tipo_pessoa: 'PF', saldo_inicial: 50.00, cor: '#64748b' },
+        { user_id: userId, nome: 'Nubank Principal', tipo: 'CORRENTE', tipo_pessoa: 'PF', saldo_inicial: 1000.00, cor: '#8b5cf6' },
+        { user_id: userId, nome: 'Itaú PJ', tipo: 'CORRENTE', tipo_pessoa: 'PJ', saldo_inicial: 3500.00, cor: '#f97316' }
+      ];
+      const { error } = await supabase.from('contas_bancarias').insert(defaults);
+      if (error) {
+        console.error('Error seeding default accounts:', error);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchAccounts = async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('contas_bancarias')
+        .select('*')
+        .order('nome', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching accounts:', error);
+      } else if (data) {
+        const mapped: BankAccount[] = data.map((item: any) => ({
+          id: item.id,
+          nome: item.nome,
+          banco: item.banco || undefined,
+          tipo: item.tipo,
+          tipoPessoa: item.tipo_pessoa,
+          saldoInicial: Number(item.saldo_inicial),
+          cor: item.cor || undefined
+        }));
+
+        if (mapped.length === 0) {
+          await seedDefaultAccounts();
+          // re-fetch once after seed
+          const { data: dataSeed } = await supabase
+            .from('contas_bancarias')
+            .select('*')
+            .order('nome', { ascending: true });
+          if (dataSeed) {
+            setAccounts(dataSeed.map((item: any) => ({
+              id: item.id,
+              nome: item.nome,
+              banco: item.banco || undefined,
+              tipo: item.tipo,
+              tipoPessoa: item.tipo_pessoa,
+              saldoInicial: Number(item.saldo_inicial),
+              cor: item.cor || undefined
+            })));
+          }
+        } else {
+          setAccounts(mapped);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchTransfers = async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('transferencias')
+        .select('*')
+        .order('data', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching transfers:', error);
+      } else if (data) {
+        const mapped: AccountTransfer[] = data.map((item: any) => ({
+          id: item.id,
+          contaOrigemId: item.conta_origem_id,
+          contaDestinoId: item.conta_destino_id,
+          valor: Number(item.valor),
+          data: item.data,
+          observacao: item.observacao || undefined
+        }));
+        setTransfers(mapped);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     if (userId) {
       fetchTransactions();
       fetchWorkShifts();
+      fetchAccounts();
+      fetchTransfers();
     }
   }, [userId]);
 
@@ -407,6 +505,7 @@ function App() {
     modoLancamento?: 'UNICO' | 'INDIVIDUAL';
     lancarCarteiraPrincipal?: boolean;
     formaPagamento?: string;
+    contaId?: string;
   }) => {
     if (!userId) return;
 
@@ -433,7 +532,8 @@ function App() {
             observacao: payload.observacao 
               ? `${payload.observacao} (Dia ${i + 1}/${payload.quantidadeDias})`
               : `Diária ${i + 1}/${payload.quantidadeDias}`,
-            vinculo_id: null
+            vinculo_id: null,
+            conta_id: payload.contaId || null
           });
         }
 
@@ -456,7 +556,8 @@ function App() {
           status: payload.status || 'RECEBIDO',
           data_recebimento: payload.dataRecebimento || null,
           observacao: payload.observacao || null,
-          vinculo_id: payload.vinculoId && payload.vinculoId !== 'motorista-app' && payload.vinculoId !== 'geral-outros' ? payload.vinculoId : null
+          vinculo_id: payload.vinculoId && payload.vinculoId !== 'motorista-app' && payload.vinculoId !== 'geral-outros' ? payload.vinculoId : null,
+          conta_id: payload.contaId || null
         };
 
         if (payload.id) {
@@ -497,22 +598,36 @@ function App() {
           return 'Outros';
         };
 
+        let personalContaId = accounts[0]?.id;
+        if (payload.formaPagamento === 'Cartão de Crédito Pessoal') {
+          const acc = accounts.find(a => a.nome.toLowerCase().includes('nubank') || a.nome.toLowerCase().includes('cartão') || a.tipoPessoa === 'PF');
+          if (acc) personalContaId = acc.id;
+        } else if (payload.formaPagamento === 'Dinheiro Pessoal') {
+          const acc = accounts.find(a => a.nome.toLowerCase().includes('carteira') || a.nome.toLowerCase().includes('dinheiro') || a.tipo === 'DINHEIRO');
+          if (acc) personalContaId = acc.id;
+        } else if (payload.formaPagamento === 'Conta Banco') {
+          const acc = accounts.find(a => a.nome.toLowerCase().includes('nubank') || a.nome.toLowerCase().includes('itaú') || a.tipo === 'CORRENTE');
+          if (acc) personalContaId = acc.id;
+        }
+
         const personalPayload = {
           tipo: 'SAIDA' as const,
           descricao: `[${payload.formaPagamento}] Custo Rua (${payload.categoria}) - Vinc: ${vinculoLabel}`,
           categoria: mapCategory(payload.categoria || 'Outros'),
           valor: payload.valor,
           data: payload.data,
-          status: 'PAGO' as const
+          status: 'PAGO' as const,
+          contaId: personalContaId
         };
 
         await handleSaveTransaction(personalPayload);
       }
-    await fetchWorkShifts();
-  } catch (err: any) {    console.error('Error saving work shift to database:', err);
-    alert('Erro ao salvar lançamento de diária: ' + (err.message || err.details || JSON.stringify(err)));
-  }
-};
+      await fetchWorkShifts();
+    } catch (err: any) {
+      console.error('Error saving work shift to database:', err);
+      alert('Erro ao salvar lançamento de diária: ' + (err.message || err.details || JSON.stringify(err)));
+    }
+  };
 
   const handleMarkShiftAsPaid = async (id: string) => {
     // Optimistic state update
@@ -608,6 +723,8 @@ function App() {
       await checkVersion();
       await fetchTransactions();
       await fetchWorkShifts();
+      await fetchAccounts();
+      await fetchTransfers();
     } finally {
       setTimeout(() => {
         setIsSyncing(false);
@@ -620,6 +737,7 @@ function App() {
     if (confirm('Deseja copiar todos os dados originais de teste do Tô Quebrado para a sua conta no Supabase?')) {
       try {
         setIsSyncing(true);
+        const defaultContaId = accounts[0]?.id || null;
         const dbPayloads = INITIAL_TRANSACTIONS.map(tx => ({
           user_id: userId,
           data: tx.data,
@@ -629,7 +747,8 @@ function App() {
           valor: tx.valor,
           status: tx.status,
           data_postergar: tx.dataPostergar || null,
-          juros: tx.juros || 0
+          juros: tx.juros || 0,
+          conta_id: defaultContaId
         }));
 
         const { error } = await supabase
@@ -691,6 +810,74 @@ function App() {
 
   const handleLoginSuccess = (name: string) => {
     setCurrentUser(name);
+  };
+
+  const handleSaveAccount = async (payload: Omit<BankAccount, 'id'> & { id?: string }) => {
+    if (!userId) return;
+    const dbPayload = {
+      user_id: userId,
+      nome: payload.nome,
+      banco: payload.banco || null,
+      tipo: payload.tipo,
+      tipo_pessoa: payload.tipoPessoa,
+      saldo_inicial: payload.saldoInicial,
+      cor: payload.cor || null
+    };
+
+    try {
+      if (payload.id) {
+        const { error } = await supabase
+          .from('contas_bancarias')
+          .update(dbPayload)
+          .eq('id', payload.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('contas_bancarias')
+          .insert(dbPayload);
+        if (error) throw error;
+      }
+      await fetchAccounts();
+    } catch (err) {
+      console.error('Error saving account:', err);
+    }
+  };
+
+  const handleDeleteAccount = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('contas_bancarias')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      await fetchAccounts();
+      await fetchTransactions();
+      await fetchWorkShifts();
+    } catch (err) {
+      console.error('Error deleting account:', err);
+    }
+  };
+
+  const handleSaveTransfer = async (payload: Omit<AccountTransfer, 'id'>) => {
+    if (!userId) return;
+    const dbPayload = {
+      user_id: userId,
+      conta_origem_id: payload.contaOrigemId,
+      conta_destino_id: payload.contaDestinoId,
+      valor: payload.valor,
+      data: payload.data,
+      observacao: payload.observacao || null
+    };
+
+    try {
+      const { error } = await supabase
+        .from('transferencias')
+        .insert(dbPayload);
+      if (error) throw error;
+      await fetchTransfers();
+    } catch (err) {
+      console.error('Error saving transfer:', err);
+    }
   };
 
   // Filter active Event type shifts for linking despesas
@@ -801,6 +988,22 @@ function App() {
                 >
                   <BarChart2 size={16} />
                   <span>Relatórios</span>
+                </button>
+
+                {/* Carteiras & Contas Link */}
+                <button
+                  onClick={() => {
+                    setActiveTab('CONTAS');
+                    setIsDrawerOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'CONTAS'
+                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
+                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                  }`}
+                >
+                  <Wallet size={16} />
+                  <span>Carteiras & Contas</span>
                 </button>
 
                 {/* Ajustes Link */}
@@ -1033,6 +1236,7 @@ function App() {
                       transactions={displayTransactions}
                       onEditTransaction={handleOpenEditModal}
                       onToggleStatus={handleToggleStatus}
+                      accounts={accounts}
                     />
                   </div>
                 </main>
@@ -1104,6 +1308,17 @@ function App() {
                 workShifts={workShifts}
                 onOpenDrawer={() => setIsDrawerOpen(true)}
               />
+            ) : activeTab === 'CONTAS' ? (
+              <AccountsDashboard
+                accounts={accounts}
+                transfers={transfers}
+                transactions={transactions}
+                workShifts={workShifts}
+                onOpenDrawer={() => setIsDrawerOpen(true)}
+                onSaveAccount={handleSaveAccount}
+                onDeleteAccount={handleDeleteAccount}
+                onSaveTransfer={handleSaveTransfer}
+              />
             ) : (
               <>
                 {/* Header for Settings page */}
@@ -1168,6 +1383,7 @@ function App() {
         editingTransaction={editingTransaction}
         categoriesList={customCategories}
         onAddNewCategory={handleAddNewCategory}
+        accounts={accounts}
       />
 
       {/* Work Shift Modal (BottomSheet) */}
@@ -1178,6 +1394,7 @@ function App() {
         onDelete={handleDeleteWorkShift}
         editingEntry={editingShiftEntry}
         activeEvents={activeEvents}
+        accounts={accounts}
       />
     </div>
   );

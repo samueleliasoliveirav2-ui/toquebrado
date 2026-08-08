@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Calendar, AlertCircle, Check, Clock } from 'lucide-react';
-import type { Transaction } from '../types';
+import { ChevronDown, ChevronUp, Calendar, AlertCircle, Check, Clock, Landmark } from 'lucide-react';
+import type { Transaction, BankAccount } from '../types';
 
 interface WeeklyAccordionProps {
   transactions: Transaction[];
   onEditTransaction: (transaction: Transaction) => void;
   onToggleStatus: (id: string) => void;
+  accounts?: BankAccount[];
 }
 
 interface WeekGroup {
@@ -20,7 +21,8 @@ interface WeekGroup {
 export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
   transactions,
   onEditTransaction,
-  onToggleStatus
+  onToggleStatus,
+  accounts = []
 }) => {
   const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({});
 
@@ -58,7 +60,6 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
     };
   };
 
-  // Helper to determine the date a transaction is currently planned for
   const getTransactionActiveDate = (tx: Transaction): string => {
     return (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data;
   };
@@ -132,6 +133,12 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
 
   const getDayNumber = (dateStr: string) => {
     return dateStr.split('-')[2];
+  };
+
+  const getAccountName = (contaId?: string) => {
+    if (!contaId) return null;
+    const acc = accounts.find(a => a.id === contaId);
+    return acc ? acc.nome : null;
   };
 
   const getStatusBadge = (tx: Transaction) => {
@@ -230,6 +237,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                   const activeDate = getTransactionActiveDate(tx);
                   const isPostponed = tx.status === 'POSTERGAR' && tx.dataPostergar;
                   const isPaid = tx.status === 'PAGO' || tx.status === 'RECEBIDO';
+                  const accountName = getAccountName(tx.contaId);
 
                   return (
                     <div 
@@ -244,8 +252,8 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                           <span className="text-sm text-slate-800 font-extrabold leading-tight mt-0.5">{getDayNumber(activeDate)}</span>
                         </div>
 
-                        {/* Mid: Description and Category */}
-                        <div className="flex flex-col">
+                        {/* Mid: Description, Category and Bank Account */}
+                        <div className="flex flex-col text-left">
                           <span className="text-sm font-bold text-slate-800 group-hover:text-blue-900 transition-colors line-clamp-1 max-w-[150px]">
                             {tx.descricao}
                           </span>
@@ -257,9 +265,20 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                             </span>
                           )}
 
-                          <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider mt-0.5">
-                            {tx.categoria}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">
+                              {tx.categoria}
+                            </span>
+                            {accountName && (
+                              <>
+                                <span className="text-[9px] text-slate-350 font-black leading-none">•</span>
+                                <span className="bg-slate-50 border border-slate-200/60 text-[8px] text-slate-500 font-bold px-1.5 py-0.5 rounded-md leading-none flex items-center gap-0.5 shadow-3xs uppercase">
+                                  <Landmark size={8} className="text-slate-400" />
+                                  {accountName}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -269,7 +288,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                           <span className={`text-sm font-extrabold ${isEntrada ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {isEntrada ? '+' : '-'} {formatCurrency(tx.valor)}
                           </span>
-                          {!!tx.juros && tx.juros > 0 && (
+                          {tx.juros && tx.juros > 0 && (
                             <span className="block text-[8px] text-rose-500 font-bold">
                               +{formatCurrency(tx.juros)} juros
                             </span>
