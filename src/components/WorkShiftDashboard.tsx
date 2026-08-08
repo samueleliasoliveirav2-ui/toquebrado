@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowUpRight, ArrowDownRight, Briefcase, Car, Calendar, DollarSign, Send, Edit3, CheckCircle, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowUpRight, ArrowDownRight, Briefcase, Car, Calendar, DollarSign, Send, Edit3, CheckCircle, Clock, ChevronDown, ChevronUp, Link, Tag } from 'lucide-react';
 import type { WorkShiftEntry } from '../types';
 
 interface WorkShiftDashboardProps {
@@ -15,6 +15,8 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   onSendToWallet,
   onMarkAsPaid
 }) => {
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -34,33 +36,24 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   };
 
   // 1. Calculations for KPIs
-  // Ganhos totais (RECEBIDOS + A_RECEBER)
   const totalGanhos = entries
     .filter(e => e.tipo === 'ENTRADA')
     .reduce((sum, e) => sum + e.valor, 0);
 
-  // Ganhos confirmados (apenas RECEBIDOS)
   const ganhosConfirmados = entries
     .filter(e => e.tipo === 'ENTRADA' && e.status === 'RECEBIDO')
     .reduce((sum, e) => sum + e.valor, 0);
 
-  // Ganhos a receber (apenas A_RECEBER)
   const totalAReceber = entries
     .filter(e => e.tipo === 'ENTRADA' && e.status === 'A_RECEBER')
     .reduce((sum, e) => sum + e.valor, 0);
 
-  // Custos totais
   const custosRua = entries
     .filter(e => e.tipo === 'SAIDA')
     .reduce((sum, e) => sum + e.valor, 0);
 
-  // Lucro Líquido Realizado (Ganhos recebidos - Custos)
   const lucroRealizado = ganhosConfirmados - custosRua;
-
-  // Lucro Líquido Projetado (Ganhos totais - Custos)
   const lucroProjetado = totalGanhos - custosRua;
-
-  // Count pending events
   const pendingCount = entries.filter(e => e.tipo === 'ENTRADA' && e.status === 'A_RECEBER').length;
 
   // 2. Group entries by date
@@ -75,17 +68,21 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   // Sort dates descending
   const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
 
+  const toggleEventExpand = (eventId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedEventId(prev => prev === eventId ? null : eventId);
+  };
+
   return (
     <div className="w-full flex-1 flex flex-col p-4 space-y-5 bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
       
       {/* 2x2 Grid of KPIs */}
       <div className="grid grid-cols-2 gap-2.5">
-        
         {/* Ganho Bruto do Mês */}
         <div className="glass bg-white/95 border border-slate-200/60 p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left">
           <div className="flex items-center justify-between">
             <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">Ganho Bruto</span>
-            <div className="w-5 h-5 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+            <div className="w-5 h-5 rounded-lg bg-slate-55 text-slate-500 flex items-center justify-center">
               <ArrowUpRight size={12} className="stroke-[3]" />
             </div>
           </div>
@@ -129,7 +126,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
             : 'bg-rose-55/10 border-rose-150/70'
         }`}>
           <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-450">Lucro Líq. Realizado</span>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-455">Lucro Líq. Realizado</span>
             <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
               lucroRealizado >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
             }`}>
@@ -163,7 +160,6 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
             {formatCurrency(lucroProjetado)}
           </span>
         </div>
-
       </div>
 
       {/* Main List Section */}
@@ -186,7 +182,14 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
             {sortedDates.map(dateKey => {
               const dayEntries = groupedByDate[dateKey];
               
-              // Calculate day details (For diárias we sum only RECEIVED ones in "Líquido Realizado", but let's show overall net balance of the day as projected or actual)
+              // Calculate day details
+              const ganhoDiaConfirmado = dayEntries
+                .filter(e => e.tipo === 'ENTRADA' && e.status === 'RECEBIDO')
+                .reduce((sum, e) => sum + e.valor, 0);
+              const saldoDiaRealizado = ganhoDiaConfirmado - dayEntries
+                .filter(e => e.tipo === 'SAIDA')
+                .reduce((sum, e) => sum + e.valor, 0);
+
               const ganhoDia = dayEntries
                 .filter(e => e.tipo === 'ENTRADA')
                 .reduce((sum, e) => sum + e.valor, 0);
@@ -197,13 +200,6 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
 
               const saldoDia = ganhoDia - custoDia;
               const isPositive = saldoDia >= 0;
-              
-              // Only allow repasse to wallet if the net balance is received and positive!
-              const ganhoDiaConfirmado = dayEntries
-                .filter(e => e.tipo === 'ENTRADA' && e.status === 'RECEBIDO')
-                .reduce((sum, e) => sum + e.valor, 0);
-              const saldoDiaRealizado = ganhoDiaConfirmado - custoDia;
-
               const primaryActivity = dayEntries.find(e => e.tipo === 'ENTRADA')?.atividade || 'Trabalho';
 
               return (
@@ -230,93 +226,208 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                   <div className="p-3 divide-y divide-slate-100">
                     {dayEntries.map(entry => {
                       const isGanho = entry.tipo === 'ENTRADA';
+                      const isEvento = isGanho && entry.atividade === 'Evento';
                       const isPending = isGanho && entry.status === 'A_RECEBER';
+                      const isExpanded = expandedEventId === entry.id;
+
+                      // Query for costs linked to this specific event
+                      const linkedCosts = isEvento 
+                        ? entries.filter(e => e.tipo === 'SAIDA' && e.vinculoId === entry.id)
+                        : [];
                       
+                      const totalLinkedCostsVal = linkedCosts.reduce((sum, e) => sum + e.valor, 0);
+                      const eventNetProfit = entry.valor - totalLinkedCostsVal;
+
                       return (
-                        <div 
-                          key={entry.id}
-                          onClick={() => onEditEntry(entry)}
-                          className="py-2.5 flex items-center justify-between hover:bg-slate-55/40 active:bg-slate-100/50 rounded-lg px-1.5 transition-colors cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            {/* Icon Indicator */}
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
-                              isGanho 
-                                ? isPending
-                                  ? 'bg-amber-50/50 border-amber-100 text-amber-600'
-                                  : 'bg-emerald-50/60 border-emerald-100 text-emerald-600' 
-                                : 'bg-rose-55/10 border-rose-100/50 text-rose-550'
-                            }`}>
-                              {isGanho ? <Car size={14} /> : <ArrowDownRight size={14} />}
+                        <div key={entry.id} className="block py-1">
+                          
+                          {/* Main Row layout */}
+                          <div 
+                            onClick={(e) => {
+                              if (isEvento) {
+                                toggleEventExpand(entry.id, e);
+                              } else {
+                                onEditEntry(entry);
+                              }
+                            }}
+                            className="py-2 flex items-center justify-between hover:bg-slate-50/60 active:bg-slate-100/50 rounded-lg px-1.5 transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {/* Icon Indicator */}
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                                isGanho 
+                                  ? isPending
+                                    ? 'bg-amber-50/50 border-amber-100 text-amber-600'
+                                    : 'bg-emerald-50/60 border-emerald-100 text-emerald-600' 
+                                  : 'bg-rose-55/10 border-rose-100/50 text-rose-550'
+                              }`}>
+                                {isGanho ? <Car size={14} /> : <ArrowDownRight size={14} />}
+                              </div>
+
+                              {/* Details text */}
+                              <div className="text-left min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-extrabold text-slate-700 truncate">
+                                    {isGanho 
+                                      ? isEvento 
+                                        ? `Evento - ${entry.observacao || 'Convenção/Job'}`
+                                        : `Ganho - ${entry.atividade}` 
+                                      : `Custo - ${entry.categoria}`}
+                                  </span>
+                                  
+                                  {/* Status Badge */}
+                                  {isGanho && (
+                                    <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-md leading-none ${
+                                      isPending 
+                                        ? 'bg-amber-105 text-amber-700' 
+                                        : 'bg-emerald-105 text-emerald-700'
+                                    }`}>
+                                      {isPending ? 'A RECEBER' : 'RECEBIDO'}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Link Indicator for costs */}
+                                {!isGanho && entry.vinculoId && (
+                                  <p className="text-[8px] text-slate-400 font-extrabold mt-0.5 flex items-center gap-0.5 uppercase tracking-wide">
+                                    <Link size={8} />
+                                    Custo Vinculado
+                                  </p>
+                                )}
+
+                                {/* Forecast dates */}
+                                {isPending && entry.dataRecebimento && (
+                                  <p className="text-[9px] text-amber-600 font-extrabold mt-0.5 flex items-center gap-0.5">
+                                    <Clock size={9} />
+                                    Previsão: {formatDate(entry.dataRecebimento)}
+                                  </p>
+                                )}
+                                {entry.observacao && !isEvento && (
+                                  <p className="text-[10px] text-slate-450 truncate font-semibold mt-0.5">
+                                    {entry.observacao}
+                                  </p>
+                                )}
+                                {isEvento && entry.quantidadeDias && entry.quantidadeDias > 1 && (
+                                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                                    Pacote de {entry.quantidadeDias} dias {entry.valorDiaria ? `(R$ ${entry.valorDiaria}/dia)` : ''}
+                                  </p>
+                                )}
+                              </div>
                             </div>
 
-                            {/* Details text */}
-                            <div className="text-left min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-extrabold text-slate-700 truncate">
-                                  {isGanho ? `Ganho - ${entry.atividade}` : `Custo - ${entry.categoria}`}
-                                </span>
-                                
-                                {/* Status Badge */}
-                                {isGanho && (
-                                  <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-md leading-none ${
-                                    isPending 
-                                      ? 'bg-amber-100 text-amber-700' 
-                                      : 'bg-emerald-100 text-emerald-700'
-                                  }`}>
-                                    {isPending ? 'A RECEBER' : 'RECEBIDO'}
-                                  </span>
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              {/* Value */}
+                              <span className={`text-xs font-extrabold ${isGanho ? 'text-emerald-650' : 'text-rose-550'}`}>
+                                {isGanho ? '+' : '-'} {formatCurrency(entry.valor)}
+                              </span>
+
+                              {/* Action: Expand toggle or Baixa Rápida or Edit */}
+                              {isEvento ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => toggleEventExpand(entry.id, e)}
+                                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-450 cursor-pointer"
+                                >
+                                  {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                </button>
+                              ) : isPending ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onMarkAsPaid(entry.id)}
+                                  className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-3xs cursor-pointer ml-1"
+                                  title="Confirmar Recebimento"
+                                >
+                                  <CheckCircle size={11} className="stroke-[2.5]" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => onEditEntry(entry)}
+                                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-650 transition-colors ml-1 cursor-pointer"
+                                  title="Editar"
+                                >
+                                  <Edit3 size={11} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Expandable DRE Details Report for Events */}
+                          {isEvento && isExpanded && (
+                            <div className="mx-2 my-1 bg-slate-50 border border-slate-200/50 rounded-xl p-3.5 space-y-3 animate-scale-up text-left">
+                              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                                <span className="text-[10px] uppercase font-bold text-slate-450 tracking-wider">Detalhamento DRE do Evento</span>
+                                <button
+                                  onClick={() => onEditEntry(entry)}
+                                  className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Edit3 size={10} />
+                                  Editar Evento
+                                </button>
+                              </div>
+
+                              {/* Costs linked list */}
+                              <div className="space-y-1.5">
+                                <span className="text-[9px] uppercase font-extrabold text-slate-400 block tracking-wider">Custos Operacionais Vinculados</span>
+                                {linkedCosts.length === 0 ? (
+                                  <span className="text-[10px] text-slate-400 italic block">Nenhum custo vinculado a este evento.</span>
+                                ) : (
+                                  <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                                    {linkedCosts.map(cost => (
+                                      <div 
+                                        key={cost.id} 
+                                        onClick={() => onEditEntry(cost)}
+                                        className="flex items-center justify-between text-[10px] text-slate-700 bg-white border border-slate-150 p-1.5 rounded-lg cursor-pointer hover:bg-slate-50"
+                                      >
+                                        <span className="font-semibold flex items-center gap-1">
+                                          <Tag size={8} className="text-slate-450" />
+                                          {cost.categoria} {cost.observacao ? `(${cost.observacao})` : ''}
+                                        </span>
+                                        <span className="font-extrabold text-rose-550">-{formatCurrency(cost.valor)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
 
-                              {/* Observation and due dates */}
-                              {isPending && entry.dataRecebimento && (
-                                <p className="text-[9px] text-amber-600 font-extrabold mt-0.5 flex items-center gap-0.5">
-                                  <Clock size={9} />
-                                  Previsão: {formatDate(entry.dataRecebimento)}
-                                </p>
-                              )}
-                              {entry.observacao && (
-                                <p className="text-[10px] text-slate-450 truncate font-semibold mt-0.5">
-                                  {entry.observacao}
-                                </p>
+                              {/* Financial DRE Summary */}
+                              <div className="bg-white border border-slate-200/80 p-2.5 rounded-xl space-y-1.5 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="font-semibold text-slate-450">Ganho Bruto:</span>
+                                  <span className="font-bold text-slate-800">{formatCurrency(entry.valor)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="font-semibold text-slate-450">Despesas Vinculadas:</span>
+                                  <span className="font-bold text-rose-550">-{formatCurrency(totalLinkedCostsVal)}</span>
+                                </div>
+                                <div className="flex justify-between pt-1.5 border-t border-slate-100 font-extrabold">
+                                  <span className="text-slate-800">Lucro Líquido:</span>
+                                  <span className={eventNetProfit >= 0 ? 'text-emerald-600' : 'text-rose-650'}>
+                                    {formatCurrency(eventNetProfit)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Baixa rápida within card */}
+                              {isPending && (
+                                <button
+                                  type="button"
+                                  onClick={() => onMarkAsPaid(entry.id)}
+                                  className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
+                                >
+                                  <CheckCircle size={12} />
+                                  Confirmar Recebimento do Cachet (Baixa)
+                                </button>
                               )}
                             </div>
-                          </div>
+                          )}
 
-                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                            {/* Value */}
-                            <span className={`text-xs font-extrabold ${isGanho ? 'text-emerald-650' : 'text-rose-550'}`}>
-                              {isGanho ? '+' : '-'} {formatCurrency(entry.valor)}
-                            </span>
-
-                            {/* Baixa Rápida de pagamento action button */}
-                            {isPending ? (
-                              <button
-                                type="button"
-                                onClick={() => onMarkAsPaid(entry.id)}
-                                className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-3xs cursor-pointer ml-1"
-                                title="Marcar como Recebido"
-                              >
-                                <CheckCircle size={11} className="stroke-[2.5]" />
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => onEditEntry(entry)}
-                                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-650 transition-colors ml-1 cursor-pointer"
-                                title="Editar"
-                              >
-                                <Edit3 size={11} />
-                              </button>
-                            )}
-                          </div>
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* Quick closing balance integration button (only allowed for positive liquid/received balances) */}
+                  {/* Quick closing balance integration button */}
                   {saldoDiaRealizado > 0 && (
                     <div className="p-2.5 bg-slate-50/40 border-t border-slate-100 flex justify-end">
                       <button

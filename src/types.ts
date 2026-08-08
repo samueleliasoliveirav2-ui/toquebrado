@@ -150,6 +150,7 @@ export interface WorkShiftEntry {
   status?: 'RECEBIDO' | 'A_RECEBER';
   dataRecebimento?: string; // YYYY-MM-DD
   observacao?: string;
+  vinculoId?: string; // Links SAIDA (costs) to an ENTRADA event or activity
 }
 
 export const ACTIVITIES = ['Motorista de App', 'Evento', 'Outro'];

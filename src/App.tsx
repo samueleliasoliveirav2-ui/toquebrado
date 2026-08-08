@@ -208,7 +208,8 @@ function App() {
           quantidadeDias: item.quantidade_dias !== null && item.quantidade_dias !== undefined ? Number(item.quantidade_dias) : undefined,
           status: item.status || 'RECEBIDO',
           dataRecebimento: item.data_recebimento || undefined,
-          observacao: item.observacao || undefined
+          observacao: item.observacao || undefined,
+          vinculoId: item.vinculo_id || undefined
         }));
         setWorkShifts(mapped);
       }
@@ -403,6 +404,8 @@ function App() {
   const handleSaveWorkShift = async (payload: Omit<WorkShiftEntry, 'id'> & { 
     id?: string;
     modoLancamento?: 'UNICO' | 'INDIVIDUAL';
+    lancarCarteiraPrincipal?: boolean;
+    formaPagamento?: string;
   }) => {
     if (!userId) return;
 
@@ -428,7 +431,8 @@ function App() {
             data_recebimento: payload.dataRecebimento || null,
             observacao: payload.observacao 
               ? `${payload.observacao} (Dia ${i + 1}/${payload.quantidadeDias})`
-              : `Diária ${i + 1}/${payload.quantidadeDias}`
+              : `Diária ${i + 1}/${payload.quantidadeDias}`,
+            vinculo_id: null
           });
         }
 
@@ -450,7 +454,8 @@ function App() {
           quantidade_dias: payload.quantidadeDias || 1,
           status: payload.status || 'RECEBIDO',
           data_recebimento: payload.dataRecebimento || null,
-          observacao: payload.observacao || null
+          observacao: payload.observacao || null,
+          vinculo_id: payload.vinculoId && payload.vinculoId !== 'motorista-app' && payload.vinculoId !== 'geral-outros' ? payload.vinculoId : null
         };
 
         if (payload.id) {
@@ -468,12 +473,45 @@ function App() {
           if (error) throw error;
         }
       }
-      await fetchWorkShifts();
-    } catch (err: any) {
-      console.error('Error saving work shift to database:', err);
-      alert('Erro ao salvar lançamento de diária: ' + (err.message || err.details || JSON.stringify(err)));
-    }
-  };
+
+      // Optional cross-ledger mirroring to the Personal Wallet (Only on creation)
+      if (!payload.id && payload.tipo === 'SAIDA' && payload.lancarCarteiraPrincipal) {
+        // Find human readable label for the vinculation
+        let vinculoLabel = 'Geral';
+        if (payload.vinculoId && payload.vinculoId !== 'motorista-app' && payload.vinculoId !== 'geral-outros') {
+          const ev = workShifts.find(w => w.id === payload.vinculoId);
+          if (ev) {
+            vinculoLabel = ev.observacao || ev.atividade;
+          }
+        } else if (payload.vinculoId === 'motorista-app') {
+          vinculoLabel = 'Motorista App';
+        } else if (payload.vinculoId === 'geral-outros') {
+          vinculoLabel = 'Geral Trabalho';
+        }
+
+        // Map operational cost category to personal category
+        const mapCategory = (cat: string) => {
+          if (cat === 'Alimentação/Lanche') return 'Lazer';
+          if (cat === 'Combustível' || cat === 'Pedágio/Estacionamento' || cat === 'Manutenção') return 'Transporte';
+          return 'Outros';
+        };
+
+        const personalPayload = {
+          tipo: 'SAIDA' as const,
+          descricao: `[${payload.formaPagamento}] Custo Rua (${payload.categoria}) - Vinc: ${vinculoLabel}`,
+          categoria: mapCategory(payload.categoria || 'Outros'),
+          valor: payload.valor,
+          data: payload.data,
+          status: 'PAGO' as const
+        };
+
+        await handleSaveTransaction(personalPayload);
+      }
+    await fetchWorkShifts();
+  } catch (err: any) {    console.error('Error saving work shift to database:', err);
+    alert('Erro ao salvar lançamento de diária: ' + (err.message || err.details || JSON.stringify(err)));
+  }
+};
 
   const handleMarkShiftAsPaid = async (id: string) => {
     // Optimistic state update
@@ -653,6 +691,9 @@ function App() {
   const handleLoginSuccess = (name: string) => {
     setCurrentUser(name);
   };
+
+  // Filter active Event type shifts for linking despesas
+  const activeEvents = workShifts.filter(e => e.tipo === 'ENTRADA' && e.atividade === 'Evento');
 
   return (
     <div className="w-full min-h-screen flex justify-center bg-slate-100 select-none">
@@ -1111,6 +1152,7 @@ function App() {
         onSave={handleSaveWorkShift}
         onDelete={handleDeleteWorkShift}
         editingEntry={editingShiftEntry}
+        activeEvents={activeEvents}
       />
     </div>
   );

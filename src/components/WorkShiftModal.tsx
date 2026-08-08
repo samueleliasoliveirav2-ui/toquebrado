@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Calendar } from 'lucide-react';
+import { X, Check, Calendar, Link } from 'lucide-react';
 import type { WorkShiftEntry } from '../types';
 import { ACTIVITIES, SHIFT_EXPENSE_CATEGORIES } from '../types';
 
@@ -9,9 +9,12 @@ interface WorkShiftModalProps {
   onSave: (entry: Omit<WorkShiftEntry, 'id'> & { 
     id?: string;
     modoLancamento?: 'UNICO' | 'INDIVIDUAL';
+    lancarCarteiraPrincipal?: boolean;
+    formaPagamento?: string;
   }) => void;
   onDelete?: (id: string) => void;
   editingEntry?: WorkShiftEntry | null;
+  activeEvents?: WorkShiftEntry[]; // Active Event entries to link despesas to
 }
 
 export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
@@ -19,7 +22,8 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
   onClose,
   onSave,
   onDelete,
-  editingEntry
+  editingEntry,
+  activeEvents = []
 }) => {
   const [data, setData] = useState('');
   const [atividade, setAtividade] = useState('Motorista de App');
@@ -27,13 +31,18 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
   const [categoria, setCategoria] = useState('Combustível');
   const [valor, setValor] = useState<number | ''>('');
   
-  // New States for Event & app rules
+  // Event & app rules states
   const [valorDiaria, setValorDiaria] = useState<number | ''>('');
   const [quantidadeDias, setQuantidadeDias] = useState<number>(1);
   const [modoLancamento, setModoLancamento] = useState<'UNICO' | 'INDIVIDUAL'>('UNICO');
   const [recebidoMesmoDia, setRecebidoMesmoDia] = useState<boolean>(true);
   const [dataRecebimento, setDataRecebimento] = useState<string>('');
   const [observacao, setObservacao] = useState('');
+
+  // Vinculation and cross-wallet states
+  const [vinculoId, setVinculoId] = useState<string>('motorista-app');
+  const [lancarCarteiraPrincipal, setLancarCarteiraPrincipal] = useState<boolean>(false);
+  const [formaPagamento, setFormaPagamento] = useState<string>('Cartão de Crédito Pessoal');
 
   // Sync state on open/edit
   useEffect(() => {
@@ -50,6 +59,8 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       setRecebidoMesmoDia(editingEntry.status === 'RECEBIDO');
       setDataRecebimento(editingEntry.dataRecebimento || '');
       setObservacao(editingEntry.observacao || '');
+      setVinculoId(editingEntry.vinculoId || 'motorista-app');
+      setLancarCarteiraPrincipal(false); // Do not support mirror changes in edit mode to avoid duplicates
     } else {
       const today = new Date().toISOString().split('T')[0];
       setData(today);
@@ -60,14 +71,16 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       setValorDiaria('');
       setQuantidadeDias(1);
       setModoLancamento('UNICO');
-      setRecebidoMesmoDia(true); // Will sync based on activity below
+      setRecebidoMesmoDia(true);
       
-      // Default forecast date to 15 days in the future
       const forecastDate = new Date();
       forecastDate.setDate(forecastDate.getDate() + 15);
       setDataRecebimento(forecastDate.toISOString().split('T')[0]);
       
       setObservacao('');
+      setVinculoId('motorista-app');
+      setLancarCarteiraPrincipal(false);
+      setFormaPagamento('Cartão de Crédito Pessoal');
     }
   }, [editingEntry, isOpen]);
 
@@ -82,7 +95,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
     }
   }, [atividade, tipo, editingEntry]);
 
-  // Auto-calculate total value for display when editing is not active
+  // Auto-calculate total value for display
   const calculatedTotal = tipo === 'ENTRADA' && atividade === 'Evento'
     ? (Number(valorDiaria || 0) * quantidadeDias)
     : Number(valor || 0);
@@ -110,13 +123,15 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       finalValor = Number(valor);
     }
 
-    if (!recebidoMesmoDia && !dataRecebimento) {
+    if (tipo === 'ENTRADA' && !recebidoMesmoDia && !dataRecebimento) {
       return alert('Selecione uma data prevista para o recebimento');
     }
 
     const payload: Omit<WorkShiftEntry, 'id'> & { 
       id?: string;
       modoLancamento?: 'UNICO' | 'INDIVIDUAL';
+      lancarCarteiraPrincipal?: boolean;
+      formaPagamento?: string;
     } = {
       data,
       atividade,
@@ -128,7 +143,10 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       status: tipo === 'ENTRADA' ? (recebidoMesmoDia ? 'RECEBIDO' : 'A_RECEBER') : 'RECEBIDO',
       dataRecebimento: (tipo === 'ENTRADA' && !recebidoMesmoDia) ? dataRecebimento : undefined,
       observacao: observacao.trim() || undefined,
-      modoLancamento: !editingEntry && tipo === 'ENTRADA' && atividade === 'Evento' ? modoLancamento : undefined
+      modoLancamento: !editingEntry && tipo === 'ENTRADA' && atividade === 'Evento' ? modoLancamento : undefined,
+      vinculoId: tipo === 'SAIDA' ? vinculoId : undefined,
+      lancarCarteiraPrincipal: tipo === 'SAIDA' && !editingEntry ? lancarCarteiraPrincipal : undefined,
+      formaPagamento: tipo === 'SAIDA' && !editingEntry && lancarCarteiraPrincipal ? formaPagamento : undefined
     };
 
     if (editingEntry) {
@@ -157,7 +175,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
           <button 
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-650 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-655 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -198,18 +216,26 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
           {/* Atividade & Data Row */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Atividade</label>
-              <select
-                value={atividade}
-                onChange={(e) => setAtividade(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-semibold cursor-pointer shadow-3xs"
-              >
-                {ACTIVITIES.map((act) => (
-                  <option key={act} value={act}>
-                    {act}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">
+                {tipo === 'SAIDA' ? 'Tipo de Registro' : 'Atividade'}
+              </label>
+              {tipo === 'SAIDA' ? (
+                <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-500 font-extrabold shadow-3xs">
+                  Custo Operacional
+                </div>
+              ) : (
+                <select
+                  value={atividade}
+                  onChange={(e) => setAtividade(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-semibold cursor-pointer shadow-3xs"
+                >
+                  {ACTIVITIES.map((act) => (
+                    <option key={act} value={act}>
+                      {act}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
@@ -351,6 +377,74 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Vinculação a uma Atividade ou Evento */}
+              <div>
+                <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1 flex items-center gap-1">
+                  <Link size={11} />
+                  Vincular despesa a:
+                </label>
+                <select
+                  value={vinculoId}
+                  onChange={(e) => setVinculoId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-semibold cursor-pointer shadow-3xs"
+                >
+                  <option value="motorista-app">Geral - Motorista de Aplicativo</option>
+                  <option value="geral-outros">Geral - Outros / Turnos</option>
+                  {activeEvents.length > 0 && <optgroup label="Seus Eventos Ativos">
+                    {activeEvents.map(ev => (
+                      <option key={ev.id} value={ev.id}>
+                        Evento: {ev.observacao || ev.atividade} ({ev.data})
+                      </option>
+                    ))}
+                  </optgroup>}
+                </select>
+              </div>
+
+              {/* Espelhamento Opcional na Carteira Principal (Apenas para novos lançamentos) */}
+              {!editingEntry && (
+                <div className="bg-slate-50/50 p-3.5 border border-slate-200/50 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-xs font-extrabold text-slate-700">Lançar na Carteira Principal?</p>
+                      <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Cria uma despesa espelhada no caixa pessoal.</p>
+                    </div>
+                    
+                    {/* Switch Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setLancarCarteiraPrincipal(!lancarCarteiraPrincipal)}
+                      className={`w-10 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                        lancarCarteiraPrincipal ? 'bg-[#0e69b2]' : 'bg-slate-300'
+                      }`}
+                    >
+                      <div
+                        className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                          lancarCarteiraPrincipal ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Forma de Pagamento */}
+                  {lancarCarteiraPrincipal && (
+                    <div className="space-y-1.5 animate-fade-in border-t border-slate-200/50 pt-2.5">
+                      <label className="block text-slate-500 text-[10px] font-bold uppercase">
+                        Forma de Pagamento Pessoal
+                      </label>
+                      <select
+                        value={formaPagamento}
+                        onChange={(e) => setFormaPagamento(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-blue-500 shadow-3xs cursor-pointer"
+                      >
+                        <option value="Cartão de Crédito Pessoal">💳 Cartão de Crédito Pessoal</option>
+                        <option value="Dinheiro Pessoal">💵 Dinheiro Pessoal</option>
+                        <option value="Conta Banco">🏦 Conta do Banco</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -406,7 +500,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
               placeholder={tipo === 'SAIDA' ? 'Ex: Combustível Posto Shell' : 'Ex: Evento de Sábado, Turno da Noite'}
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-450 focus:outline-none focus:border-blue-500 font-semibold shadow-3xs"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-455 focus:outline-none focus:border-blue-500 font-semibold shadow-3xs"
             />
           </div>
 
