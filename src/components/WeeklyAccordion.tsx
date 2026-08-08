@@ -136,8 +136,10 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
   };
 
   const getAccountName = (contaId?: string) => {
-    if (!contaId) return null;
-    const acc = accounts.find(a => a.id === contaId);
+    const fallbackPF = accounts.find(a => a.tipoPessoa === 'PF')?.id || accounts[0]?.id;
+    const cId = contaId || fallbackPF;
+    if (!cId) return null;
+    const acc = accounts.find(a => a.id === cId);
     return acc ? acc.nome : null;
   };
 
@@ -288,7 +290,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                           <span className={`text-sm font-extrabold ${isEntrada ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {isEntrada ? '+' : '-'} {formatCurrency(tx.valor)}
                           </span>
-                          {tx.juros && tx.juros > 0 && (
+                          {!!tx.juros && tx.juros > 0 && (
                             <span className="block text-[8px] text-rose-500 font-bold">
                               +{formatCurrency(tx.juros)} juros
                             </span>

@@ -23,6 +23,9 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
   onDeleteAccount,
   onSaveTransfer
 }) => {
+  const fallbackPF = accounts.find(a => a.tipoPessoa === 'PF')?.id || accounts[0]?.id || '';
+  const fallbackPJ = accounts.find(a => a.tipoPessoa === 'PJ')?.id || accounts[0]?.id || '';
+
   // Modal states
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
@@ -53,7 +56,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
     
     // Personal transactions sum
     const txSum = transactions
-      .filter(tx => tx.contaId === account.id)
+      .filter(tx => (tx.contaId || fallbackPF) === account.id)
       .reduce((sum, tx) => {
         if (tx.tipo === 'ENTRADA' && tx.status === 'RECEBIDO') {
           return sum + tx.valor;
@@ -65,7 +68,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
 
     // Work shifts sum
     const workSum = workShifts
-      .filter(ws => ws.contaId === account.id)
+      .filter(ws => (ws.contaId || fallbackPJ) === account.id)
       .reduce((sum, ws) => {
         if (ws.tipo === 'ENTRADA' && ws.status === 'RECEBIDO') {
           return sum + ws.valor;
@@ -189,7 +192,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
   // Get Statement items for selected account
   const getAccountStatement = (accountId: string) => {
     const pExpenses = transactions
-      .filter(tx => tx.contaId === accountId)
+      .filter(tx => (tx.contaId || fallbackPF) === accountId)
       .map(tx => ({
         id: tx.id,
         data: (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data,
@@ -201,7 +204,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
       }));
 
     const wExpenses = workShifts
-      .filter(ws => ws.contaId === accountId)
+      .filter(ws => (ws.contaId || fallbackPJ) === accountId)
       .map(ws => ({
         id: ws.id,
         data: ws.data,
