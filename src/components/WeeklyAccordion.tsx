@@ -269,7 +269,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                           <span className={`text-sm font-extrabold ${isEntrada ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {isEntrada ? '+' : '-'} {formatCurrency(tx.valor)}
                           </span>
-                          {tx.juros && tx.juros > 0 && (
+                          {!!tx.juros && tx.juros > 0 && (
                             <span className="block text-[8px] text-rose-500 font-bold">
                               +{formatCurrency(tx.juros)} juros
                             </span>
