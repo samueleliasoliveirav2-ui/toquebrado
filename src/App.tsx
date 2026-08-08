@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Transaction, TransactionStatus } from './types';
+import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, Briefcase } from 'lucide-react';
+import type { Transaction, TransactionStatus, WorkShiftEntry } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
 import { WeeklyAccordion } from './components/WeeklyAccordion';
 import { TransactionModal } from './components/TransactionModal';
 import { LoginScreen } from './components/LoginScreen';
 import { ProfileSettings } from './components/ProfileSettings';
+import { WorkShiftDashboard } from './components/WorkShiftDashboard';
+import { WorkShiftModal } from './components/WorkShiftModal';
 import { supabase } from './lib/supabaseClient';
 
 const CURRENT_VERSION = '1.0.1';
@@ -17,16 +19,21 @@ function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [workShifts, setWorkShifts] = useState<WorkShiftEntry[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Active view state
-  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL'>('INICIO');
+  // Active view state: INICIO, PERFIL, or DIARIAS
+  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL' | 'DIARIAS'>('INICIO');
 
   // Sidebar Drawer menu state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // App version alert state
   const [newVersionAvailable, setNewVersionAvailable] = useState(false);
+
+  // Modal states for Work Shifts
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [editingShiftEntry, setEditingShiftEntry] = useState<WorkShiftEntry | null>(null);
 
   // Custom Dynamic Categories state
   const [customCategories, setCustomCategories] = useState<Record<'ENTRADA' | 'SAIDA', string[]>>(() => {
@@ -118,6 +125,7 @@ function App() {
         setUserEmail('');
         setUserId(null);
         setTransactions([]);
+        setWorkShifts([]);
       }
       setLoading(false);
     });
@@ -177,9 +185,38 @@ function App() {
     }
   };
 
+  // 3. Fetch Work Shifts from Supabase
+  const fetchWorkShifts = async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('diarias_trabalho')
+        .select('*')
+        .order('data', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching work shifts:', error);
+      } else if (data) {
+        const mapped: WorkShiftEntry[] = data.map((item: any) => ({
+          id: item.id,
+          data: item.data,
+          atividade: item.atividade,
+          tipo: item.tipo,
+          categoria: item.categoria || undefined,
+          valor: Number(item.valor),
+          observacao: item.observacao || undefined
+        }));
+        setWorkShifts(mapped);
+      }
+    } catch (err) {
+      console.error('Unexpected error loading work shifts data', err);
+    }
+  };
+
   useEffect(() => {
     if (userId) {
       fetchTransactions();
+      fetchWorkShifts();
     }
   }, [userId]);
 
@@ -210,6 +247,9 @@ function App() {
     const activeDate = (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data;
     return activeDate.startsWith(selectedMonth);
   });
+
+  // Filtered month work shifts
+  const monthWorkShifts = workShifts.filter(e => e.data.startsWith(selectedMonth));
 
   // Cumulative Balance (All-time actual liquid: RECEIVED entries - PAID exits)
   const saldoAcumulado = transactions.reduce((sum, tx) => {
@@ -355,6 +395,74 @@ function App() {
     }
   };
 
+  // CRUD for Work Shifts
+  const handleSaveWorkShift = async (payload: Omit<WorkShiftEntry, 'id'> & { id?: string }) => {
+    if (!userId) return;
+
+    const dbPayload = {
+      user_id: userId,
+      data: payload.data,
+      atividade: payload.atividade,
+      tipo: payload.tipo,
+      categoria: payload.categoria || null,
+      valor: payload.valor,
+      observacao: payload.observacao || null
+    };
+
+    try {
+      if (payload.id) {
+        const { error } = await supabase
+          .from('diarias_trabalho')
+          .update(dbPayload)
+          .eq('id', payload.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('diarias_trabalho')
+          .insert(dbPayload);
+
+        if (error) throw error;
+      }
+      await fetchWorkShifts();
+    } catch (err: any) {
+      console.error('Error saving work shift to database:', err);
+      alert('Erro ao salvar lançamento de diária: ' + (err.message || err.details || JSON.stringify(err)));
+    }
+  };
+
+  const handleDeleteWorkShift = async (id: string) => {
+    try {
+      setWorkShifts(prev => prev.filter(e => e.id !== id));
+      const { error } = await supabase
+        .from('diarias_trabalho')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (err: any) {
+      console.error('Error deleting work shift from database:', err);
+      alert('Erro ao excluir lançamento de diária: ' + (err.message || err.details || JSON.stringify(err)));
+      await fetchWorkShifts();
+    }
+  };
+
+  const handleSendToWallet = async (date: string, activity: string, amount: number) => {
+    if (!userId) return;
+
+    const payload = {
+      tipo: 'ENTRADA' as const,
+      descricao: `Lucro Diário - ${activity}`,
+      categoria: 'Freelance',
+      valor: amount,
+      data: date,
+      status: 'RECEBIDO' as const
+    };
+
+    await handleSaveTransaction(payload);
+    alert('Lucro líquido diário enviado com sucesso para sua Carteira Pessoal!');
+  };
+
   const handleAddNewCategory = (tipo: 'ENTRADA' | 'SAIDA', category: string) => {
     setCustomCategories(prev => {
       const list = prev[tipo];
@@ -376,11 +484,22 @@ function App() {
     setIsModalOpen(true);
   };
 
+  // FAB Button context action
+  const handleFABClick = () => {
+    if (activeTab === 'DIARIAS') {
+      setEditingShiftEntry(null);
+      setIsShiftModalOpen(true);
+    } else {
+      handleOpenAddModal();
+    }
+  };
+
   const handleSync = async () => {
     setIsSyncing(true);
     try {
       await checkVersion();
       await fetchTransactions();
+      await fetchWorkShifts();
     } finally {
       setTimeout(() => {
         setIsSyncing(false);
@@ -534,11 +653,27 @@ function App() {
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'INICIO'
                       ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
-                      : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
                   }`}
                 >
                   <Home size={16} />
                   <span>Início</span>
+                </button>
+
+                {/* Controle de Diárias Link */}
+                <button
+                  onClick={() => {
+                    setActiveTab('DIARIAS');
+                    setIsDrawerOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'DIARIAS'
+                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
+                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                  }`}
+                >
+                  <Briefcase size={16} />
+                  <span>Controle de Diárias</span>
                 </button>
 
                 {/* Ajustes Link */}
@@ -550,7 +685,7 @@ function App() {
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'PERFIL'
                       ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
-                      : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
                   }`}
                 >
                   <Settings size={16} />
@@ -626,7 +761,7 @@ function App() {
                     )}
                   </div>
 
-                  {/* Month Selector Slider with Left and Right Arrows */}
+                  {/* Month Selector Slider */}
                   <div className="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
                     <button
                       onClick={handlePrevMonth}
@@ -746,7 +881,7 @@ function App() {
                           filterType === 'ENTRADA'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs'
                             : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
-                        }`}
+                      }`}
                       >
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         Receitas
@@ -775,6 +910,66 @@ function App() {
                   </div>
                 </main>
               </>
+            ) : activeTab === 'DIARIAS' ? (
+              <>
+                {/* Header for Work Shifts page */}
+                <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
+                  <div className="flex items-center justify-between">
+                    
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setIsDrawerOpen(true)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-650 hover:text-slate-800 transition-colors cursor-pointer"
+                        title="Menu"
+                      >
+                        <Menu size={20} />
+                      </button>
+                      
+                      <span className="text-sm font-extrabold text-slate-800 font-sans">
+                        Diárias & Trabalho
+                      </span>
+                    </div>
+
+                    {isSyncing && (
+                      <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
+                    )}
+                  </div>
+
+                  {/* Month Selector Slider */}
+                  <div className="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
+                    <button
+                      onClick={handlePrevMonth}
+                      disabled={currentIndex === 0}
+                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      title="Mês Anterior"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    
+                    <span className="text-xs font-black text-[#0e69b2] uppercase tracking-wider select-none font-sans">
+                      {months[currentIndex]?.label}
+                    </span>
+
+                    <button
+                      onClick={handleNextMonth}
+                      disabled={currentIndex === months.length - 1}
+                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      title="Próximo Mês"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </header>
+
+                <WorkShiftDashboard
+                  entries={monthWorkShifts}
+                  onEditEntry={(entry) => {
+                    setEditingShiftEntry(entry);
+                    setIsShiftModalOpen(true);
+                  }}
+                  onSendToWallet={handleSendToWallet}
+                />
+              </>
             ) : (
               <>
                 {/* Header for Settings page */}
@@ -782,7 +977,7 @@ function App() {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setIsDrawerOpen(true)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-650 hover:text-slate-800 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-655 hover:text-slate-800 transition-colors cursor-pointer"
                       title="Menu"
                     >
                       <Menu size={20} />
@@ -793,7 +988,7 @@ function App() {
                     </span>
                   </div>
                   
-                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 py-1 px-2.5 rounded-xl text-[9px] text-slate-500 font-bold">
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 py-1 px-2.5 rounded-xl text-[9px] text-slate-500 font-bold font-sans">
                     Versão {CURRENT_VERSION}
                   </div>
                 </header>
@@ -810,16 +1005,16 @@ function App() {
               </>
             )}
 
-            {/* Bottom-Right Circular Highlighted FAB Plus Button */}
+            {/* Bottom-Right Circular Highlighted FAB Plus Button (Context Aware) */}
             <div className="absolute bottom-6 right-6 z-20">
               {/* pulsing glow rings to highlight */}
               <div className="absolute -inset-1.5 rounded-full bg-[#f08622]/20 animate-pulse scale-105" />
               <div className="absolute -inset-3.5 rounded-full bg-[#f08622]/5 scale-110" />
               
               <button
-                onClick={handleOpenAddModal}
+                onClick={handleFABClick}
                 className="relative w-14 h-14 rounded-full bg-[#f08622] hover:bg-[#d97214] text-white flex items-center justify-center shadow-lg shadow-[#f08622]/35 hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
-                title="Novo Lançamento"
+                title={activeTab === 'DIARIAS' ? 'Novo Lançamento Diário' : 'Novo Lançamento Pessoal'}
               >
                 <Plus size={28} className="stroke-[3]" />
               </button>
@@ -837,6 +1032,15 @@ function App() {
         editingTransaction={editingTransaction}
         categoriesList={customCategories}
         onAddNewCategory={handleAddNewCategory}
+      />
+
+      {/* Work Shift Modal (BottomSheet) */}
+      <WorkShiftModal
+        isOpen={isShiftModalOpen}
+        onClose={() => setIsShiftModalOpen(false)}
+        onSave={handleSaveWorkShift}
+        onDelete={handleDeleteWorkShift}
+        editingEntry={editingShiftEntry}
       />
     </div>
   );

@@ -137,3 +137,23 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     status: 'RECEBIDO'
   }
 ];
+
+export interface WorkShiftEntry {
+  id: string;
+  data: string; // YYYY-MM-DD
+  atividade: string; // 'Motorista de App' | 'Evento' | 'Outro'
+  tipo: 'ENTRADA' | 'SAIDA';
+  categoria?: string; // 'Combustível' | 'Alimentação/Lanche' | 'Pedágio/Estacionamento' | 'Manutenção' | 'Outros'
+  valor: number;
+  observacao?: string;
+}
+
+export const ACTIVITIES = ['Motorista de App', 'Evento', 'Outro'];
+
+export const SHIFT_EXPENSE_CATEGORIES = [
+  'Combustível',
+  'Alimentação/Lanche',
+  'Pedágio/Estacionamento',
+  'Manutenção',
+  'Outros'
+];
