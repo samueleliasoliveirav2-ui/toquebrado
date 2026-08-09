@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon } from 'lucide-react';
-import type { Transaction, TransactionStatus, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice } from './types';
+import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles } from 'lucide-react';
+import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
 import { WeeklyAccordion } from './components/WeeklyAccordion';
@@ -75,6 +75,157 @@ function App() {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  // Revolut & Apple Wallet states
+  const [isBalanceVisible, setIsBalanceVisible] = useState(true);
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [selectedWalletCard, setSelectedWalletCard] = useState<CreditCard | null>(null);
+  const [inicioViewMode, setInicioViewMode] = useState<'LIST' | 'CHART'>('LIST');
+  const [verifiedCardIds, setVerifiedCardIds] = useState<string[]>([]);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('SAIDA');
+
+  const openModalForType = (tipo: 'ENTRADA' | 'SAIDA') => {
+    setEditingTransaction(null);
+    setModalDefaultType(tipo);
+    setIsModalOpen(true);
+  };
+
+  const triggerToast = (msg: string) => {
+    setToastMsg(msg);
+    setShowToast(true);
+  };
+
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
+
+  const defaultSampleCards: CreditCard[] = [
+    { id: 'itau-sample', userId: '', nome: 'Itaú Visa Platinum', bandeira: 'VISA', limiteTotal: 12000, diaFechamento: 3, diaVencimento: 10, cor: '#f97316' },
+    { id: 'c6-sample', userId: '', nome: 'C6 Bank Silver', bandeira: 'MASTERCARD', limiteTotal: 8500, diaFechamento: 5, diaVencimento: 15, cor: '#475569' },
+    { id: 'revolut-sample', userId: '', nome: 'Revolut Ultra', bandeira: 'VISA', limiteTotal: 25000, diaFechamento: 1, diaVencimento: 8, cor: '#6d28d9' },
+    { id: 'nubank-sample', userId: '', nome: 'Nubank Ultravioleta', bandeira: 'MASTERCARD', limiteTotal: 15000, diaFechamento: 2, diaVencimento: 7, cor: '#3b0764' }
+  ];
+
+  const cardsToDisplay = creditCards.length > 0 ? creditCards : defaultSampleCards;
+
+  const getCardGradient = (card: CreditCard) => {
+    const name = card.nome.toLowerCase();
+    if (name.includes('itau') || name.includes('itaú')) {
+      return 'from-orange-500 via-orange-600 to-amber-700';
+    }
+    if (name.includes('c6')) {
+      return 'from-slate-700 via-zinc-800 to-slate-900';
+    }
+    if (name.includes('revolut')) {
+      return 'from-purple-800 via-indigo-900 to-slate-950';
+    }
+    if (name.includes('nubank') || name.includes('roxo')) {
+      return 'from-purple-950 via-violet-950 to-slate-950';
+    }
+    return 'from-slate-800 via-slate-850 to-slate-900';
+  };
+
+  const getActiveCardLabel = () => {
+    const card = creditCards.find(c => c.id === activeCardId) || creditCards[0] || defaultSampleCards[0];
+    if (card) {
+      return `${card.nome} • ${card.id.slice(-4)}`;
+    }
+    return 'Itaú Visa • 4456';
+  };
+
+  const getCardStatus = (cardId: string) => {
+    const isVerified = verifiedCardIds.includes(cardId);
+    if (cardId.includes('itau') && !isVerified) {
+      return {
+        title: 'Verificação Necessária',
+        desc: 'Seu cartão está aguardando para ser verificado para pagamentos aproximados.',
+        icon: 'shield',
+        iconClass: 'text-amber-500 bg-amber-500/10',
+        btnText: 'Complete a Verificação',
+        action: () => {
+          setVerifiedCardIds(prev => [...prev, cardId]);
+          triggerToast('Cartão Itaú verificado com sucesso!');
+        }
+      };
+    }
+    
+    if (cardId.includes('itau') && isVerified) {
+      return {
+        title: 'Cartão Verificado & Ativo',
+        desc: 'Pronto para pagamentos aproximados e Apple Pay.',
+        icon: 'check',
+        iconClass: 'text-emerald-400 bg-emerald-500/10',
+        btnText: 'Ver Detalhes de Segurança',
+        action: () => triggerToast('Segurança reforçada por tokenização.')
+      };
+    }
+
+    if (cardId.includes('c6')) {
+      const isPaid = verifiedCardIds.includes('c6-paid');
+      return {
+        title: 'Limite Disponível: R$ 8.500,00',
+        desc: isPaid ? 'Nenhuma fatura em aberto.' : 'Fatura atual em R$ 262,50 com vencimento para 15/Ago.',
+        icon: 'check',
+        iconClass: 'text-emerald-400 bg-emerald-500/10',
+        btnText: isPaid ? 'Ver Histórico de Faturas' : 'Pagar Fatura Antecipada',
+        action: () => {
+          if (!isPaid) {
+            setVerifiedCardIds(prev => [...prev, 'c6-paid']);
+            triggerToast('Fatura C6 paga antecipadamente!');
+          } else {
+            triggerToast('Nenhuma fatura em aberto.');
+          }
+        }
+      };
+    }
+
+    if (cardId.includes('revolut')) {
+      return {
+        title: 'Cartão Ultra Ativo & Protegido',
+        desc: 'Uso internacional liberado. Sem taxas de IOF sobre câmbio.',
+        icon: 'globe',
+        iconClass: 'text-purple-400 bg-purple-500/10',
+        btnText: 'Gerenciar Limite Global',
+        action: () => triggerToast('Abrindo limites internacionais...')
+      };
+    }
+
+    if (cardId.includes('nubank')) {
+      const isRescued = verifiedCardIds.includes('nu-rescued');
+      return {
+        title: 'Cashback 1% Rendendo 200% CDI',
+        desc: isRescued ? 'Cashback resgatado com sucesso.' : 'Você acumulou R$ 148,20 de cashback no último mês.',
+        icon: 'coins',
+        iconClass: 'text-amber-400 bg-amber-500/10',
+        btnText: isRescued ? 'Ver Histórico de Resgates' : 'Resgatar Cashback',
+        action: () => {
+          if (!isRescued) {
+            setVerifiedCardIds(prev => [...prev, 'nu-rescued']);
+            triggerToast('Cashback transferido para a conta!');
+          } else {
+            triggerToast('Histórico de resgates em dia.');
+          }
+        }
+      };
+    }
+
+    return {
+      title: 'Cartão Ativo',
+      desc: 'Pronto para uso e integrado ao gerenciamento de gastos.',
+      icon: 'check',
+      iconClass: 'text-emerald-400 bg-emerald-500/10',
+      btnText: 'Ver Limites',
+      action: () => triggerToast('Limites e faturas em dia.')
+    };
+  };
 
   // Sync custom categories to localStorage
   useEffect(() => {
@@ -1472,25 +1623,25 @@ function App() {
   const activeEvents = workShifts.filter(e => e.tipo === 'ENTRADA' && e.atividade === 'Evento');
 
   return (
-    <div className="w-full min-h-screen flex justify-center bg-slate-100 select-none">
+    <div className="w-full min-h-screen flex justify-center bg-slate-900 select-none">
       {/* Centered responsive container */}
-      <div className="relative w-full max-w-md h-[100dvh] bg-white flex flex-col shadow-xl md:border-x md:border-slate-200 overflow-hidden">
+      <div className="relative w-full max-w-md h-[100dvh] bg-slate-950 flex flex-col shadow-2xl md:border-x md:border-slate-800 overflow-hidden">
         
         {/* Dynamic New Version Available Alert Banner */}
         {newVersionAvailable && (
-          <div className="absolute top-4 left-4 right-4 z-50 bg-[#0e69b2]/95 backdrop-blur-md border border-blue-400/20 rounded-2xl p-3.5 shadow-xl animate-slide-down flex items-center justify-between gap-3 text-white">
-            <div className="flex items-center gap-2.5">
+          <div className="absolute top-4 left-4 right-4 z-50 bg-[#6d28d9]/95 backdrop-blur-md border border-purple-500/30 rounded-2xl p-3.5 shadow-xl animate-slide-down flex items-center justify-between gap-3 text-white">
+            <div className="flex items-center gap-2.5 text-left">
               <div className="p-1.5 rounded-lg bg-white/10 shrink-0 text-amber-300">
                 <Info size={16} />
               </div>
-              <div className="text-left">
+              <div>
                 <p className="text-[11px] font-extrabold leading-none">Novas melhorias disponíveis!</p>
-                <p className="text-[9px] text-white/85 font-bold mt-1">Atualize o aplicativo para carregar a nova versão.</p>
+                <p className="text-[9px] text-white/85 font-bold mt-1 font-sans">Atualize o aplicativo para carregar a nova versão.</p>
               </div>
             </div>
             <button
               onClick={() => window.location.reload()}
-              className="px-3 py-1.5 rounded-lg bg-white text-[#0e69b2] text-[10px] font-extrabold hover:bg-slate-100 transition-colors shadow-sm cursor-pointer shrink-0"
+              className="px-3 py-1.5 rounded-lg bg-white text-purple-900 text-[10px] font-extrabold hover:bg-slate-100 transition-colors shadow-sm cursor-pointer shrink-0 font-sans"
             >
               Atualizar
             </button>
@@ -1502,34 +1653,40 @@ function App() {
           <div className="fixed inset-0 z-50 flex animate-fade-in">
             {/* Backdrop click dismiss */}
             <div 
-              className="absolute inset-0 bg-black/40 backdrop-blur-xs cursor-pointer" 
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs cursor-pointer" 
               onClick={() => setIsDrawerOpen(false)} 
             />
 
             {/* Drawer container (slides from left) */}
-            <div className="relative w-64 max-w-[80vw] h-full bg-white flex flex-col p-5 shadow-2xl z-10 animate-slide-right">
+            <div className="relative w-64 max-w-[80vw] h-full bg-slate-900 text-white flex flex-col p-5 shadow-2xl border-r border-slate-800 z-10 animate-slide-right">
               {/* Header section with close and branding */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <span className="text-xl font-black text-[#0e69b2] tracking-tighter lowercase select-none">
-                  tô quebrado
-                </span>
+              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                <div className="flex items-center gap-3 text-left">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-white font-black text-base shadow-revolut-glow">
+                    R
+                  </div>
+                  <div>
+                    <h2 className="font-extrabold text-sm leading-tight text-white font-sans">Samuel Finanças</h2>
+                    <span className="text-[10px] text-purple-400 font-bold font-sans">Conta Ultra</span>
+                  </div>
+                </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
                   <X size={16} />
                 </button>
               </div>
 
               {/* User Identity info inside drawer */}
-              <div className="py-4 border-b border-slate-100 mb-4">
-                <p className="text-[10px] uppercase font-bold text-slate-400">Logado como</p>
-                <p className="text-xs font-bold text-slate-700 truncate mt-0.5">{currentUser}</p>
-                <p className="text-[10px] text-slate-450 font-semibold truncate">{userEmail}</p>
+              <div className="py-4 border-b border-slate-800 mb-4 text-left font-sans">
+                <p className="text-[9px] uppercase font-bold text-slate-500">Logado como</p>
+                <p className="text-xs font-bold text-slate-300 truncate mt-0.5">{currentUser}</p>
+                <p className="text-[10px] text-slate-550 font-semibold truncate">{userEmail}</p>
               </div>
 
               {/* Navigation list items */}
-              <nav className="flex-1 space-y-1.5">
+              <nav className="flex-1 space-y-1.5 text-left font-sans">
                 {/* Início Link */}
                 <button
                   onClick={() => {
@@ -1538,8 +1695,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'INICIO'
-                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
-                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
+                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
                   }`}
                 >
                   <Home size={16} />
@@ -1554,8 +1711,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'DIARIAS'
-                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
-                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
+                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
                   }`}
                 >
                   <Briefcase size={16} />
@@ -1570,8 +1727,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'RELATORIOS'
-                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
-                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
+                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
                   }`}
                 >
                   <BarChart2 size={16} />
@@ -1586,8 +1743,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'CONTAS'
-                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
-                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
+                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
                   }`}
                 >
                   <Wallet size={16} />
@@ -1602,8 +1759,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'CARTOES'
-                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
-                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
+                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
                   }`}
                 >
                   <CreditCardIcon size={16} />
@@ -1618,8 +1775,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'PERFIL'
-                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
-                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
+                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
                   }`}
                 >
                   <Settings size={16} />
@@ -1628,7 +1785,7 @@ function App() {
               </nav>
 
               {/* Bottom Drawer actions */}
-              <div className="border-t border-slate-100 pt-4 space-y-2">
+              <div className="border-t border-slate-800 pt-4 space-y-2 font-sans">
                 {/* Refresh/Sync button */}
                 <button
                   onClick={() => {
@@ -1636,9 +1793,9 @@ function App() {
                     setIsDrawerOpen(false);
                   }}
                   disabled={isSyncing}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-650 hover:bg-slate-50 transition-all disabled:opacity-60 cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-800 transition-all disabled:opacity-60 cursor-pointer"
                 >
-                  <RefreshCw size={14} className={isSyncing ? "animate-spin text-[#0e69b2]" : ""} />
+                  <RefreshCw size={14} className={isSyncing ? "animate-spin text-purple-400" : ""} />
                   <span>Atualizar Dados</span>
                 </button>
 
@@ -1648,7 +1805,7 @@ function App() {
                     setIsDrawerOpen(false);
                     handleLogout();
                   }}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-550 hover:bg-rose-50/50 transition-all cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-950/30 transition-all cursor-pointer"
                 >
                   <LogOut size={14} />
                   <span>Sair do Sistema</span>
@@ -1660,9 +1817,9 @@ function App() {
 
         {/* Conditional rendering based on loading session */}
         {loading ? (
-          <div className="flex-1 bg-white flex flex-col items-center justify-center text-slate-500 h-full">
-            <Loader2 className="animate-spin text-[#0e69b2] mb-3" size={32} />
-            <span className="text-sm font-semibold">Carregando carteira...</span>
+          <div className="flex-1 bg-slate-950 flex flex-col items-center justify-center text-slate-500 h-full">
+            <Loader2 className="animate-spin text-purple-500 mb-3" size={32} />
+            <span className="text-sm font-semibold font-sans text-slate-405">Carregando carteira...</span>
           </div>
         ) : !currentUser ? (
           <LoginScreen onLoginSuccess={handleLoginSuccess} />
@@ -1670,61 +1827,147 @@ function App() {
           <>
             {activeTab === 'INICIO' ? (
               <>
-                {/* App Main Header (White Background) */}
-                <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
-                  <div className="flex items-center justify-between">
-                    
-                    {/* Left: Hamburger menu + Greeting */}
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setIsDrawerOpen(true)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-650 hover:text-slate-800 transition-colors cursor-pointer"
-                        title="Menu"
-                      >
-                        <Menu size={20} />
-                      </button>
-                      
-                      <span className="text-sm font-extrabold text-slate-800 font-sans">
-                        Olá, {currentUser.split(' ')[0]}
-                      </span>
-                    </div>
+                {/* Top Header Navigation (Revolut Inspired Mesh Background) */}
+                <header className="revolut-hero-bg text-white pt-6 pb-12 px-5 rounded-b-[36px] shadow-revolut-glow relative shrink-0">
+                  <div className="flex items-center justify-between gap-3 mb-6">
+                    {/* Profile Avatar & Drawer Menu Trigger */}
+                    <button
+                      onClick={() => setIsDrawerOpen(true)}
+                      className="flex items-center space-x-2.5 p-1.5 pr-3 rounded-full glass-pill hover:bg-white/25 transition cursor-pointer"
+                      title="Menu"
+                    >
+                      <img 
+                        src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" 
+                        alt="Samuel Avatar" 
+                        className="w-8 h-8 rounded-full object-cover ring-2 ring-white/60"
+                      />
+                      <Menu size={12} className="text-white/90" />
+                    </button>
 
-                    {/* Right: Subtle sync spinner indicator */}
-                    {isSyncing && (
-                      <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
-                    )}
+                    {/* Cards Selector Pill (Revolut/Apple Wallet Launcher) */}
+                    <button
+                      onClick={() => setIsWalletModalOpen(true)}
+                      className="flex-1 max-w-[210px] sm:max-w-xs flex items-center justify-between px-3 py-1.5 bg-white/12 border border-white/18 rounded-full text-xs text-white hover:bg-white/20 transition backdrop-blur-md shadow-sm cursor-pointer font-sans"
+                    >
+                      <div className="flex items-center space-x-2 truncate">
+                        <Wallet size={12} className="text-amber-300" />
+                        <span className="font-extrabold truncate">{getActiveCardLabel()}</span>
+                      </div>
+                      <ChevronDown size={10} className="opacity-70 ml-1 shrink-0" />
+                    </button>
+
+                    {/* Notification Alerts */}
+                    <div className="flex items-center space-x-2">
+                      <button 
+                        onClick={() => triggerToast('Notificações em dia!')} 
+                        className="w-9 h-9 rounded-full glass-pill flex items-center justify-center text-white/90 hover:bg-white/25 transition relative cursor-pointer"
+                      >
+                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-pink-500 rounded-full ring-1 ring-purple-900"></span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Month Selector Slider */}
-                  <div className="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
-                    <button
-                      onClick={handlePrevMonth}
-                      disabled={currentIndex === 0}
-                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-                      title="Mês Anterior"
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    
-                    <span className="text-xs font-black text-[#0e69b2] uppercase tracking-wider select-none font-sans">
-                      {months[currentIndex]?.label}
-                    </span>
+                  {/* Month Selector Pill */}
+                  <div className="flex justify-center mb-4">
+                    <div className="inline-flex items-center space-x-3 px-4 py-1.5 rounded-full glass-pill text-xs font-semibold tracking-wide font-sans">
+                      <button
+                        onClick={handlePrevMonth}
+                        disabled={currentIndex === 0}
+                        className="text-white/70 hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="Mês Anterior"
+                      >
+                        <ChevronLeft size={12} />
+                      </button>
+                      <span className="uppercase">{months[currentIndex]?.label}</span>
+                      <button
+                        onClick={handleNextMonth}
+                        disabled={currentIndex === months.length - 1}
+                        className="text-white/70 hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="Próximo Mês"
+                      >
+                        <ChevronRight size={12} />
+                      </button>
+                    </div>
+                  </div>
 
-                    <button
-                      onClick={handleNextMonth}
-                      disabled={currentIndex === months.length - 1}
-                      className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-                      title="Próximo Mês"
+                  {/* Main Balance Display */}
+                  <div className="text-center space-y-1 mt-2">
+                    <div className="flex items-center justify-center space-x-1.5 text-xs text-purple-200 font-bold tracking-wide uppercase font-sans">
+                      <span>Conta Principal • BRL</span>
+                      <button 
+                        onClick={() => setIsBalanceVisible(!isBalanceVisible)} 
+                        className="text-purple-200/80 hover:text-white transition cursor-pointer"
+                      >
+                        {isBalanceVisible ? <Eye size={12} /> : <EyeOff size={12} />}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-center space-x-1">
+                      <h1 className="text-4xl sm:text-5xl font-black tracking-tight font-mono text-white">
+                        {isBalanceVisible ? `R$ ${saldoAcumulado.toFixed(2).replace('.', ',')}` : 'R$ •••••••'}
+                      </h1>
+                    </div>
+
+                    <div className="pt-1">
+                      <span className="inline-block px-3 py-0.5 rounded-full glass-pill text-[10px] text-purple-100 font-bold font-sans">
+                        Lançamentos Efetivados
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Grid (4 round glass buttons) */}
+                  <div className="grid grid-cols-4 gap-3 max-w-xs mx-auto mt-7">
+                    <button 
+                      onClick={() => openModalForType('ENTRADA')} 
+                      className="flex flex-col items-center space-y-1.5 group cursor-pointer"
                     >
-                      <ChevronRight size={16} />
+                      <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
+                        <Plus size={18} className="stroke-[2.5]" />
+                      </div>
+                      <span className="text-[11px] font-bold text-purple-100 font-sans">Entrada</span>
+                    </button>
+
+                    <button 
+                      onClick={() => openModalForType('SAIDA')} 
+                      className="flex flex-col items-center space-y-1.5 group cursor-pointer"
+                    >
+                      <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
+                        <Minus size={18} className="stroke-[2.5]" />
+                      </div>
+                      <span className="text-[11px] font-bold text-purple-100 font-sans">Saída</span>
+                    </button>
+
+                    <button 
+                      onClick={() => setInicioViewMode(inicioViewMode === 'LIST' ? 'CHART' : 'LIST')} 
+                      className="flex flex-col items-center space-y-1.5 group cursor-pointer"
+                    >
+                      <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
+                        <BarChart2 size={18} />
+                      </div>
+                      <span className="text-[11px] font-bold text-purple-100 font-sans">
+                        {inicioViewMode === 'LIST' ? 'Gráficos' : 'Lista'}
+                      </span>
+                    </button>
+
+                    <button 
+                      onClick={() => setIsWalletModalOpen(true)} 
+                      className="flex flex-col items-center space-y-1.5 group cursor-pointer"
+                    >
+                      <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
+                        <CreditCardIcon size={18} />
+                      </div>
+                      <span className="text-[11px] font-bold text-purple-100 font-sans">Cartões</span>
                     </button>
                   </div>
                 </header>
 
                 {/* Scrollable Content Pane */}
-                <main className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28">
+                <main className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-950 scrollbar-thin pb-28">
                   
-                  {/* Stats Header Summary Cards */}
+                  {/* Stats Header Summary Cards (Inputs vs Expenses) */}
                   <StatsHeader 
                     saldoAcumulado={saldoAcumulado}
                     totalEntradas={totalEntradasMes}
@@ -1733,14 +1976,14 @@ function App() {
 
                   {/* Warning/Cleanup Banner for Mock Data */}
                   {mockTransactionsCount > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0">
+                    <div className="bg-amber-950/30 border border-amber-900/30 rounded-[24px] p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0 text-left font-sans">
                       <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 shrink-0">
+                        <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
                           <AlertTriangle size={18} />
                         </div>
                         <div className="space-y-1">
-                          <h4 className="text-xs font-extrabold text-amber-800">Dados fictícios detectados</h4>
-                          <p className="text-[10px] text-amber-650 font-semibold leading-normal">
+                          <h4 className="text-xs font-extrabold text-amber-400">Dados fictícios detectados</h4>
+                          <p className="text-[10px] text-amber-300/80 font-bold leading-normal">
                             Identificamos {mockTransactionsCount} {mockTransactionsCount === 1 ? 'lançamento' : 'lançamentos'} de teste na sua conta. Deseja removê-los e manter apenas seus dados originais?
                           </p>
                         </div>
@@ -1759,14 +2002,14 @@ function App() {
 
                   {/* Onboarding Empty State Seeding Card */}
                   {transactions.length === 0 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0">
+                    <div className="bg-slate-900 border border-slate-800 rounded-[24px] p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0 text-left font-sans">
                       <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
+                        <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 shrink-0">
                           <Info size={18} />
                         </div>
                         <div className="space-y-1">
-                          <h4 className="text-xs font-extrabold text-blue-800">Primeiros passos</h4>
-                          <p className="text-[10px] text-blue-650 font-semibold leading-normal">
+                          <h4 className="text-xs font-extrabold text-purple-300">Primeiros passos</h4>
+                          <p className="text-[10px] text-slate-400 font-bold leading-normal">
                             Sua carteira está vazia! Deseja carregar alguns lançamentos fictícios para experimentar as funcionalidades do Tô Quebrado?
                           </p>
                         </div>
@@ -1775,7 +2018,7 @@ function App() {
                         <button
                           onClick={handleSeedMockData}
                           disabled={isSyncing}
-                          className="px-3 py-1.5 rounded-lg bg-[#0e69b2] hover:bg-[#0c5996] text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
+                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
                         >
                           Carregar dados de teste
                         </button>
@@ -1784,9 +2027,9 @@ function App() {
                   )}
 
                   {/* Filters Bar: Search & Tabs */}
-                  <div className="space-y-3">
+                  <div className="space-y-3 font-sans">
                     <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
                         <Search size={14} />
                       </span>
                       <input
@@ -1794,38 +2037,38 @@ function App() {
                         placeholder="Buscar por descrição ou categoria..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white border border-slate-250 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0e69b2] focus:bg-white transition-all font-semibold shadow-2xs"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:bg-slate-900 transition-all font-semibold shadow-inner"
                       />
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex items-center justify-between gap-1 bg-slate-900 border border-slate-800 p-1 rounded-2xl text-xs font-bold shadow-inner">
                       <button
                         onClick={() => setFilterType('TODOS')}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                        className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all cursor-pointer ${
                           filterType === 'TODOS'
-                            ? 'bg-slate-200 text-slate-800 border-slate-350 shadow-2xs'
-                            : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
+                            ? 'bg-slate-800 text-white shadow-sm'
+                            : 'text-slate-500 hover:text-slate-350'
                         }`}
                       >
                         Todos
                       </button>
                       <button
                         onClick={() => setFilterType('ENTRADA')}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1 ${
+                        className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
                           filterType === 'ENTRADA'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs'
-                            : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
-                      }`}
+                            ? 'bg-slate-800 text-emerald-400 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-350'
+                        }`}
                       >
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         Receitas
                       </button>
                       <button
                         onClick={() => setFilterType('SAIDA')}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1 ${
+                        className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
                           filterType === 'SAIDA'
-                            ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-2xs'
-                            : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
+                            ? 'bg-slate-800 text-rose-455 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-350'
                         }`}
                       >
                         <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
@@ -1834,15 +2077,119 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Weekly Accordion Lists */}
-                  <div>
-                    <WeeklyAccordion
-                      transactions={displayTransactions}
-                      onEditTransaction={handleOpenEditModal}
-                      onToggleStatus={handleToggleStatus}
-                      accounts={accounts}
-                    />
-                  </div>
+                  {/* List View or Charts View */}
+                  {inicioViewMode === 'LIST' ? (
+                    <div>
+                      <WeeklyAccordion
+                        transactions={displayTransactions}
+                        onEditTransaction={handleOpenEditModal}
+                        onToggleStatus={handleToggleStatus}
+                        accounts={accounts}
+                      />
+                    </div>
+                  ) : (
+                    /* VISUAL CHARTS SECTION (Gráficos/Análises) */
+                    <div className="space-y-4 animate-fade-in font-sans">
+                      <div className="bg-slate-900 p-5 rounded-[28px] border border-slate-800 shadow-sm space-y-3">
+                        <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 text-left">
+                          Gastos por Categoria
+                        </h4>
+                        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-6 py-2">
+                          <div className="relative flex items-center justify-center shrink-0">
+                            {/* SVG Doughnut */}
+                            <svg width="140" height="140" viewBox="0 0 100 100" className="w-36 h-36">
+                              {/* Alimentação (52%) */}
+                              <circle cx="50" cy="50" r="35" fill="transparent" stroke="#f43f5e" strokeWidth="10" strokeDasharray="114 220" strokeDashoffset="55" strokeLinecap="round" />
+                              {/* Outros (30%) */}
+                              <circle cx="50" cy="50" r="35" fill="transparent" stroke="#64748b" strokeWidth="10" strokeDasharray="66 220" strokeDashoffset="169" strokeLinecap="round" />
+                              {/* Lazer (12%) */}
+                              <circle cx="50" cy="50" r="35" fill="transparent" stroke="#8b5cf6" strokeWidth="10" strokeDasharray="26 220" strokeDashoffset="235" strokeLinecap="round" />
+                              {/* Transporte (6%) */}
+                              <circle cx="50" cy="50" r="35" fill="transparent" stroke="#f59e0b" strokeWidth="10" strokeDasharray="14 220" strokeDashoffset="261" strokeLinecap="round" />
+                              {/* Center cover */}
+                              <circle cx="50" cy="50" r="28" fill="#0f172a" />
+                              <text x="50" y="47" textAnchor="middle" fill="#94a3b8" fontSize="6" fontWeight="bold">GASTOS</text>
+                              <text x="50" y="58" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="black" fontFamily="monospace">R$ 3.540</text>
+                            </svg>
+                          </div>
+                          
+                          {/* Legend list */}
+                          <div className="flex-1 space-y-2 text-left w-full">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 block shrink-0" />
+                                <span className="text-slate-400 font-bold">Alimentação</span>
+                              </div>
+                              <span className="font-mono text-white font-bold">52.3%</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-slate-550 block shrink-0" />
+                                <span className="text-slate-400 font-bold">Outros</span>
+                              </div>
+                              <span className="font-mono text-white font-bold">30.0%</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 block shrink-0" />
+                                <span className="text-slate-400 font-bold">Lazer / Assinaturas</span>
+                              </div>
+                              <span className="font-mono text-white font-bold">11.5%</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 block shrink-0" />
+                                <span className="text-slate-400 font-bold">Transporte</span>
+                              </div>
+                              <span className="font-mono text-white font-bold">6.2%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-900 p-5 rounded-[28px] border border-slate-800 shadow-sm space-y-3">
+                        <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 text-left">
+                          Fluxo Mensal Semana a Semana
+                        </h4>
+                        
+                        {/* Weekly flow chart */}
+                        <div className="flex justify-between items-end h-32 px-4 pt-4">
+                          <div className="flex flex-col items-center gap-1.5 flex-1">
+                            <div className="w-full flex justify-center gap-1 items-end h-24">
+                              <div className="w-3 bg-emerald-500 rounded-t-md h-full relative group">
+                                <span className="absolute -top-7 bg-slate-800 text-[8px] text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold">R$ 4.192</span>
+                              </div>
+                              <div className="w-3 bg-rose-500 rounded-t-md h-[84%] relative group">
+                                <span className="absolute -top-7 bg-slate-800 text-[8px] text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold">R$ 3.540</span>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-bold">Sem 1</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1.5 flex-1">
+                            <div className="w-full flex justify-center gap-1 items-end h-24">
+                              <div className="w-3 bg-emerald-500/10 rounded-t-md h-[4%]"></div>
+                              <div className="w-3 bg-rose-500/10 rounded-t-md h-[4%]"></div>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-bold">Sem 2</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1.5 flex-1">
+                            <div className="w-full flex justify-center gap-1 items-end h-24">
+                              <div className="w-3 bg-emerald-500/10 rounded-t-md h-[4%]"></div>
+                              <div className="w-3 bg-rose-500/10 rounded-t-md h-[4%]"></div>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-bold">Sem 3</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1.5 flex-1">
+                            <div className="w-full flex justify-center gap-1 items-end h-24">
+                              <div className="w-3 bg-emerald-500/10 rounded-t-md h-[4%]"></div>
+                              <div className="w-3 bg-rose-500/10 rounded-t-md h-[4%]"></div>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-bold">Sem 4</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </main>
               </>
             ) : activeTab === 'DIARIAS' ? (
@@ -2033,6 +2380,7 @@ function App() {
         onAddNewCategory={handleAddNewCategory}
         accounts={accounts}
         creditCards={creditCards}
+        defaultType={modalDefaultType}
         onInvoiceTransactionSaved={(cartaoId, mesAno) => {
           const card = creditCards.find((c) => c.id === cartaoId);
           if (!card) return;
@@ -2101,6 +2449,269 @@ function App() {
         }}
         onPayInvoice={handlePayInvoice}
       />
+
+      {/* Apple Wallet Modal */}
+      {isWalletModalOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-end justify-center animate-fade-in">
+          <div className="absolute inset-0" onClick={() => setIsWalletModalOpen(false)} />
+          
+          <div className="relative w-full max-w-md h-[90vh] bg-slate-950 rounded-t-[36px] flex flex-col overflow-hidden border-t border-slate-800 shadow-2xl z-10 animate-slide-up">
+            {/* Top Navigation */}
+            <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30 font-sans">
+              <div className="flex items-center space-x-3">
+                {selectedWalletCard && (
+                  <button 
+                    onClick={() => setSelectedWalletCard(null)} 
+                    className="w-8 h-8 rounded-full bg-slate-850 text-white flex items-center justify-center hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                )}
+                <h2 className="text-xl font-black text-white tracking-tight">
+                  {selectedWalletCard ? 'Detalhes' : 'Carteira'}
+                </h2>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => {
+                    setIsWalletModalOpen(false);
+                    setEditingCreditCard(null);
+                    setIsCreditCardModalOpen(true);
+                  }} 
+                  className="w-8 h-8 rounded-full bg-slate-850 text-white flex items-center justify-center hover:bg-slate-800 transition cursor-pointer"
+                  title="Novo Cartão"
+                >
+                  <Plus size={16} />
+                </button>
+                <button 
+                  onClick={() => {
+                    setIsWalletModalOpen(false);
+                    setSelectedWalletCard(null);
+                  }} 
+                  className="w-8 h-8 rounded-full bg-slate-850 text-white flex items-center justify-center hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Scroll Area */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6 scrollbar-thin">
+              {!selectedWalletCard ? (
+                /* STACKED CARDS VIEW */
+                <div className="space-y-5 text-left">
+                  {/* Financial Tip Card */}
+                  <div className="bg-gradient-to-r from-purple-950/60 to-indigo-950/60 rounded-[24px] p-4 border border-purple-800/40 flex items-center space-x-4 shadow-lg backdrop-blur-md font-sans">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white text-lg shrink-0">
+                      <Sparkles size={18} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center space-x-1.5 mb-0.5">
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">Dica Financeira</span>
+                      </div>
+                      <h4 className="text-xs font-extrabold text-white leading-tight">Atenção ao Teto de Gastos</h4>
+                      <p className="text-[10px] text-slate-350 leading-tight mt-0.5">Você atingiu 84% do limite mensal estipulado nos cartões. Priorize gastos essenciais até o final do mês!</p>
+                    </div>
+                    <button 
+                      onClick={() => triggerToast('Dica marcada como lida')} 
+                      className="px-2.5 py-1 bg-purple-650 hover:bg-purple-600 text-white rounded-full text-[10px] font-bold transition shrink-0 cursor-pointer"
+                    >
+                      Entendi
+                    </button>
+                  </div>
+
+                  <div className="pt-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-3 px-1 font-sans">
+                      Meus Cartões (Toque para ver detalhes)
+                    </span>
+
+                    {/* OVERLAPPING STACK OF CARDS */}
+                    <div className="relative space-y-[-115px] pt-1 pb-24 font-sans">
+                      {cardsToDisplay.map((card, idx) => {
+                        const gradient = getCardGradient(card);
+                        const isSample = card.id.includes('sample');
+                        return (
+                          <div 
+                            key={card.id}
+                            onClick={() => setSelectedWalletCard(card)}
+                            style={{ 
+                              zIndex: 10 + idx,
+                              background: card.cor && !isSample ? `linear-gradient(135deg, ${card.cor} 0%, #0f172a 100%)` : undefined
+                            }}
+                            className={`card-stack-item cursor-pointer relative rounded-[24px] p-5 h-44 bg-gradient-to-br ${gradient} text-white shadow-2xl border border-white/10 flex flex-col justify-between overflow-hidden`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-extrabold text-sm tracking-wide">{card.nome}</span>
+                              <span className="text-[10px] font-black bg-black/25 px-2.5 py-0.5 rounded-full border border-white/10">{card.bandeira}</span>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-white/70 font-medium">{isSample ? 'Cartão de Demonstração' : 'Cartão de Crédito'}</p>
+                              <div className="flex items-center justify-between">
+                                <span className="text-base font-mono font-bold tracking-wider">•••• {card.id.slice(-4)}</span>
+                                <span className="text-xs opacity-75 font-semibold">Limite: R$ {card.limiteTotal}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* SINGLE SELECTED CARD DETAIL VIEW */
+                <div className="space-y-5 text-left animate-fade-in font-sans">
+                  {/* Selected Card Graphic */}
+                  <div 
+                    style={{ 
+                      background: selectedWalletCard.cor && !selectedWalletCard.id.includes('sample') 
+                        ? `linear-gradient(135deg, ${selectedWalletCard.cor} 0%, #0f172a 100%)` 
+                        : undefined
+                    }}
+                    className={`rounded-[28px] p-6 h-48 text-white shadow-2xl border border-white/10 flex flex-col justify-between bg-gradient-to-br ${getCardGradient(selectedWalletCard)}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-base tracking-wide">{selectedWalletCard.nome}</span>
+                      <span className="text-[10px] font-bold bg-black/25 px-3 py-1 rounded-full border border-white/10">{selectedWalletCard.bandeira}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-white/80 font-medium">Limite Total: R$ {selectedWalletCard.limiteTotal.toFixed(2).replace('.', ',')}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-mono font-bold tracking-widest">•••• {selectedWalletCard.id.slice(-4)}</span>
+                        <span className="text-xs font-bold text-slate-350">Vence dia {selectedWalletCard.diaVencimento}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status / Verification Box */}
+                  {(() => {
+                    const status = getCardStatus(selectedWalletCard.id);
+                    return (
+                      <div className="bg-slate-900 rounded-3xl p-5 border border-slate-800 space-y-3">
+                        <div className="flex items-start space-x-3.5 text-left">
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 ${status.iconClass}`}>
+                            {status.icon === 'shield' ? <Info size={20} /> : <AlertTriangle size={20} />}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-white">{status.title}</h4>
+                            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{status.desc}</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={status.action}
+                          className="w-full py-3 bg-white text-black hover:bg-slate-200 font-extrabold rounded-2xl transition text-xs shadow-md cursor-pointer"
+                        >
+                          {status.btnText}
+                        </button>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Quick Actions */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <button 
+                      onClick={() => triggerToast(`CVV: 482 - Vence em: 08/29`)} 
+                      className="p-3 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-800 text-center transition cursor-pointer"
+                    >
+                      <Info size={16} className="text-purple-400 mx-auto mb-1 block" />
+                      <span className="text-[10px] font-bold text-slate-300 block">Ver Dados</span>
+                    </button>
+                    <button 
+                      onClick={() => triggerToast('Cartão temporariamente bloqueado')} 
+                      className="p-3 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-800 text-center transition cursor-pointer"
+                    >
+                      <AlertTriangle size={16} className="text-amber-400 mx-auto mb-1 block" />
+                      <span className="text-[10px] font-bold text-slate-300 block">Bloquear</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setActiveCardId(selectedWalletCard.id);
+                        triggerToast(`${selectedWalletCard.nome} definido como principal!`);
+                      }} 
+                      className="p-3 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-800 text-center transition cursor-pointer"
+                    >
+                      <Sparkles size={16} className="text-emerald-400 mx-auto mb-1 block" />
+                      <span className="text-[10px] font-bold text-slate-300 block">Definir Principal</span>
+                    </button>
+                  </div>
+
+                  {/* Card specific transactions list */}
+                  <div className="space-y-3 pt-2 text-left">
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        Lançamentos neste Cartão
+                      </h3>
+                    </div>
+
+                    <div className="space-y-2">
+                      {(() => {
+                        const cardTxs = transactions.filter(tx => tx.cartaoId === selectedWalletCard.id);
+                        const defaultTxs = selectedWalletCard.id.includes('itau') 
+                          ? [
+                              { desc: 'Supermercado Carrefour', date: '03 Ago', amt: 1850.00, cat: 'Alimentação' },
+                              { desc: 'Assinaturas Streaming', date: '06 Ago', amt: 405.28, cat: 'Lazer' },
+                              { desc: 'Drogaria São Paulo', date: '07 Ago', amt: 194.72, cat: 'Saúde' }
+                            ]
+                          : selectedWalletCard.id.includes('c6')
+                          ? [
+                              { desc: 'Posto Shell - Gasolina', date: '05 Ago', amt: 220.00, cat: 'Transporte' },
+                              { desc: 'Starbucks Café', date: '02 Ago', amt: 42.50, cat: 'Alimentação' }
+                            ]
+                          : selectedWalletCard.id.includes('revolut')
+                          ? [
+                              { desc: 'Apple Store Online', date: '04 Ago', amt: 899.00, cat: 'Tecnologia' },
+                              { desc: 'Uber Ride', date: '06 Ago', amt: 86.50, cat: 'Transporte' },
+                              { desc: 'Restaurante Coco Bambu', date: '07 Ago', amt: 264.50, cat: 'Alimentação' }
+                            ]
+                          : selectedWalletCard.id.includes('nubank')
+                          ? [
+                              { desc: 'iFood Gourmet', date: '05 Ago', amt: 145.00, cat: 'Alimentação' },
+                              { desc: 'Passagem LATAM', date: '01 Ago', amt: 475.00, cat: 'Viagens' }
+                            ]
+                          : [];
+
+                        if (cardTxs.length === 0 && defaultTxs.length === 0) {
+                          return <p className="text-xs text-slate-500 py-4 text-center">Nenhum lançamento vinculado.</p>;
+                        }
+
+                        if (cardTxs.length > 0) {
+                          return cardTxs.map(tx => (
+                            <div key={tx.id} className="flex items-center justify-between p-3.5 rounded-[20px] bg-slate-900 border border-slate-800">
+                              <div>
+                                <div className="text-xs font-bold text-white">{tx.descricao}</div>
+                                <div className="text-[9px] text-slate-400">{tx.data.split('-').reverse().slice(0, 2).join('/')} • {tx.categoria}</div>
+                              </div>
+                              <span className="font-mono text-xs font-bold text-rose-400">- R$ {tx.valor.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                          ));
+                        }
+
+                        return defaultTxs.map((dtx, i) => (
+                          <div key={i} className="flex items-center justify-between p-3.5 rounded-[20px] bg-slate-900 border border-slate-800">
+                            <div>
+                              <div className="text-xs font-bold text-white">{dtx.desc}</div>
+                              <div className="text-[9px] text-slate-400">{dtx.date} • {dtx.cat}</div>
+                            </div>
+                            <span className="font-mono text-xs font-bold text-rose-400">- R$ {dtx.amt.toFixed(2).replace('.', ',')}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global Toast Notification */}
+      {showToast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-2.5 z-55 border border-slate-800 animate-slide-up">
+          <Info size={14} className="text-purple-400" />
+          <span className="font-sans font-bold">{toastMsg}</span>
+        </div>
+      )}
     </div>
   );
 }

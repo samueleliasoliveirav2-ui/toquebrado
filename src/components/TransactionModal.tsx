@@ -16,6 +16,7 @@ interface TransactionModalProps {
   accounts?: BankAccount[];
   creditCards?: CreditCard[];
   onInvoiceTransactionSaved?: (cartaoId: string, mesAnoAlocacao: string) => void;
+  defaultType?: TransactionType;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -28,9 +29,17 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   onAddNewCategory,
   accounts = [],
   creditCards = [],
-  onInvoiceTransactionSaved
+  onInvoiceTransactionSaved,
+  defaultType
 }) => {
   const [tipo, setTipo] = useState<TransactionType>('SAIDA');
+
+  // Initialize tipo based on defaultType when modal opens
+  useEffect(() => {
+    if (isOpen && !editingTransaction) {
+      setTipo(defaultType || 'SAIDA');
+    }
+  }, [isOpen, defaultType, editingTransaction]);
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
   const [valor, setValor] = useState<number | ''>('');
@@ -87,7 +96,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setCartaoId('');
       }
     } else {
-      setTipo('SAIDA');
+      setTipo(defaultType || 'SAIDA');
       setDescricao('');
       setCategoria('');
       setValor('');
@@ -282,23 +291,23 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-xs animate-fade-in font-sans">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in font-sans">
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Modal Bottom Sheet Container */}
-      <div className="relative w-full max-w-md bg-white border-t border-slate-250 rounded-t-3xl shadow-2xl p-6 z-10 animate-slide-up max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-md bg-slate-900 border-t border-slate-800 rounded-t-[32px] shadow-2xl p-6 z-10 animate-slide-up max-h-[92vh] overflow-y-auto">
         
         {/* Handle bar for native look */}
-        <div className="mx-auto w-12 h-1.5 bg-slate-200 rounded-full mb-6 cursor-pointer" onClick={onClose} />
+        <div className="mx-auto w-12 h-1.5 bg-slate-800 rounded-full mb-6 cursor-pointer" onClick={onClose} />
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="text-left">
-            <h3 className="text-xl font-bold text-slate-800">
+            <h3 className="text-xl font-bold text-white">
               {editingTransaction ? 'Editar Lançamento' : 'Novo Lançamento'}
             </h3>
             {editingTransaction?.grupoRecorrenciaId && (
-              <span className="text-[10px] bg-blue-50 text-blue-600 font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider block mt-1">
+              <span className="text-[10px] bg-purple-950 border border-purple-800 text-purple-300 font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider block mt-1">
                 {editingTransaction.frequencia === 'PARCELADO' 
                   ? `Parcelado • Parcela ${editingTransaction.parcelaAtual}/${editingTransaction.totalParcelas}`
                   : `Recorrente • ${editingTransaction.periodicidade}`}
@@ -308,9 +317,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <button 
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-655 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
@@ -318,7 +327,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-5 text-left">
           
           {/* Toggle Entrada / Saída */}
-          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+          <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-850">
             <button
               type="button"
               disabled={!!editingTransaction}
@@ -328,11 +337,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               }}
               className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'SAIDA'
-                  ? 'bg-rose-500/10 text-rose-700 shadow-xs border border-rose-250 font-black'
-                  : 'text-slate-500 hover:text-slate-705'
-              } ${editingTransaction ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-900/30 font-black shadow-inner'
+                  : 'text-slate-400 hover:text-white'
+              } ${editingTransaction ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <div className="w-2 h-2 rounded-full bg-rose-500" />
+              <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
               Despesa
             </button>
             
@@ -345,29 +354,29 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               }}
               className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'ENTRADA'
-                  ? 'bg-emerald-500/10 text-emerald-700 shadow-xs border border-emerald-250 font-black'
-                  : 'text-slate-500 hover:text-slate-705'
-              } ${editingTransaction ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-900/30 font-black shadow-inner'
+                  : 'text-slate-400 hover:text-white'
+              } ${editingTransaction ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               Receita
             </button>
           </div>
 
           {/* Amount input in big font */}
-          <div className="flex flex-col items-center justify-center py-2 border-y border-slate-100">
+          <div className="flex flex-col items-center justify-center py-2 border-y border-slate-800/80">
             <label className="text-slate-400 text-xs uppercase font-bold mb-1">
-              {frequencia === 'PARCELADO' && tipoCalculoParcela === 'TOTAL' ? 'Valor Total das Parcelas' : 'Valor do Lançamento'}
+              {frequencia === 'PARCELADO' && tipoCalculoParcela === 'TOTAL' ? 'Valor Total' : 'Valor'}
             </label>
-            <div className="flex items-center text-slate-800 font-extrabold text-3xl">
-              <span className={`mr-1.5 text-2xl ${tipo === 'SAIDA' ? 'text-rose-550' : 'text-emerald-550'}`}>R$</span>
+            <div className="flex items-center text-white font-extrabold text-3xl font-mono">
+              <span className={`mr-1.5 text-2xl ${tipo === 'SAIDA' ? 'text-rose-455' : 'text-emerald-455'}`}>R$</span>
               <input
                 type="number"
                 step="0.01"
                 placeholder="0,00"
                 value={valor}
                 onChange={(e) => setValor(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                className="bg-transparent border-none focus:outline-none w-44 text-center font-extrabold text-slate-800 placeholder-slate-350"
+                className="bg-transparent border-none focus:outline-none w-44 text-center font-extrabold text-white placeholder-slate-600"
                 required
                 autoFocus={!editingTransaction}
               />
@@ -376,13 +385,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
           {/* Descrição */}
           <div>
-            <label className="block text-slate-500 text-xs font-bold uppercase mb-1.5">Descrição</label>
+            <label className="block text-slate-450 text-xs font-bold uppercase mb-1.5">Descrição</label>
             <input
               type="text"
               placeholder="Ex: Uber, Supermercado, Pró-labore..."
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm font-semibold shadow-2xs"
+              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-sm font-semibold shadow-inner"
               required
             />
           </div>
@@ -796,7 +805,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     }
                   }
                 }}
-                className="flex-1 py-3.5 rounded-xl bg-rose-50 border border-rose-150 hover:bg-rose-100/50 text-rose-600 font-bold text-xs transition-all cursor-pointer animate-fade-in"
+                className="flex-1 py-3.5 rounded-xl bg-rose-950/40 border border-rose-900/40 hover:bg-rose-900/30 text-rose-400 font-bold text-xs transition-all cursor-pointer animate-fade-in"
               >
                 Excluir
               </button>
@@ -804,9 +813,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
             <button
               type="submit"
-              className={`py-3.5 rounded-xl text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                editingTransaction ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900 hover:bg-slate-800'
-              } ${editingTransaction && onDelete ? 'flex-[2]' : 'w-full'}`}
+              className={`py-3.5 rounded-xl text-white font-bold text-xs shadow-revolut-glow flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 ${editingTransaction && onDelete ? 'flex-[2]' : 'w-full'}`}
             >
               <Check size={16} />
               {editingTransaction ? 'Salvar Lançamento' : 'Confirmar Lançamento'}
@@ -818,14 +825,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
       {/* CONFIRMATION POPUP 1: SAVE DIALOG (ONLY THIS vs THIS & NEXT) */}
       {showSaveScopeDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
-            <div className="flex items-center gap-3 text-blue-650">
-              <RefreshCw size={24} className="animate-spin text-[#0e69b2] select-none" style={{ animationDuration: '3s' }} />
-              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alterar Lançamento Fixo/Parcela</h4>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
+            <div className="flex items-center gap-3 text-purple-400">
+              <RefreshCw size={24} className="animate-spin select-none" style={{ animationDuration: '3s' }} />
+              <h4 className="text-sm font-black text-white uppercase tracking-wider">Alterar Lançamento Fixo/Parcela</h4>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
+            <p className="text-xs text-slate-400 leading-relaxed">
               Você está alterando um lançamento que pertence a uma recorrência ou parcelamento. Deseja aplicar as alterações apenas a este registro ou estendê-las para todos os lançamentos futuros deste grupo?
             </p>
 
@@ -833,21 +840,21 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleConfirmSave('ONLY_THIS')}
-                className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer text-center"
+                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer text-center"
               >
                 Alterar apenas este lançamento
               </button>
               <button
                 type="button"
                 onClick={() => handleConfirmSave('THIS_AND_FUTURE')}
-                className="w-full py-3 rounded-xl bg-[#0e69b2] hover:bg-[#0c5996] text-white font-bold text-xs cursor-pointer text-center shadow-3xs"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-750 text-white font-bold text-xs cursor-pointer text-center shadow-md"
               >
                 Alterar este e todos os próximos
               </button>
               <button
                 type="button"
                 onClick={() => setShowSaveScopeDialog(false)}
-                className="w-full py-2.5 text-center text-xs text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
+                className="w-full py-2.5 text-center text-xs text-slate-500 hover:text-slate-350 font-bold cursor-pointer"
               >
                 Cancelar
               </button>
@@ -858,14 +865,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
       {/* CONFIRMATION POPUP 2: DELETE DIALOG (ONLY THIS vs THIS & NEXT) */}
       {showDeleteScopeDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
-            <div className="flex items-center gap-3 text-rose-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
+            <div className="flex items-center gap-3 text-rose-400">
               <X size={24} className="text-rose-500" />
-              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Excluir Lançamento Fixo/Parcela</h4>
+              <h4 className="text-sm font-black text-white uppercase tracking-wider">Excluir Lançamento Fixo/Parcela</h4>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
+            <p className="text-xs text-slate-400 leading-relaxed">
               Você deseja excluir apenas esta parcela/lançamento específico ou prefere remover esta ocorrência e todas as futuras deste grupo de recorrência?
             </p>
 
@@ -873,21 +880,21 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleConfirmDelete('ONLY_THIS')}
-                className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer text-center"
+                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer text-center"
               >
                 Excluir apenas este lançamento
               </button>
               <button
                 type="button"
                 onClick={() => handleConfirmDelete('THIS_AND_FUTURE')}
-                className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer text-center shadow-3xs"
+                className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer text-center shadow-md"
               >
                 Excluir este e todos os próximos
               </button>
               <button
                 type="button"
                 onClick={() => setShowDeleteScopeDialog(false)}
-                className="w-full py-2.5 text-center text-xs text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
+                className="w-full py-2.5 text-center text-xs text-slate-500 hover:text-slate-350 font-bold cursor-pointer"
               >
                 Cancelar
               </button>
