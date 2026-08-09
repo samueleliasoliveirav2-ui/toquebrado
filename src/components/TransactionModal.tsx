@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, RefreshCw } from 'lucide-react';
-import type { Transaction, TransactionType, TransactionStatus, BankAccount } from '../types';
+import { X, Check, RefreshCw, CreditCard as CreditCardIcon, Wallet, Info } from 'lucide-react';
+import type { Transaction, TransactionType, TransactionStatus, BankAccount, CreditCard } from '../types';
 
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (
-    transaction: Omit<Transaction, 'id'> & { id?: string },
+    transaction: Omit<Transaction, 'id'> & { id?: string; tipoCalculoParcela?: 'TOTAL' | 'PARCELA' },
     scope?: 'ONLY_THIS' | 'THIS_AND_FUTURE'
   ) => void;
   onDelete?: (id: string, scope?: 'ONLY_THIS' | 'THIS_AND_FUTURE') => void;
@@ -14,6 +14,8 @@ interface TransactionModalProps {
   categoriesList: Record<TransactionType, string[]>;
   onAddNewCategory: (tipo: TransactionType, category: string) => void;
   accounts?: BankAccount[];
+  creditCards?: CreditCard[];
+  onInvoiceTransactionSaved?: (cartaoId: string, mesAnoAlocacao: string) => void;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -24,7 +26,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   editingTransaction,
   categoriesList,
   onAddNewCategory,
-  accounts = []
+  accounts = [],
+  creditCards = [],
+  onInvoiceTransactionSaved
 }) => {
   const [tipo, setTipo] = useState<TransactionType>('SAIDA');
   const [descricao, setDescricao] = useState('');
@@ -35,6 +39,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [dataPostergar, setDataPostergar] = useState('');
   const [juros, setJuros] = useState<number | ''>('');
   const [contaId, setContaId] = useState('');
+
+  // Forma de Pagamento / Cartão de Crédito
+  const [formaPagamento, setFormaPagamento] = useState<'CONTA' | 'CARTAO'>('CONTA');
+  const [cartaoId, setCartaoId] = useState<string>('');
 
   // Frequency/Billing States (Only for new entries)
   const [frequencia, setFrequencia] = useState<'AVULSO' | 'RECORRENTE' | 'PARCELADO'>('AVULSO');
@@ -70,6 +78,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setNewCategoryName('');
       setShowSaveScopeDialog(false);
       setShowDeleteScopeDialog(false);
+      // Cartao de Credito
+      if (editingTransaction.cartaoId) {
+        setFormaPagamento('CARTAO');
+        setCartaoId(editingTransaction.cartaoId);
+      } else {
+        setFormaPagamento('CONTA');
+        setCartaoId('');
+      }
     } else {
       setTipo('SAIDA');
       setDescricao('');
@@ -111,6 +127,27 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   if (!isOpen) return null;
 
+  const calcularMesAlocacaoFatura = (dataRef: string, card: CreditCard): string => {
+    const d = new Date(dataRef + 'T12:00:00');
+    const dia = d.getDate();
+    let mes = d.getMonth();
+    let ano = d.getFullYear();
+    if (dia >= card.diaFechamento) {
+      mes++;
+      if (mes > 11) {
+        mes = 0;
+        ano++;
+      }
+    }
+    return `${ano}-${String(mes + 1).padStart(2, '0')}`;
+  };
+
+  const selectedCard = creditCards.find((c) => c.id === cartaoId);
+  const mesAlvoPreview =
+    tipo === 'SAIDA' && formaPagamento === 'CARTAO' && selectedCard && data
+      ? calcularMesAlocacaoFatura(data, selectedCard)
+      : null;
+
   const handleCategoryChange = (val: string) => {
     if (val === 'ADD_NEW_CAT') {
       setIsAddingNew(true);
@@ -121,13 +158,19 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   };
 
-  const getPayload = (): Omit<Transaction, 'id'> & { id?: string } => {
+  const getPayload = (): Omit<Transaction, 'id'> & {
+    id?: string;
+    tipoCalculoParcela?: 'TOTAL' | 'PARCELA';
+  } => {
     let finalCategory = categoria;
     if (isAddingNew) {
       finalCategory = newCategoryName.trim();
     }
 
+    const usaCartao = tipo === 'SAIDA' && formaPagamento === 'CARTAO' && !!selectedCard;
+
     return {
+      id: editingTransaction?.id,
       tipo,
       descricao: descricao.trim(),
       categoria: finalCategory,
@@ -136,12 +179,15 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       status,
       dataPostergar: status === 'POSTERGAR' ? dataPostergar : undefined,
       juros: tipo === 'SAIDA' && juros !== '' ? Number(juros) : undefined,
-      contaId: contaId || undefined,
+      contaId: usaCartao ? undefined : (contaId || undefined),
       frequencia,
       periodicidade: frequencia === 'RECORRENTE' ? periodicidade : undefined,
       totalParcelas: frequencia === 'PARCELADO' ? (Number(totalParcelas) || undefined) : undefined,
       parcelaAtual: editingTransaction?.parcelaAtual || (frequencia === 'PARCELADO' ? 1 : undefined),
-      grupoRecorrenciaId: editingTransaction?.grupoRecorrenciaId || undefined
+      grupoRecorrenciaId: editingTransaction?.grupoRecorrenciaId || undefined,
+      cartaoId: usaCartao ? selectedCard.id : (editingTransaction?.cartaoId || undefined),
+      dataCompra: usaCartao ? data : (editingTransaction?.dataCompra || undefined),
+      tipoCalculoParcela
     };
   };
 
@@ -154,8 +200,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     if (status === 'POSTERGAR' && !dataPostergar) {
       return alert('Informe a data de postergação');
     }
-    if (!contaId && accounts.length > 0) {
+    const usaCartao = tipo === 'SAIDA' && formaPagamento === 'CARTAO';
+    if (!usaCartao && !contaId && accounts.length > 0) {
       return alert('Selecione uma conta ou carteira para esta movimentação');
+    }
+    if (usaCartao && !cartaoId && creditCards.length > 0) {
+      return alert('Selecione o cartão de crédito utilizado');
     }
     if (frequencia === 'PARCELADO' && (!totalParcelas || Number(totalParcelas) <= 1)) {
       return alert('O número total de parcelas deve ser maior que 1');
@@ -175,23 +225,41 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       return alert('Selecione ou cadastre uma categoria');
     }
 
-    // Check if this is an edit of a recurring/installment item
-    if (editingTransaction && editingTransaction.grupoRecorrenciaId) {
-      setShowSaveScopeDialog(true);
-    } else {
-      // Normal save
+    const cartaoUtilizado = usaCartao ? selectedCard : null;
+    const mesAlocacao = cartaoUtilizado ? calcularMesAlocacaoFatura(data, cartaoUtilizado) : null;
+
+    const realizarSave = () => {
       const payload = getPayload();
-      // Add tipoCalculoParcela parameter dynamically for new installments
       const savePayload = {
         ...payload,
         ...(frequencia === 'PARCELADO' ? { tipoCalculoParcela } : {})
       };
-
       if (editingTransaction) {
         savePayload.id = editingTransaction.id;
       }
       onSave(savePayload);
+      if (cartaoUtilizado && mesAlocacao && onInvoiceTransactionSaved) {
+        if (frequencia === 'PARCELADO') {
+          const tp = Number(totalParcelas) || 1;
+          const dRef = new Date(data + 'T12:00:00');
+          for (let i = 0; i < tp; i++) {
+            const d = new Date(dRef);
+            d.setMonth(d.getMonth() + i);
+            const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            onInvoiceTransactionSaved(cartaoUtilizado.id, m);
+          }
+        } else {
+          onInvoiceTransactionSaved(cartaoUtilizado.id, mesAlocacao);
+        }
+      }
       onClose();
+    };
+
+    // Check if this is an edit of a recurring/installment item
+    if (editingTransaction && editingTransaction.grupoRecorrenciaId) {
+      setShowSaveScopeDialog(true);
+    } else {
+      realizarSave();
     }
   };
 
@@ -470,8 +538,94 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </div>
           )}
 
-          {/* Conta / Carteira Selector */}
-          {accounts.length > 0 && (
+          {/* Forma de Pagamento (apenas SAÍDA) */}
+          {tipo === 'SAIDA' && (accounts.length > 0 || creditCards.length > 0) && (
+            <div className="space-y-3 bg-slate-50/50 p-3.5 border border-slate-200/50 rounded-2xl">
+              <div>
+                <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1.5">Forma de Pagamento</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormaPagamento('CONTA')}
+                    disabled={accounts.length === 0}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-1 text-[10px] font-bold rounded-lg border text-center transition-all cursor-pointer ${
+                      formaPagamento === 'CONTA'
+                        ? 'bg-slate-900 border-slate-950 text-white shadow-2xs font-extrabold'
+                        : 'bg-white text-slate-500 border-slate-200 hover:text-slate-800 disabled:opacity-40 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    <Wallet size={12} /> Conta / Dinheiro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormaPagamento('CARTAO')}
+                    disabled={creditCards.length === 0}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-1 text-[10px] font-bold rounded-lg border text-center transition-all cursor-pointer ${
+                      formaPagamento === 'CARTAO'
+                        ? 'bg-slate-900 border-slate-950 text-white shadow-2xs font-extrabold'
+                        : 'bg-white text-slate-500 border-slate-200 hover:text-slate-800 disabled:opacity-40 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    <CreditCardIcon size={12} /> Cartão de Crédito
+                  </button>
+                </div>
+              </div>
+
+              {formaPagamento === 'CONTA' && accounts.length > 0 && (
+                <div className="animate-fade-in">
+                  <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Conta / Carteira</label>
+                  <select
+                    value={contaId}
+                    onChange={(e) => setContaId(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-3xs"
+                    required
+                  >
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.nome} ({acc.tipoPessoa})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {formaPagamento === 'CARTAO' && creditCards.length > 0 && (
+                <div className="animate-fade-in space-y-2">
+                  <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Cartão Utilizado</label>
+                  <select
+                    value={cartaoId}
+                    onChange={(e) => setCartaoId(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-3xs"
+                    required
+                  >
+                    <option value="">Selecione um cartão</option>
+                    {creditCards.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome} — {c.bandeira}
+                      </option>
+                    ))}
+                  </select>
+
+                  {mesAlvoPreview && selectedCard && (
+                    <div className="flex items-start gap-2 bg-blue-50/70 border border-blue-100 rounded-lg p-2 text-[10px] leading-snug">
+                      <Info size={12} className="text-blue-700 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-black text-blue-800">
+                          Lançamento alocado na fatura de {mesAlvoPreview}
+                        </p>
+                        <p className="font-semibold text-blue-700/90">
+                          Fecha dia {selectedCard.diaFechamento.toString().padStart(2,'0')} • Vence dia {selectedCard.diaVencimento.toString().padStart(2,'0')}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Conta / Carteira Selector (fallback para ENTRADAS antigas) */}
+          {tipo !== 'SAIDA' && accounts.length > 0 && (
             <div>
               <label className="block text-slate-500 text-xs font-bold uppercase mb-1.5">Conta / Carteira</label>
               <select

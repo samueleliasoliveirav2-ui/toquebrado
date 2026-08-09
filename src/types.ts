@@ -17,6 +17,45 @@ export interface Transaction {
   parcelaAtual?: number;
   totalParcelas?: number;
   grupoRecorrenciaId?: string;
+  // --- Cartão de Crédito ---
+  cartaoId?: string; // Vinculo com cartao_credito
+  faturaId?: string; // Vinculo com fatura_cartao
+  dataCompra?: string; // Data real da compra (pode diferir da data de alocação na fatura)
+}
+
+// ============================================================
+// CARTÃO DE CRÉDITO
+// ============================================================
+export type BandeiraCartao = 'VISA' | 'MASTERCARD' | 'ELO' | 'AMEX' | 'HIPERCARD' | 'OUTROS';
+
+export interface CreditCard {
+  id: string;
+  userId: string;
+  nome: string;          // "Itaú Universo"
+  bandeira: BandeiraCartao;
+  limiteTotal: number;   // R$ 10.000,00
+  diaFechamento: number; // 1-28
+  diaVencimento: number; // 1-28
+  cor: string;           // "#000000"
+  contaPagamentoPadraoId?: string; // Conta bancária padrão para pagar a fatura
+}
+
+// ============================================================
+// FATURA DE CARTÃO DE CRÉDITO
+// ============================================================
+export type InvoiceStatus = 'ABERTA' | 'FECHADA' | 'PAGA' | 'ATRASADA';
+
+export interface CreditCardInvoice {
+  id: string;
+  userId: string;
+  cartaoId: string;
+  mesAno: string;         // "2026-08"
+  dataFechamento: string; // YYYY-MM-DD
+  dataVencimento: string; // YYYY-MM-DD
+  valorTotal: number;     // atualizado dinamicamente via transações
+  status: InvoiceStatus;
+  valorPago?: number;
+  dataPagamento?: string;
 }
 
 export const CATEGORIES = {

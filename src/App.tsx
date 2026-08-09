@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, Briefcase, BarChart2, Wallet } from 'lucide-react';
-import type { Transaction, TransactionStatus, WorkShiftEntry, BankAccount, AccountTransfer } from './types';
+import { Plus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon } from 'lucide-react';
+import type { Transaction, TransactionStatus, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
 import { WeeklyAccordion } from './components/WeeklyAccordion';
@@ -11,6 +11,9 @@ import { WorkShiftDashboard } from './components/WorkShiftDashboard';
 import { WorkShiftModal } from './components/WorkShiftModal';
 import { ReportsDashboard } from './components/ReportsDashboard';
 import { AccountsDashboard } from './components/AccountsDashboard';
+import { CreditCardsDashboard } from './components/CreditCardsDashboard';
+import { CreditCardModal } from './components/CreditCardModal';
+import { InvoiceDetailModal } from './components/InvoiceDetailModal';
 import { supabase } from './lib/supabaseClient';
 
 const CURRENT_VERSION = '1.0.1';
@@ -24,10 +27,12 @@ function App() {
   const [workShifts, setWorkShifts] = useState<WorkShiftEntry[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transfers, setTransfers] = useState<AccountTransfer[]>([]);
+  const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+  const [creditCardInvoices, setCreditCardInvoices] = useState<CreditCardInvoice[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Active view state
-  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL' | 'DIARIAS' | 'RELATORIOS' | 'CONTAS'>('INICIO');
+  const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL' | 'DIARIAS' | 'RELATORIOS' | 'CONTAS' | 'CARTOES'>('INICIO');
 
   // Sidebar Drawer menu state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -38,6 +43,13 @@ function App() {
   // Modal states for Work Shifts
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [editingShiftEntry, setEditingShiftEntry] = useState<WorkShiftEntry | null>(null);
+
+  // Modal states for Credit Cards
+  const [isCreditCardModalOpen, setIsCreditCardModalOpen] = useState(false);
+  const [editingCreditCard, setEditingCreditCard] = useState<CreditCard | null>(null);
+  const [isInvoiceDetailOpen, setIsInvoiceDetailOpen] = useState(false);
+  const [selectedInvoiceCard, setSelectedInvoiceCard] = useState<CreditCard | null>(null);
+  const [invoiceDetailMonth, setInvoiceDetailMonth] = useState('2026-08');
 
   // Custom Dynamic Categories state
   const [customCategories, setCustomCategories] = useState<Record<'ENTRADA' | 'SAIDA', string[]>>(() => {
@@ -164,7 +176,10 @@ function App() {
           periodicidade: item.periodicidade || undefined,
           parcelaAtual: item.parcela_atual || undefined,
           totalParcelas: item.total_parcelas || undefined,
-          grupoRecorrenciaId: item.grupo_recorrencia_id || undefined
+          grupoRecorrenciaId: item.grupo_recorrencia_id || undefined,
+          cartaoId: item.cartao_id || undefined,
+          faturaId: item.fatura_id || undefined,
+          dataCompra: item.data_compra || undefined
         }));
         setTransactions(mapped);
 
@@ -320,12 +335,73 @@ function App() {
     }
   };
 
+  const fetchCreditCards = async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('cartoes_credito')
+        .select('*')
+        .order('nome', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching credit cards:', error);
+      } else if (data) {
+        const mapped: CreditCard[] = data.map((item: any) => ({
+          id: item.id,
+          userId: item.user_id,
+          nome: item.nome,
+          bandeira: item.bandeira || 'OUTROS',
+          limiteTotal: Number(item.limite_total) || 0,
+          diaFechamento: Number(item.dia_fechamento) || 1,
+          diaVencimento: Number(item.dia_vencimento) || 5,
+          cor: item.cor || '#0f172a',
+          contaPagamentoPadraoId: item.conta_pagamento_padrao_id || undefined
+        }));
+        setCreditCards(mapped);
+      }
+    } catch (err) {
+      console.error('Unexpected error loading credit cards', err);
+    }
+  };
+
+  const fetchCreditCardInvoices = async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('faturas_cartao')
+        .select('*')
+        .order('mes_ano', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching credit card invoices:', error);
+      } else if (data) {
+        const mapped: CreditCardInvoice[] = data.map((item: any) => ({
+          id: item.id,
+          userId: item.user_id,
+          cartaoId: item.cartao_id,
+          mesAno: item.mes_ano,
+          dataFechamento: item.data_fechamento,
+          dataVencimento: item.data_vencimento,
+          valorTotal: Number(item.valor_total) || 0,
+          status: item.status || 'ABERTA',
+          valorPago: item.valor_pago !== null && item.valor_pago !== undefined ? Number(item.valor_pago) : undefined,
+          dataPagamento: item.data_pagamento || undefined
+        }));
+        setCreditCardInvoices(mapped);
+      }
+    } catch (err) {
+      console.error('Unexpected error loading credit card invoices', err);
+    }
+  };
+
   useEffect(() => {
     if (userId) {
       fetchTransactions();
       fetchWorkShifts();
       fetchAccounts();
       fetchTransfers();
+      fetchCreditCards();
+      fetchCreditCardInvoices();
     }
   }, [userId]);
 
@@ -512,7 +588,9 @@ function App() {
           periodicidade: payload.periodicidade || null,
           parcela_atual: payload.parcelaAtual || null,
           total_parcelas: payload.totalParcelas || null,
-          grupo_recorrencia_id: payload.grupoRecorrenciaId || null
+          grupo_recorrencia_id: payload.grupoRecorrenciaId || null,
+          cartao_id: payload.cartaoId || null,
+          data_compra: payload.dataCompra || null
         };
 
         // Sub-caso A: Edição com grupo_recorrenciaId e scope THIS_AND_FUTURE
@@ -559,9 +637,31 @@ function App() {
       // CASO 2: CRIAÇÃO (novo lançamento)
       // ==============================
       const frequencia = payload.frequencia || 'AVULSO';
+      const cartao = payload.cartaoId ? creditCards.find((c) => c.id === payload.cartaoId) : null;
+
+      const calcularMesAlocacao = (dataRef: string, cc: CreditCard): string => {
+        const d = new Date(dataRef + 'T12:00:00');
+        const dia = d.getDate();
+        let mes = d.getMonth();
+        let ano = d.getFullYear();
+        if (dia >= cc.diaFechamento) {
+          mes++;
+          if (mes > 11) { mes = 0; ano++; }
+        }
+        return `${ano}-${String(mes + 1).padStart(2, '0')}`;
+      };
+
+      const obterFaturaId = async (cc: CreditCard, dataRef: string): Promise<string | null> => {
+        const mesAlvo = calcularMesAlocacao(dataRef, cc);
+        const inv = await getOrCreateInvoiceFor(cc, mesAlvo);
+        return inv?.id || null;
+      };
 
       // ----- 2A: Lançamento Avulso / Único -----
       if (frequencia === 'AVULSO') {
+        let faturaId: string | null = null;
+        if (cartao) faturaId = await obterFaturaId(cartao, payload.data);
+
         const dbPayload = {
           user_id: userId,
           data: payload.data,
@@ -577,11 +677,18 @@ function App() {
           periodicidade: null,
           parcela_atual: null,
           total_parcelas: null,
-          grupo_recorrencia_id: null
+          grupo_recorrencia_id: null,
+          cartao_id: payload.cartaoId || null,
+          fatura_id: faturaId,
+          data_compra: payload.dataCompra || (payload.cartaoId ? payload.data : null)
         };
 
         const { error } = await supabase.from('transactions').insert(dbPayload);
         if (error) throw error;
+        if (cartao && faturaId) {
+          const mesAlvo = calcularMesAlocacao(payload.data, cartao);
+          recalcInvoiceTotals(cartao.id, mesAlvo);
+        }
 
       // ----- 2B: Lançamento Recorrente (Fixo) -----
       } else if (frequencia === 'RECORRENTE') {
@@ -594,6 +701,7 @@ function App() {
           : 5; // ANUAL
 
         const rows = [];
+        const mesesParaRecalcular = new Set<string>();
         for (let i = 0; i < totalOcorrencias; i++) {
           let targetDate = payload.data;
           if (periodicidade === 'SEMANAL') targetDate = addDays(payload.data, i * 7);
@@ -601,6 +709,10 @@ function App() {
           else targetDate = addYears(payload.data, i);
 
           const statusInicial = i === 0 ? payload.status : 'PENDENTE';
+          if (cartao) {
+            const mesAlvo = calcularMesAlocacao(targetDate, cartao);
+            mesesParaRecalcular.add(mesAlvo);
+          }
 
           rows.push({
             user_id: userId,
@@ -617,12 +729,21 @@ function App() {
             periodicidade,
             parcela_atual: null,
             total_parcelas: null,
-            grupo_recorrencia_id: grupoId
+            grupo_recorrencia_id: grupoId,
+            cartao_id: payload.cartaoId || null,
+            fatura_id: null,
+            data_compra: payload.dataCompra || (payload.cartaoId ? payload.data : null)
           });
         }
 
         const { error } = await supabase.from('transactions').insert(rows);
         if (error) throw error;
+
+        if (cartao && mesesParaRecalcular.size > 0) {
+          for (const m of mesesParaRecalcular) {
+            recalcInvoiceTotals(cartao.id, m);
+          }
+        }
 
       // ----- 2C: Lançamento Parcelado -----
       } else if (frequencia === 'PARCELADO') {
@@ -637,12 +758,18 @@ function App() {
         }
 
         const BATCH_SIZE = 100;
+        const mesesParaRecalcular = new Set<string>();
         const rows = [];
         for (let i = 1; i <= totalParcelas; i++) {
           const targetDate = addMonths(payload.data, i - 1);
           const statusInicial = i === 1 ? payload.status : 'PENDENTE';
           const sufixo = `(${i}/${totalParcelas})`;
           const descricaoCompleta = `${payload.descricao} ${sufixo}`;
+
+          if (cartao) {
+            const mesAlvo = calcularMesAlocacao(targetDate, cartao);
+            mesesParaRecalcular.add(mesAlvo);
+          }
 
           rows.push({
             user_id: userId,
@@ -659,18 +786,30 @@ function App() {
             periodicidade: null,
             parcela_atual: i,
             total_parcelas: totalParcelas,
-            grupo_recorrencia_id: grupoId
+            grupo_recorrencia_id: grupoId,
+            cartao_id: payload.cartaoId || null,
+            fatura_id: null,
+            data_compra: payload.dataCompra || (payload.cartaoId ? payload.data : null)
           });
         }
 
-        if (rows.length <= BATCH_SIZE) {
-          const { error } = await supabase.from('transactions').insert(rows);
+        const insertBatch = async (batch: any[]) => {
+          const { error } = await supabase.from('transactions').insert(batch);
           if (error) throw error;
+        };
+
+        if (rows.length <= BATCH_SIZE) {
+          await insertBatch(rows);
         } else {
           for (let b = 0; b < rows.length; b += BATCH_SIZE) {
             const batch = rows.slice(b, b + BATCH_SIZE);
-            const { error } = await supabase.from('transactions').insert(batch);
-            if (error) throw error;
+            await insertBatch(batch);
+          }
+        }
+
+        if (cartao && mesesParaRecalcular.size > 0) {
+          for (const m of mesesParaRecalcular) {
+            recalcInvoiceTotals(cartao.id, m);
           }
         }
       }
@@ -955,6 +1094,8 @@ function App() {
       await fetchWorkShifts();
       await fetchAccounts();
       await fetchTransfers();
+      await fetchCreditCards();
+      await fetchCreditCardInvoices();
     } finally {
       setTimeout(() => {
         setIsSyncing(false);
@@ -1110,6 +1251,223 @@ function App() {
     }
   };
 
+  // ---------- Cartão de Crédito: CRUD ----------
+  const handleSaveCreditCard = async (
+    payload: Omit<CreditCard, 'id' | 'userId'> & { id?: string }
+  ) => {
+    if (!userId) return;
+    const dbPayload = {
+      user_id: userId,
+      nome: payload.nome,
+      bandeira: payload.bandeira,
+      limite_total: payload.limiteTotal,
+      dia_fechamento: payload.diaFechamento,
+      dia_vencimento: payload.diaVencimento,
+      cor: payload.cor,
+      conta_pagamento_padrao_id: payload.contaPagamentoPadraoId || null
+    };
+
+    try {
+      if (payload.id) {
+        const { error } = await supabase
+          .from('cartoes_credito')
+          .update(dbPayload)
+          .eq('id', payload.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('cartoes_credito')
+          .insert(dbPayload);
+        if (error) throw error;
+      }
+      await fetchCreditCards();
+    } catch (err: any) {
+      console.error('Error saving credit card:', err);
+      alert('Erro ao salvar cartão de crédito: ' + (err.message || JSON.stringify(err)));
+    }
+  };
+
+  const handleDeleteCreditCard = async (id: string) => {
+    if (!confirm('Tem certeza de que deseja excluir este cartão? As faturas vinculadas também serão removidas.')) return;
+    try {
+      const { error } = await supabase
+        .from('cartoes_credito')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      await fetchCreditCards();
+      await fetchCreditCardInvoices();
+    } catch (err: any) {
+      console.error('Error deleting credit card:', err);
+      alert('Erro ao excluir cartão: ' + (err.message || JSON.stringify(err)));
+    }
+  };
+
+  // ---------- Fatura Cartão: Pagamento e criação ----------
+  const getOrCreateInvoiceFor = async (
+    card: CreditCard,
+    mesAno: string
+  ): Promise<CreditCardInvoice | null> => {
+    if (!userId) return null;
+
+    const existing = creditCardInvoices.find(
+      (inv) => inv.cartaoId === card.id && inv.mesAno === mesAno
+    );
+    if (existing) return existing;
+
+    const [anoStr, mesStr] = mesAno.split('-');
+    const ano = parseInt(anoStr, 10);
+    const mes = parseInt(mesStr, 10) - 1;
+
+    const df = new Date(ano, mes, Math.min(card.diaFechamento, 28), 12, 0, 0);
+    let dv = new Date(ano, mes, Math.min(card.diaVencimento, 28), 12, 0, 0);
+    if (card.diaVencimento <= card.diaFechamento) {
+      dv.setMonth(dv.getMonth() + 1);
+    }
+
+    const payloadInv = {
+      user_id: userId,
+      cartao_id: card.id,
+      mes_ano: mesAno,
+      data_fechamento: df.toISOString().split('T')[0],
+      data_vencimento: dv.toISOString().split('T')[0],
+      valor_total: 0,
+      status: 'ABERTA'
+    };
+
+    const { data, error } = await supabase
+      .from('faturas_cartao')
+      .insert(payloadInv)
+      .select()
+      .limit(1)
+      .single();
+    if (error) {
+      console.error('Error creating invoice:', error);
+      return null;
+    }
+
+    const newInv: CreditCardInvoice = {
+      id: data.id,
+      userId: data.user_id,
+      cartaoId: data.cartao_id,
+      mesAno: data.mes_ano,
+      dataFechamento: data.data_fechamento,
+      dataVencimento: data.data_vencimento,
+      valorTotal: Number(data.valor_total) || 0,
+      status: data.status,
+      valorPago: data.valor_pago ?? undefined,
+      dataPagamento: data.data_pagamento ?? undefined
+    };
+    setCreditCardInvoices((prev) => [...prev, newInv]);
+    return newInv;
+  };
+
+  const handlePayInvoice = async (
+    invoiceId: string,
+    accountId: string,
+    valorPago: number
+  ) => {
+    if (!userId) return;
+    const invoice = creditCardInvoices.find((i) => i.id === invoiceId);
+    const card = creditCards.find((c) => c.id === invoice?.cartaoId);
+    if (!invoice || !card) return;
+
+    try {
+      const pagoAnterior = invoice.valorPago || 0;
+      const novoPago = pagoAnterior + valorPago;
+      const saldoRestante = invoice.valorTotal - novoPago;
+      const novoStatus = saldoRestante <= 0.01 ? 'PAGA' : invoice.status;
+      const hoje = new Date().toISOString().split('T')[0];
+
+      const { error: errUpd } = await supabase
+        .from('faturas_cartao')
+        .update({
+          status: novoStatus,
+          valor_pago: Number(novoPago.toFixed(2)),
+          data_pagamento: novoStatus === 'PAGA' ? hoje : (invoice.dataPagamento || null)
+        })
+        .eq('id', invoiceId);
+      if (errUpd) throw errUpd;
+
+      const despesa: Omit<Transaction, 'id'> = {
+        tipo: 'SAIDA',
+        descricao: `Pagamento Fatura ${card.nome} - ${invoice.mesAno}`,
+        categoria: 'Cartão',
+        valor: Number(valorPago.toFixed(2)),
+        data: hoje,
+        status: 'PAGO',
+        contaId: accountId
+      };
+      await handleSaveTransaction(despesa);
+
+      await fetchCreditCardInvoices();
+      await fetchTransactions();
+    } catch (err: any) {
+      console.error('Error paying invoice:', err);
+      alert('Erro ao pagar fatura: ' + (err.message || JSON.stringify(err)));
+    }
+  };
+
+  const handleViewInvoice = async (card: CreditCard) => {
+    setSelectedInvoiceCard(card);
+    setInvoiceDetailMonth(selectedMonth);
+    setIsInvoiceDetailOpen(true);
+    const today = new Date(selectedMonth + '-01T12:00:00');
+    for (let offset = -1; offset <= 2; offset++) {
+      const d = new Date(today);
+      d.setMonth(d.getMonth() + offset);
+      const mes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      await getOrCreateInvoiceFor(card, mes);
+    }
+  };
+
+  const handlePayInvoiceFromDashboard = (
+    card: CreditCard,
+    _invoice: CreditCardInvoice
+  ) => {
+    setSelectedInvoiceCard(card);
+    setInvoiceDetailMonth(selectedMonth);
+    setIsInvoiceDetailOpen(true);
+  };
+
+  const getInvoiceForCardMonth = (
+    cardId: string,
+    mesAno: string
+  ): CreditCardInvoice | undefined => {
+    return creditCardInvoices.find(
+      (i) => i.cartaoId === cardId && i.mesAno === mesAno
+    );
+  };
+
+  const getInvoiceTransactions = (
+    cardId: string,
+    mesAno: string
+  ): Transaction[] => {
+    return transactions.filter(
+      (t) => t.cartaoId === cardId && t.data.startsWith(mesAno) && t.tipo === 'SAIDA'
+    );
+  };
+
+  const recalcInvoiceTotals = async (cardId: string, mesAno: string) => {
+    const inv = creditCardInvoices.find(
+      (i) => i.cartaoId === cardId && i.mesAno === mesAno
+    );
+    if (!inv) return;
+    const txs = getInvoiceTransactions(cardId, mesAno);
+    const total = txs.reduce((s, t) => s + Number(t.valor), 0);
+    if (Math.abs(inv.valorTotal - total) < 0.005) return;
+    try {
+      const { error } = await supabase
+        .from('faturas_cartao')
+        .update({ valor_total: Number(total.toFixed(2)) })
+        .eq('id', inv.id);
+      if (error) throw error;
+      await fetchCreditCardInvoices();
+    } catch (err) {
+      console.error('Error recalc invoice totals:', err);
+    }
+  };
+
   // Filter active Event type shifts for linking despesas
   const activeEvents = workShifts.filter(e => e.tipo === 'ENTRADA' && e.atividade === 'Evento');
 
@@ -1234,6 +1592,22 @@ function App() {
                 >
                   <Wallet size={16} />
                   <span>Carteiras & Contas</span>
+                </button>
+
+                {/* Cartões de Crédito Link */}
+                <button
+                  onClick={() => {
+                    setActiveTab('CARTOES');
+                    setIsDrawerOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'CARTOES'
+                      ? 'bg-[#0e69b2]/10 text-[#0e69b2]'
+                      : 'text-slate-655 hover:bg-slate-50 hover:text-slate-800'
+                  }`}
+                >
+                  <CreditCardIcon size={16} />
+                  <span>Cartões de Crédito</span>
                 </button>
 
                 {/* Ajustes Link */}
@@ -1549,6 +1923,50 @@ function App() {
                 onDeleteAccount={handleDeleteAccount}
                 onSaveTransfer={handleSaveTransfer}
               />
+            ) : activeTab === 'CARTOES' ? (
+              <>
+                <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setIsDrawerOpen(true)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-655 hover:text-slate-800 transition-colors cursor-pointer"
+                        title="Menu"
+                      >
+                        <Menu size={20} />
+                      </button>
+                      <span className="text-sm font-extrabold text-slate-800 font-sans">
+                        Cartões de Crédito
+                      </span>
+                    </div>
+                    {isSyncing && (
+                      <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
+                    )}
+                  </div>
+                </header>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28">
+                  <CreditCardsDashboard
+                    cards={creditCards}
+                    invoices={creditCardInvoices}
+                    _transactions={transactions}
+                    _accounts={accounts}
+                    selectedMonth={selectedMonth}
+                    onMonthChange={setSelectedMonth}
+                    months={months}
+                    onAddCard={() => {
+                      setEditingCreditCard(null);
+                      setIsCreditCardModalOpen(true);
+                    }}
+                    onEditCard={(card) => {
+                      setEditingCreditCard(card);
+                      setIsCreditCardModalOpen(true);
+                    }}
+                    onViewInvoice={handleViewInvoice}
+                    onPayInvoice={handlePayInvoiceFromDashboard}
+                  />
+                </div>
+              </>
             ) : (
               <>
                 {/* Header for Settings page */}
@@ -1614,6 +2032,14 @@ function App() {
         categoriesList={customCategories}
         onAddNewCategory={handleAddNewCategory}
         accounts={accounts}
+        creditCards={creditCards}
+        onInvoiceTransactionSaved={(cartaoId, mesAno) => {
+          const card = creditCards.find((c) => c.id === cartaoId);
+          if (!card) return;
+          getOrCreateInvoiceFor(card, mesAno).then(() =>
+            recalcInvoiceTotals(card.id, mesAno)
+          );
+        }}
       />
 
       {/* Work Shift Modal (BottomSheet) */}
@@ -1625,6 +2051,55 @@ function App() {
         editingEntry={editingShiftEntry}
         activeEvents={activeEvents}
         accounts={accounts}
+      />
+
+      {/* Credit Card Modal (BottomSheet) */}
+      <CreditCardModal
+        isOpen={isCreditCardModalOpen}
+        onClose={() => {
+          setIsCreditCardModalOpen(false);
+          setEditingCreditCard(null);
+        }}
+        onSave={(payload) => {
+          handleSaveCreditCard(payload);
+          setIsCreditCardModalOpen(false);
+          setEditingCreditCard(null);
+        }}
+        onDelete={handleDeleteCreditCard}
+        editingCard={editingCreditCard}
+        accounts={accounts}
+      />
+
+      {/* Invoice Detail Modal (BottomSheet) */}
+      <InvoiceDetailModal
+        isOpen={isInvoiceDetailOpen}
+        onClose={() => {
+          setIsInvoiceDetailOpen(false);
+          setSelectedInvoiceCard(null);
+        }}
+        card={selectedInvoiceCard}
+        invoice={
+          selectedInvoiceCard
+            ? getInvoiceForCardMonth(selectedInvoiceCard.id, invoiceDetailMonth) || null
+            : null
+        }
+        transactions={
+          selectedInvoiceCard
+            ? getInvoiceTransactions(selectedInvoiceCard.id, invoiceDetailMonth)
+            : []
+        }
+        accounts={accounts}
+        selectedMonth={invoiceDetailMonth}
+        months={months}
+        onMonthChange={(m) => {
+          setInvoiceDetailMonth(m);
+          if (selectedInvoiceCard) {
+            getOrCreateInvoiceFor(selectedInvoiceCard, m).then(() =>
+              recalcInvoiceTotals(selectedInvoiceCard.id, m)
+            );
+          }
+        }}
+        onPayInvoice={handlePayInvoice}
       />
     </div>
   );
