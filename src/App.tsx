@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles } from 'lucide-react';
 import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
@@ -78,6 +78,7 @@ function App() {
 
   // Revolut & Apple Wallet states
   const [isBalanceVisible, setIsBalanceVisible] = useState(true);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [selectedWalletCard, setSelectedWalletCard] = useState<CreditCard | null>(null);
@@ -1893,86 +1894,106 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Main Balance Display */}
-                  <div className="text-center space-y-1 mt-2">
-                    <div className="flex items-center justify-center space-x-1.5 text-xs text-purple-200 font-bold tracking-wide uppercase font-sans">
-                      <span>Conta Principal • BRL</span>
-                      <button 
-                        onClick={() => setIsBalanceVisible(!isBalanceVisible)} 
-                        className="text-purple-200/80 hover:text-white transition cursor-pointer"
-                      >
-                        {isBalanceVisible ? <Eye size={12} /> : <EyeOff size={12} />}
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-center space-x-1">
-                      <h1 className="text-4xl sm:text-5xl font-black tracking-tight font-mono text-white">
-                        {isBalanceVisible ? `R$ ${saldoAcumulado.toFixed(2).replace('.', ',')}` : 'R$ •••••••'}
-                      </h1>
-                    </div>
-
-                    <div className="pt-1">
-                      <span className="inline-block px-3 py-0.5 rounded-full glass-pill text-[10px] text-purple-100 font-bold font-sans">
-                        Lançamentos Efetivados
-                      </span>
-                    </div>
+                  {/* Grab Handle / Minimize Toggle (White Pill Bar) */}
+                  <div className="mt-6 mb-0.5 flex items-center justify-center z-20 relative">
+                    <button
+                      onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+                      className="group flex flex-col items-center justify-center gap-1 cursor-pointer select-none"
+                      title={isHeaderCollapsed ? 'Mostrar detalhes do saldo' : 'Minimizar valores'}
+                    >
+                      <span className="block h-1.5 w-14 rounded-full bg-white/85 shadow-[0_2px_10px_rgba(255,255,255,0.28)] transition-all group-hover:w-16 group-hover:bg-white" />
+                      {isHeaderCollapsed && (
+                        <ChevronUp size={12} className="text-white/85 animate-fade-in" strokeWidth={3} />
+                      )}
+                    </button>
                   </div>
 
-                  {/* Quick Action Grid (4 round glass buttons) */}
-                  <div className="grid grid-cols-4 gap-3 max-w-xs mx-auto mt-7">
-                    <button 
-                      onClick={() => openModalForType('ENTRADA')} 
-                      className="flex flex-col items-center space-y-1.5 group cursor-pointer"
-                    >
-                      <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
-                        <Plus size={18} className="stroke-[2.5]" />
-                      </div>
-                      <span className="text-[11px] font-bold text-purple-100 font-sans">Entrada</span>
-                    </button>
+                  {/* Collapsible Content: Balance + Quick Actions */}
+                  <div className={`overflow-hidden transition-all duration-500 ease-out ${isHeaderCollapsed ? 'max-h-0 opacity-0 mt-0 pointer-events-none' : 'max-h-[560px] opacity-100 mt-3'}`}>
 
-                    <button 
-                      onClick={() => openModalForType('SAIDA')} 
-                      className="flex flex-col items-center space-y-1.5 group cursor-pointer"
-                    >
-                      <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
-                        <Minus size={18} className="stroke-[2.5]" />
+                    {/* Main Balance Display */}
+                    <div className="text-center space-y-1 mt-2">
+                      <div className="flex items-center justify-center space-x-1.5 text-xs text-purple-200 font-bold tracking-wide uppercase font-sans">
+                        <span>Conta Principal • BRL</span>
+                        <button 
+                          onClick={() => setIsBalanceVisible(!isBalanceVisible)} 
+                          className="text-purple-200/80 hover:text-white transition cursor-pointer"
+                        >
+                          {isBalanceVisible ? <Eye size={12} /> : <EyeOff size={12} />}
+                        </button>
                       </div>
-                      <span className="text-[11px] font-bold text-purple-100 font-sans">Saída</span>
-                    </button>
 
-                    <button 
-                      onClick={() => setInicioViewMode(inicioViewMode === 'LIST' ? 'CHART' : 'LIST')} 
-                      className="flex flex-col items-center space-y-1.5 group cursor-pointer"
-                    >
-                      <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
-                        <BarChart2 size={18} />
+                      <div className="flex items-center justify-center space-x-1">
+                        <h1 className="text-4xl sm:text-5xl font-black tracking-tight font-mono text-white">
+                          {isBalanceVisible ? `R$ ${saldoAcumulado.toFixed(2).replace('.', ',')}` : 'R$ •••••••'}
+                        </h1>
                       </div>
-                      <span className="text-[11px] font-bold text-purple-100 font-sans">
-                        {inicioViewMode === 'LIST' ? 'Gráficos' : 'Lista'}
-                      </span>
-                    </button>
 
-                    <button 
-                      onClick={() => setIsWalletModalOpen(true)} 
-                      className="flex flex-col items-center space-y-1.5 group cursor-pointer"
-                    >
-                      <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
-                        <CreditCardIcon size={18} />
+                      <div className="pt-1">
+                        <span className="inline-block px-3 py-0.5 rounded-full glass-pill text-[10px] text-purple-100 font-bold font-sans">
+                          Lançamentos Efetivados
+                        </span>
                       </div>
-                      <span className="text-[11px] font-bold text-purple-100 font-sans">Cartões</span>
-                    </button>
+                    </div>
+
+                    {/* Quick Action Grid (4 round glass buttons) */}
+                    <div className="grid grid-cols-4 gap-3 max-w-xs mx-auto mt-7">
+                      <button 
+                        onClick={() => openModalForType('ENTRADA')} 
+                        className="flex flex-col items-center space-y-1.5 group cursor-pointer"
+                      >
+                        <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
+                          <Plus size={18} className="stroke-[2.5]" />
+                        </div>
+                        <span className="text-[11px] font-bold text-purple-100 font-sans">Entrada</span>
+                      </button>
+
+                      <button 
+                        onClick={() => openModalForType('SAIDA')} 
+                        className="flex flex-col items-center space-y-1.5 group cursor-pointer"
+                      >
+                        <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
+                          <Minus size={18} className="stroke-[2.5]" />
+                        </div>
+                        <span className="text-[11px] font-bold text-purple-100 font-sans">Saída</span>
+                      </button>
+
+                      <button 
+                        onClick={() => setInicioViewMode(inicioViewMode === 'LIST' ? 'CHART' : 'LIST')} 
+                        className="flex flex-col items-center space-y-1.5 group cursor-pointer"
+                      >
+                        <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
+                          <BarChart2 size={18} />
+                        </div>
+                        <span className="text-[11px] font-bold text-purple-100 font-sans">
+                          {inicioViewMode === 'LIST' ? 'Gráficos' : 'Lista'}
+                        </span>
+                      </button>
+
+                      <button 
+                        onClick={() => setIsWalletModalOpen(true)} 
+                        className="flex flex-col items-center space-y-1.5 group cursor-pointer"
+                      >
+                        <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
+                          <CreditCardIcon size={18} />
+                        </div>
+                        <span className="text-[11px] font-bold text-purple-100 font-sans">Cartões</span>
+                      </button>
+                    </div>
                   </div>
                 </header>
 
                 {/* Scrollable Content Pane */}
-                <main className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-950 scrollbar-thin pb-28">
+                <main className={`flex-1 overflow-y-auto p-4 space-y-5 bg-slate-950 scrollbar-thin pb-28 transition-all duration-500 ease-out ${isHeaderCollapsed ? 'pt-2' : ''}`}>
                   
-                  {/* Stats Header Summary Cards (Inputs vs Expenses) */}
-                  <StatsHeader 
-                    saldoAcumulado={saldoAcumulado}
-                    totalEntradas={totalEntradasMes}
-                    totalSaidas={totalSaidasMes}
-                  />
+                  {/* Stats Header Summary Cards (Inputs vs Expenses) - HIDE on collapse */}
+                  <div className={`overflow-hidden transition-all duration-500 ease-out ${isHeaderCollapsed ? 'max-h-0 opacity-0 mb-0 pointer-events-none scale-95 origin-top' : 'max-h-[280px] opacity-100'}`}>
+                    <StatsHeader 
+                      saldoAcumulado={saldoAcumulado}
+                      totalEntradas={totalEntradasMes}
+                      totalSaidas={totalSaidasMes}
+                    />
+                  </div>
 
                   {/* Warning/Cleanup Banner for Mock Data */}
                   {mockTransactionsCount > 0 && (
