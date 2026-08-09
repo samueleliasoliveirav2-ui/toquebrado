@@ -1894,20 +1894,6 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Grab Handle / Minimize Toggle (White Pill Bar) */}
-                  <div className="mt-6 mb-0.5 flex items-center justify-center z-20 relative">
-                    <button
-                      onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
-                      className="group flex flex-col items-center justify-center gap-1 cursor-pointer select-none"
-                      title={isHeaderCollapsed ? 'Mostrar detalhes do saldo' : 'Minimizar valores'}
-                    >
-                      <span className="block h-1.5 w-14 rounded-full bg-white/85 shadow-[0_2px_10px_rgba(255,255,255,0.28)] transition-all group-hover:w-16 group-hover:bg-white" />
-                      {isHeaderCollapsed && (
-                        <ChevronUp size={12} className="text-white/85 animate-fade-in" strokeWidth={3} />
-                      )}
-                    </button>
-                  </div>
-
                   {/* Collapsible Content: Balance + Quick Actions */}
                   <div className={`overflow-hidden transition-all duration-500 ease-out ${isHeaderCollapsed ? 'max-h-0 opacity-0 mt-0 pointer-events-none' : 'max-h-[560px] opacity-100 mt-3'}`}>
 
@@ -1980,6 +1966,23 @@ function App() {
                         <span className="text-[11px] font-bold text-blue-50 font-sans">Cartões</span>
                       </button>
                     </div>
+                  </div>
+
+                  {/* Grab Handle / Minimize Toggle (White Pill Bar) - BORDA INFERIOR do Header */}
+                  <div className="mt-7 -mb-1 flex items-center justify-center z-30 relative">
+                    <button
+                      onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+                      className="group flex flex-col items-center justify-center gap-0.5 cursor-pointer select-none"
+                      title={isHeaderCollapsed ? 'Mostrar detalhes do saldo' : 'Minimizar valores'}
+                    >
+                      <span className="block h-1.5 w-14 rounded-full bg-white/95 shadow-[0_2px_14px_rgba(15,23,42,0.15)] transition-all group-hover:w-16 group-hover:bg-white" />
+                      {isHeaderCollapsed && (
+                        <ChevronUp size={12} className="text-white animate-fade-in" strokeWidth={3} />
+                      )}
+                      {!isHeaderCollapsed && (
+                        <ChevronDown size={11} className="text-white/85 animate-fade-in" strokeWidth={3} />
+                      )}
+                    </button>
                   </div>
                 </header>
 
