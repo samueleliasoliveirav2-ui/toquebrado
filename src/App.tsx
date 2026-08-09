@@ -14,6 +14,7 @@ import { AccountsDashboard } from './components/AccountsDashboard';
 import { CreditCardsDashboard } from './components/CreditCardsDashboard';
 import { CreditCardModal } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
+import type { TemaVisual, UserProfile } from './types';
 import { supabase } from './lib/supabaseClient';
 
 const CURRENT_VERSION = '1.0.1';
@@ -22,6 +23,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const [userId, setUserId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [workShifts, setWorkShifts] = useState<WorkShiftEntry[]>([]);
@@ -276,22 +278,27 @@ function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        setCurrentUser(session.user.user_metadata?.nome || session.user.email || 'Usuário');
+        const nome = session.user.user_metadata?.nome || session.user.email || 'Usuário';
+        setCurrentUser(nome);
         setUserEmail(session.user.email || '');
         setUserId(session.user.id);
+        fetchUserProfile(session.user.id);
       }
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        setCurrentUser(session.user.user_metadata?.nome || session.user.email || 'Usuário');
+        const nome = session.user.user_metadata?.nome || session.user.email || 'Usuário';
+        setCurrentUser(nome);
         setUserEmail(session.user.email || '');
         setUserId(session.user.id);
+        fetchUserProfile(session.user.id);
       } else {
         setCurrentUser(null);
         setUserEmail('');
         setUserId(null);
+        setUserProfile(null);
         setTransactions([]);
         setWorkShifts([]);
       }
@@ -299,7 +306,70 @@ function App() {
     });
 
     return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchUserProfile = async (uid: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', uid)
+        .maybeSingle();
+      if (error) {
+        console.error('fetchUserProfile error:', error.message || error);
+        return;
+      }
+      if (data) {
+        const profile: UserProfile = {
+          id: data.id,
+          nomeCompleto: data.nome_completo || undefined,
+          email: data.email || undefined,
+          telefone: data.telefone || undefined,
+          avatarUrl: data.avatar_url || undefined,
+          moedaPadrao: data.moeda_padrao || 'BRL',
+          temaVisual: (data.tema_visual as TemaVisual) || 'LIGHT',
+          ocultarSaldosDefault: !!data.ocultar_saldos_default,
+          tipoPlano: data.tipo_plano || 'PESSOAL'
+        };
+        setUserProfile(profile);
+        // Reflete instantaneamente no header/sidebar
+        if (profile.nomeCompleto) setCurrentUser(profile.nomeCompleto);
+        if (profile.email) setUserEmail(profile.email);
+        if (profile.ocultarSaldosDefault) setIsBalanceVisible(false);
+      } else {
+        // Se nao tem perfil ainda, tenta criar um fallback (trigger geralmente cuida, mas garante)
+        try {
+          const nowEmail = userEmail || undefined;
+          const nowNome = currentUser || undefined;
+          await supabase
+            .from('profiles')
+            .insert({
+              id: uid,
+              nome_completo: nowNome || null,
+              email: nowEmail || null,
+              moeda_padrao: 'BRL',
+              tema_visual: 'LIGHT',
+              ocultar_saldos_default: false,
+              tipo_plano: 'PESSOAL'
+            });
+          setUserProfile({
+            id: uid,
+            nomeCompleto: nowNome,
+            email: nowEmail,
+            moedaPadrao: 'BRL',
+            temaVisual: 'LIGHT',
+            ocultarSaldosDefault: false,
+            tipoPlano: 'PESSOAL'
+          });
+        } catch {
+          // fallback silencioso
+        }
+      }
+    } catch (err) {
+      console.error('fetchUserProfile exception:', err);
+    }
+  };
 
   // 2. Fetch transactions from Supabase
   const fetchTransactions = async () => {
@@ -1326,8 +1396,92 @@ function App() {
   };
 
   const handleLogout = async () => {
-    if (confirm('Deseja realmente sair do sistema?')) {
-      await supabase.auth.signOut();
+    await supabase.auth.signOut();
+  };
+
+  // ------- Profile / User Settings save handler -------
+  const handleSaveProfile = async (patch: Partial<UserProfile> & {
+    currentPassword?: string;
+    newPassword?: string;
+  }): Promise<boolean> => {
+    if (!userId) return false;
+    try {
+      // 1) Tenta atualizar na tabela profiles
+      const dbPayload: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (patch.nomeCompleto !== undefined) dbPayload.nome_completo = patch.nomeCompleto;
+      if (patch.email !== undefined) dbPayload.email = patch.email;
+      if (patch.telefone !== undefined) dbPayload.telefone = patch.telefone;
+      if (patch.avatarUrl !== undefined) dbPayload.avatar_url = patch.avatarUrl;
+      if (patch.moedaPadrao !== undefined) dbPayload.moeda_padrao = patch.moedaPadrao;
+      if (patch.temaVisual !== undefined) dbPayload.tema_visual = patch.temaVisual;
+      if (patch.ocultarSaldosDefault !== undefined) dbPayload.ocultar_saldos_default = patch.ocultarSaldosDefault;
+
+      if (Object.keys(dbPayload).length > 1) {
+        const { error: errProfile } = await supabase
+          .from('profiles')
+          .upsert({ id: userId, ...dbPayload });
+        if (errProfile) {
+          console.error('handleSaveProfile profiles error:', errProfile.message || errProfile);
+        }
+      }
+
+      // 2) Atualiza o email/login no auth.user se solicitado (quando tiver permissao)
+      let trocouSenha = false;
+      if (patch.currentPassword && patch.newPassword) {
+        try {
+          const { error: pwdErr } = await supabase.auth.updateUser({ password: patch.newPassword });
+          if (pwdErr) {
+            console.error('updateUser password error:', pwdErr.message || pwdErr);
+            triggerToast('Erro ao alterar senha: ' + (pwdErr.message || 'desconhecido'));
+          } else {
+            trocouSenha = true;
+          }
+        } catch (e) {
+          console.error('updateUser password exception:', e);
+        }
+      }
+
+      // 3) Reflete o estado na UI instantaneamente (atualiza state + storage)
+      setUserProfile(prev => {
+        const next: UserProfile = prev || {
+          id: userId,
+          moedaPadrao: 'BRL',
+          temaVisual: 'LIGHT',
+          ocultarSaldosDefault: false,
+          tipoPlano: 'PESSOAL'
+        };
+        const merged: UserProfile = {
+          id: next.id,
+          nomeCompleto: patch.nomeCompleto !== undefined ? patch.nomeCompleto : next.nomeCompleto,
+          email: patch.email !== undefined ? patch.email : next.email,
+          telefone: patch.telefone !== undefined ? patch.telefone : next.telefone,
+          avatarUrl: patch.avatarUrl !== undefined ? patch.avatarUrl : next.avatarUrl,
+          moedaPadrao: patch.moedaPadrao ?? next.moedaPadrao,
+          temaVisual: patch.temaVisual ?? next.temaVisual,
+          ocultarSaldosDefault: patch.ocultarSaldosDefault ?? next.ocultarSaldosDefault,
+          tipoPlano: next.tipoPlano
+        };
+
+        if (merged.nomeCompleto) setCurrentUser(merged.nomeCompleto);
+        if (merged.email) setUserEmail(merged.email);
+        setIsBalanceVisible(!merged.ocultarSaldosDefault);
+        return merged;
+      });
+
+      if (patch.nomeCompleto) {
+        try {
+          await supabase.auth.updateUser({ data: { nome: patch.nomeCompleto } });
+        } catch {
+          /* ignore */
+        }
+      }
+
+      triggerToast(trocouSenha ? 'Perfil e senha atualizados com sucesso!' : 'Alterações salvas com sucesso!');
+      return true;
+    } catch (e) {
+      console.error('handleSaveProfile exception:', e);
+      triggerToast('Não foi possível salvar as alterações');
+      return false;
     }
   };
 
@@ -2364,6 +2518,8 @@ function App() {
                 <ProfileSettings
                   userName={currentUser}
                   userEmail={userEmail}
+                  userProfile={userProfile}
+                  onSaveProfile={handleSaveProfile}
                   onLogout={handleLogout}
                   onSeedData={handleSeedMockData}
                   onDeleteMockData={handleDeleteMockData}

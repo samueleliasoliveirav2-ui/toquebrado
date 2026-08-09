@@ -1,6 +1,34 @@
 export type TransactionType = 'ENTRADA' | 'SAIDA';
 export type TransactionStatus = 'PENDENTE' | 'RECEBIDO' | 'PAGO' | 'POSTERGAR';
 
+export const MOEDAS_PADRAO = [
+  { codigo: 'BRL', simbolo: 'R$', rotulo: 'Real (BRL)' },
+  { codigo: 'USD', simbolo: 'US$', rotulo: 'Dólar (USD)' },
+  { codigo: 'EUR', simbolo: '€', rotulo: 'Euro (EUR)' },
+  { codigo: 'ARS', simbolo: 'AR$', rotulo: 'Peso Argentino (ARS)' },
+  { codigo: 'CLP', simbolo: 'CL$', rotulo: 'Peso Chileno (CLP)' },
+  { codigo: 'COP', simbolo: 'COL$', rotulo: 'Peso Colombiano (COP)' },
+  { codigo: 'MXN', simbolo: 'MX$', rotulo: 'Peso Mexicano (MXN)' },
+  { codigo: 'GBP', simbolo: '£', rotulo: 'Libra Esterlina (GBP)' },
+  { codigo: 'PYG', simbolo: '₲', rotulo: 'Guarani Paraguaio (PYG)' },
+  { codigo: 'UYU', simbolo: 'UYU$', rotulo: 'Peso Uruguaio (UYU)' }
+] as const;
+
+export type TemaVisual = 'LIGHT' | 'DARK' | 'SYSTEM';
+export type TipoPlanoConta = 'PESSOAL' | 'ULTRA' | 'PRO';
+
+export interface UserProfile {
+  id: string;
+  nomeCompleto?: string;
+  email?: string;
+  telefone?: string;
+  avatarUrl?: string;
+  moedaPadrao: typeof MOEDAS_PADRAO[number]['codigo'];
+  temaVisual: TemaVisual;
+  ocultarSaldosDefault: boolean;
+  tipoPlano: TipoPlanoConta;
+}
+
 export interface Transaction {
   id: string;
   data: string; // YYYY-MM-DD
