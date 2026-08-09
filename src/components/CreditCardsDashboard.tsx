@@ -190,7 +190,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
           <div className="flex items-center gap-1.5 text-[#0e69b2] mb-1">
             <CreditCard size={12} />
           </div>
-          <span className="text-[8px] uppercase font-bold text-slate-400 leading-tight">
+          <span className="text-[8px] uppercase font-bold text-slate-500 leading-tight">
             Limite Total
           </span>
           <span className="text-[11px] font-black text-slate-800 mt-1 leading-tight">
@@ -202,7 +202,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
           <div className="flex items-center gap-1.5 text-emerald-600 mb-1">
             <CheckCircle2 size={12} />
           </div>
-          <span className="text-[8px] uppercase font-bold text-slate-400 leading-tight">
+          <span className="text-[8px] uppercase font-bold text-slate-500 leading-tight">
             Disponível
           </span>
           <span className="text-[11px] font-black text-emerald-700 mt-1 leading-tight">
@@ -214,7 +214,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
           <div className="flex items-center gap-1.5 text-amber-600 mb-1">
             <DollarSign size={12} />
           </div>
-          <span className="text-[8px] uppercase font-bold text-slate-400 leading-tight">
+          <span className="text-[8px] uppercase font-bold text-slate-500 leading-tight">
             Fatura Mês
           </span>
           <span className="text-[11px] font-black text-amber-700 mt-1 leading-tight">
@@ -238,11 +238,11 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
 
         {cards.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-white border border-slate-200 rounded-3xl">
-            <CreditCard className="text-slate-300 mb-3" size={32} />
+            <CreditCard className="text-slate-500 mb-3" size={32} />
             <p className="text-slate-700 text-xs font-bold">
               Nenhum cartão cadastrado.
             </p>
-            <p className="text-slate-400 text-[10px] mt-1">
+            <p className="text-slate-500 text-[10px] mt-1">
               Toque no botão acima para cadastrar seu primeiro cartão.
             </p>
           </div>
@@ -329,11 +329,11 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
 
                   <div className="p-3.5 space-y-3 bg-white text-left">
                     <div className="flex items-center justify-between text-[10px]">
-                      <div className="flex items-center gap-1 text-slate-500 font-bold">
+                      <div className="flex items-center gap-1 text-slate-600 font-bold">
                         <Calendar size={11} />
                         <span>Fecha: dia {card.diaFechamento}</span>
                       </div>
-                      <div className="flex items-center gap-1 text-slate-500 font-bold">
+                      <div className="flex items-center gap-1 text-slate-600 font-bold">
                         <DollarSign size={11} />
                         <span>Vence: dia {card.diaVencimento}</span>
                       </div>
@@ -341,7 +341,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
 
                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 flex items-center justify-between">
                       <div className="text-left">
-                        <span className="text-[8px] uppercase font-bold text-slate-400 block leading-none">
+                        <span className="text-[8px] uppercase font-bold text-slate-500 block leading-none">
                           Fatura {selectedMonth}
                         </span>
                         <span className="text-sm font-black text-slate-800 leading-tight">

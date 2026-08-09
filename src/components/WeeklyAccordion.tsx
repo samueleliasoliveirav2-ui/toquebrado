@@ -83,27 +83,27 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
     if (tipo === 'ENTRADA') {
       return {
         icon: DollarSign,
-        bg: 'bg-emerald-950/70 text-emerald-400',
-        iconColor: 'text-emerald-400'
+        bg: 'bg-emerald-50 text-emerald-700',
+        iconColor: 'text-emerald-600'
       };
     }
     
     if (cat.includes('supermercado') || cat.includes('aliment') || cat.includes('comida') || cat.includes('ifood') || cat.includes('restaurante')) {
-      return { icon: ShoppingCart, bg: 'bg-rose-950/70 text-rose-400', iconColor: 'text-rose-400' };
+      return { icon: ShoppingCart, bg: 'bg-rose-50 text-rose-700', iconColor: 'text-rose-600' };
     }
     if (cat.includes('transporte') || cat.includes('gasolina') || cat.includes('combustivel') || cat.includes('uber') || cat.includes('carro')) {
-      return { icon: Car, bg: 'bg-amber-950/70 text-amber-400', iconColor: 'text-amber-400' };
+      return { icon: Car, bg: 'bg-amber-50 text-amber-700', iconColor: 'text-amber-600' };
     }
     if (cat.includes('assinatura') || cat.includes('lazer') || cat.includes('netflix') || cat.includes('spotify') || cat.includes('streaming') || cat.includes('tv')) {
-      return { icon: Tv, bg: 'bg-indigo-950/70 text-indigo-400', iconColor: 'text-indigo-400' };
+      return { icon: Tv, bg: 'bg-blue-50 text-blue-700', iconColor: 'text-blue-600' };
     }
     if (cat.includes('saude') || cat.includes('dentista') || cat.includes('remedio') || cat.includes('farmacia') || cat.includes('drogaria')) {
-      return { icon: Heart, bg: 'bg-red-950/70 text-red-400', iconColor: 'text-red-400' };
+      return { icon: Heart, bg: 'bg-red-50 text-red-700', iconColor: 'text-red-600' };
     }
     if (cat.includes('cartao') || cat.includes('fatura') || cat.includes('emprestimo')) {
-      return { icon: CreditCard, bg: 'bg-purple-950/70 text-purple-400', iconColor: 'text-purple-400' };
+      return { icon: CreditCard, bg: 'bg-blue-50 text-blue-700', iconColor: 'text-blue-600' };
     }
-    return { icon: HelpCircle, bg: 'bg-slate-800 text-slate-400', iconColor: 'text-slate-400' };
+    return { icon: HelpCircle, bg: 'bg-slate-100 text-slate-600', iconColor: 'text-slate-600' };
   };
 
   // Group transactions by their active Monday week key
@@ -171,14 +171,14 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
     switch (tx.status) {
       case 'RECEBIDO':
         return (
-          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 flex items-center gap-1 shadow-2xs">
+          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-2xs">
             <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
             RECEBIDO
           </span>
         );
       case 'PAGO':
         return (
-          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-950/80 text-amber-400 border border-amber-800/40 flex items-center gap-1 shadow-2xs">
+          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 shadow-2xs">
             <span className="w-1 h-1 rounded-full bg-amber-500" />
             PAGO
           </span>
@@ -188,18 +188,18 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
           ? tx.dataPostergar.split('-').reverse().slice(0, 2).join('/')
           : '';
         return (
-          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-sky-950/80 text-sky-400 border border-sky-800/40 flex flex-col items-center shadow-2xs">
+          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-sky-50 text-sky-700 border border-sky-200 flex flex-col items-center shadow-2xs">
             <span className="flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-sky-400" />
+              <span className="w-1 h-1 rounded-full bg-sky-500" />
               POSTERGADO
             </span>
-            {postDate && <span className="text-[7px] text-sky-300 font-bold">p/ {postDate}</span>}
+            {postDate && <span className="text-[7px] text-sky-600 font-bold">p/ {postDate}</span>}
           </span>
         );
       case 'PENDENTE':
       default:
         return (
-          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-slate-800 text-slate-400 border border-slate-700/60 flex items-center gap-1">
+          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
             <span className="w-1 h-1 rounded-full bg-slate-500" />
             PENDENTE
           </span>
@@ -209,9 +209,9 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
 
   if (weekGroups.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-slate-900/60 border border-slate-800 rounded-3xl">
+      <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-slate-50 border border-slate-200 rounded-3xl">
         <AlertCircle className="text-slate-500 mb-3" size={32} />
-        <p className="text-slate-350 text-sm font-semibold">Nenhum lançamento encontrado neste mês.</p>
+        <p className="text-slate-700 text-sm font-semibold">Nenhum lançamento encontrado neste mês.</p>
         <p className="text-slate-500 text-xs mt-1">Toque no botão + acima para cadastrar uma receita ou despesa.</p>
       </div>
     );
@@ -227,21 +227,21 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
         return (
           <div 
             key={group.key} 
-            className="bg-slate-900 rounded-[28px] overflow-hidden border border-slate-800 transition-all duration-300 shadow-sm"
+            className="bg-white rounded-[28px] overflow-hidden border border-slate-200 transition-all duration-300 shadow-sm"
           >
             {/* Header Accordion */}
             <div 
               onClick={() => toggleExpand(group.key)}
-              className="px-4 py-3.5 hover:bg-slate-800/40 flex items-center justify-between cursor-pointer select-none transition-colors border-b border-slate-800/50"
+              className="px-4 py-3.5 hover:bg-slate-50 flex items-center justify-between cursor-pointer select-none transition-colors border-b border-slate-100"
             >
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-extrabold text-white">{group.label}</span>
+                  <span className="text-sm font-extrabold text-slate-800">{group.label}</span>
                   {group.label === 'Primeira Semana' && (
-                    <span className="text-[9px] px-1.5 py-0.5 bg-purple-950 border border-purple-800/40 text-purple-300 rounded-full font-bold">Atual</span>
+                    <span className="text-[9px] px-1.5 py-0.5 bg-blue-100 border border-blue-200 text-blue-700 rounded-full font-bold">Atual</span>
                   )}
                 </div>
-                <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5 font-medium">
+                <span className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
                   <Calendar size={10} className="text-slate-500" />
                   {rangeStr}
                 </span>
@@ -250,11 +250,11 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <span className="text-[8px] uppercase tracking-wider text-slate-500 block font-bold">Saldo</span>
-                  <span className={`text-xs font-extrabold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <span className={`text-xs font-extrabold ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {formatCurrency(group.saldoSemana)}
                   </span>
                 </div>
-                <div className="p-1 rounded-lg text-slate-400">
+                <div className="p-1 rounded-lg text-slate-500">
                   {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </div>
               </div>
@@ -262,7 +262,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
 
             {/* List Drawer */}
             <div className={`transition-all duration-350 ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-              <div className="p-3 space-y-2 bg-slate-950/20 divide-y divide-slate-900/40">
+              <div className="p-3 space-y-2 bg-slate-50 divide-y divide-slate-100">
                 {group.transactions.map((tx) => {
                   const isEntrada = tx.tipo === 'ENTRADA';
                   const activeDate = getTransactionActiveDate(tx);
@@ -276,7 +276,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                     <div 
                       key={tx.id}
                       onClick={() => onEditTransaction(tx)}
-                      className="flex items-center justify-between p-3.5 rounded-[20px] bg-slate-900 border border-slate-800/80 hover:bg-slate-850/80 active:scale-98 transition-all cursor-pointer group"
+                      className="flex items-center justify-between p-3.5 rounded-[20px] bg-white border border-slate-200 hover:bg-slate-50 active:scale-98 transition-all cursor-pointer group"
                     >
                       {/* Left: Icon and info */}
                       <div className="flex items-center gap-3">
@@ -286,16 +286,16 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
 
                         {/* Mid: Description, Category and Date */}
                         <div className="flex flex-col text-left">
-                          <span className="text-sm font-extrabold text-white group-hover:text-purple-300 transition-colors line-clamp-1 max-w-[150px]">
+                          <span className="text-sm font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1 max-w-[150px]">
                             {tx.descricao}
                           </span>
                           
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="text-[10px] text-slate-400 font-medium">
+                            <span className="text-[10px] text-slate-500 font-medium">
                               {activeDate.split('-')[2]} Ago • {tx.categoria}
                             </span>
                             {isPostponed && (
-                              <span className="text-[8px] text-slate-500 font-bold line-through">
+                              <span className="text-[8px] text-slate-600 font-bold line-through">
                                 ({tx.data.split('-')[2]} Ago)
                               </span>
                             )}
@@ -306,11 +306,11 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                       {/* Right: Value and Badge status */}
                       <div className="flex items-center gap-2.5">
                         <div className="text-right flex flex-col items-end">
-                          <span className={`text-sm font-black font-mono tracking-tight ${isEntrada ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          <span className={`text-sm font-black font-mono tracking-tight ${isEntrada ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {isEntrada ? '+' : '-'} {formatCurrency(tx.valor)}
                           </span>
                           {!!tx.juros && tx.juros > 0 && (
-                            <span className="block text-[8px] text-rose-400 font-bold">
+                            <span className="block text-[8px] text-rose-600 font-bold">
                               +{formatCurrency(tx.juros)} juros
                             </span>
                           )}
@@ -326,11 +326,11 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                           className="hover:scale-105 active:scale-95 transition-transform relative group/badge flex items-center justify-center cursor-pointer"
                         >
                           {getStatusBadge(tx)}
-                          <div className="absolute inset-0 bg-slate-900 opacity-0 group-hover/badge:opacity-100 flex items-center justify-center rounded-full transition-opacity border border-slate-700">
+                          <div className="absolute inset-0 bg-white opacity-0 group-hover/badge:opacity-100 flex items-center justify-center rounded-full transition-opacity border border-slate-200">
                             {isPaid ? (
-                              <Clock size={11} className="text-slate-400" />
+                              <Clock size={11} className="text-slate-500" />
                             ) : (
-                              <Check size={11} className="text-emerald-400 font-bold" />
+                              <Check size={11} className="text-emerald-600 font-bold" />
                             )}
                           </div>
                         </button>

@@ -183,7 +183,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
           <button 
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-655 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -320,7 +320,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
                 <div className="space-y-1.5 pt-1">
                   <label className="block text-slate-500 text-[10px] font-bold uppercase">Como criar os lançamentos?</label>
                   <div className="flex gap-4">
-                    <label className="flex items-center gap-1.5 text-xs text-slate-655 font-semibold cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold cursor-pointer">
                       <input
                         type="radio"
                         name="modoLancamento"
@@ -330,7 +330,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
                       />
                       Lançamento Único
                     </label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-655 font-semibold cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold cursor-pointer">
                       <input
                         type="radio"
                         name="modoLancamento"
@@ -398,7 +398,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
                       placeholder="0,00"
                       value={valor}
                       onChange={(e) => setValor(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-850 font-black focus:outline-none focus:border-blue-500 shadow-3xs"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-800 font-black focus:outline-none focus:border-blue-500 shadow-3xs"
                       required
                     />
                   </div>
@@ -434,7 +434,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="text-left">
                       <p className="text-xs font-extrabold text-slate-700">Lançar na Carteira Principal?</p>
-                      <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Cria uma despesa espelhada no caixa pessoal.</p>
+                      <p className="text-[9px] text-slate-500 font-semibold mt-0.5">Cria uma despesa espelhada no caixa pessoal.</p>
                     </div>
                     
                     {/* Switch Toggle */}
@@ -480,8 +480,8 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
             <div className="bg-slate-50/50 p-3.5 border border-slate-200/50 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="text-left">
-                  <p className="text-xs font-extrabold text-slate-700">Recebido no mesmo dia?</p>
-                  <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Define se o dinheiro já está na conta.</p>
+                  <p className="text-xs font-extrabold text-slate-800">Recebido no mesmo dia?</p>
+                  <p className="text-[9px] text-slate-500 font-semibold mt-0.5">Define se o dinheiro já está na conta.</p>
                 </div>
                 
                 {/* Switch Toggle */}
@@ -527,7 +527,7 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
               placeholder={tipo === 'SAIDA' ? 'Ex: Combustível Posto Shell' : 'Ex: Evento de Sábado, Turno da Noite'}
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-455 focus:outline-none focus:border-blue-500 font-semibold shadow-3xs"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-semibold shadow-3xs"
             />
           </div>
 

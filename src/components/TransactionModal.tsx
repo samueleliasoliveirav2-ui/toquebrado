@@ -291,23 +291,23 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in font-sans">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-xs animate-fade-in font-sans">
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Modal Bottom Sheet Container */}
-      <div className="relative w-full max-w-md bg-slate-900 border-t border-slate-800 rounded-t-[32px] shadow-2xl p-6 z-10 animate-slide-up max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-md bg-white border-t border-slate-200 rounded-t-[32px] shadow-2xl p-6 z-10 animate-slide-up max-h-[92vh] overflow-y-auto">
         
         {/* Handle bar for native look */}
-        <div className="mx-auto w-12 h-1.5 bg-slate-800 rounded-full mb-6 cursor-pointer" onClick={onClose} />
+        <div className="mx-auto w-12 h-1.5 bg-slate-200 rounded-full mb-6 cursor-pointer" onClick={onClose} />
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="text-left">
-            <h3 className="text-xl font-bold text-white">
+            <h3 className="text-xl font-bold text-slate-800">
               {editingTransaction ? 'Editar Lançamento' : 'Novo Lançamento'}
             </h3>
             {editingTransaction?.grupoRecorrenciaId && (
-              <span className="text-[10px] bg-purple-950 border border-purple-800 text-purple-300 font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider block mt-1">
+              <span className="text-[10px] bg-blue-50 border border-blue-200 text-blue-700 font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider block mt-1">
                 {editingTransaction.frequencia === 'PARCELADO' 
                   ? `Parcelado • Parcela ${editingTransaction.parcelaAtual}/${editingTransaction.totalParcelas}`
                   : `Recorrente • ${editingTransaction.periodicidade}`}
@@ -317,7 +317,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <button 
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -327,7 +327,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-5 text-left">
           
           {/* Toggle Entrada / Saída */}
-          <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-850">
+          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
             <button
               type="button"
               disabled={!!editingTransaction}
@@ -337,8 +337,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               }}
               className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'SAIDA'
-                  ? 'bg-rose-500/10 text-rose-400 border border-rose-900/30 font-black shadow-inner'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-rose-500/10 text-rose-600 border border-rose-200 font-black shadow-inner'
+                  : 'text-slate-500 hover:text-slate-800'
               } ${editingTransaction ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
@@ -354,8 +354,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               }}
               className={`py-3 px-4 rounded-xl font-extrabold text-sm transition-all duration-350 flex items-center justify-center gap-2 cursor-pointer ${
                 tipo === 'ENTRADA'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-900/30 font-black shadow-inner'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-200 font-black shadow-inner'
+                  : 'text-slate-500 hover:text-slate-800'
               } ${editingTransaction ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -364,19 +364,19 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </div>
 
           {/* Amount input in big font */}
-          <div className="flex flex-col items-center justify-center py-2 border-y border-slate-800/80">
-            <label className="text-slate-400 text-xs uppercase font-bold mb-1">
+          <div className="flex flex-col items-center justify-center py-2 border-y border-slate-200">
+            <label className="text-slate-500 text-xs uppercase font-bold mb-1">
               {frequencia === 'PARCELADO' && tipoCalculoParcela === 'TOTAL' ? 'Valor Total' : 'Valor'}
             </label>
-            <div className="flex items-center text-white font-extrabold text-3xl font-mono">
-              <span className={`mr-1.5 text-2xl ${tipo === 'SAIDA' ? 'text-rose-455' : 'text-emerald-455'}`}>R$</span>
+            <div className="flex items-center text-slate-800 font-extrabold text-3xl font-mono">
+              <span className={`mr-1.5 text-2xl ${tipo === 'SAIDA' ? 'text-rose-600' : 'text-emerald-600'}`}>R$</span>
               <input
                 type="number"
                 step="0.01"
                 placeholder="0,00"
                 value={valor}
                 onChange={(e) => setValor(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                className="bg-transparent border-none focus:outline-none w-44 text-center font-extrabold text-white placeholder-slate-600"
+                className="bg-transparent border-none focus:outline-none w-44 text-center font-extrabold text-slate-800 placeholder-slate-400"
                 required
                 autoFocus={!editingTransaction}
               />
@@ -385,13 +385,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
           {/* Descrição */}
           <div>
-            <label className="block text-slate-450 text-xs font-bold uppercase mb-1.5">Descrição</label>
+            <label className="block text-slate-500 text-xs font-bold uppercase mb-1.5">Descrição</label>
             <input
               type="text"
               placeholder="Ex: Uber, Supermercado, Pró-labore..."
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-sm font-semibold shadow-inner"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm font-semibold shadow-inner"
               required
             />
           </div>
@@ -438,7 +438,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                       onClick={() => setFrequencia(opt)}
                       className={`py-2 px-1 text-[10px] font-bold rounded-lg border text-center transition-all cursor-pointer ${
                         frequencia === opt
-                          ? 'bg-slate-900 border-slate-950 text-white shadow-2xs font-extrabold'
+                          ? 'bg-slate-800 border-slate-900 text-white shadow-2xs font-extrabold'
                           : 'bg-white text-slate-500 border-slate-200 hover:text-slate-800'
                       }`}
                     >
@@ -470,7 +470,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                       </label>
                       {(() => {
                         const d = data ? new Date(data + 'T12:00:00') : null;
-                        if (!d || isNaN(d.getTime())) return <p className="text-[10px] text-slate-400 font-semibold py-2">Selecione uma data</p>;
+                        if (!d || isNaN(d.getTime())) return <p className="text-[10px] text-slate-500 font-semibold py-2">Selecione uma data</p>;
                         let text = '';
                         if (periodicidade === 'MENSAL') {
                           text = `Todo dia ${d.getDate().toString().padStart(2, '0')}`;
@@ -483,7 +483,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                       })()}
                     </div>
                   </div>
-                  <p className="text-[9px] text-slate-400 font-semibold leading-normal">
+                  <p className="text-[9px] text-slate-500 font-semibold leading-normal">
                     {periodicidade === 'MENSAL' && 'O sistema projetará 12 meses futuros como PENDENTE.'}
                     {periodicidade === 'SEMANAL' && 'O sistema projetará 24 semanas futuras como PENDENTE.'}
                     {periodicidade === 'ANUAL' && 'O sistema projetará 5 anos futuros como PENDENTE.'}
@@ -559,7 +559,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     disabled={accounts.length === 0}
                     className={`flex items-center justify-center gap-1.5 py-2 px-1 text-[10px] font-bold rounded-lg border text-center transition-all cursor-pointer ${
                       formaPagamento === 'CONTA'
-                        ? 'bg-slate-900 border-slate-950 text-white shadow-2xs font-extrabold'
+                        ? 'bg-slate-800 border-slate-900 text-white shadow-2xs font-extrabold'
                         : 'bg-white text-slate-500 border-slate-200 hover:text-slate-800 disabled:opacity-40 disabled:cursor-not-allowed'
                     }`}
                   >
@@ -571,7 +571,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     disabled={creditCards.length === 0}
                     className={`flex items-center justify-center gap-1.5 py-2 px-1 text-[10px] font-bold rounded-lg border text-center transition-all cursor-pointer ${
                       formaPagamento === 'CARTAO'
-                        ? 'bg-slate-900 border-slate-950 text-white shadow-2xs font-extrabold'
+                        ? 'bg-slate-800 border-slate-900 text-white shadow-2xs font-extrabold'
                         : 'bg-white text-slate-500 border-slate-200 hover:text-slate-800 disabled:opacity-40 disabled:cursor-not-allowed'
                     }`}
                   >
@@ -672,13 +672,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               {/* Dynamic Sub-Input to Register New Category */}
               {isAddingNew && (
                 <div className="mt-2.5 space-y-1 animate-fade-in">
-                  <label className="block text-slate-400 text-[9px] font-bold uppercase">Nome da Nova Categoria</label>
+                  <label className="block text-slate-500 text-[9px] font-bold uppercase">Nome da Nova Categoria</label>
                   <input
                     type="text"
                     placeholder="Nova categoria..."
                     value={newCategoryName}
                     onChange={(e) => setNewCategoryName(e.target.value)}
-                    className="w-full bg-white border border-slate-250 rounded-lg px-2.5 py-1.5 text-slate-800 text-xs font-semibold focus:outline-none focus:border-blue-500 shadow-3xs"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 text-xs font-semibold focus:outline-none focus:border-blue-500 shadow-3xs"
                     required
                   />
                 </div>
@@ -706,8 +706,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 onClick={() => setStatus('PENDENTE')}
                 className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
                   status === 'PENDENTE'
-                    ? 'bg-slate-200 text-slate-800 border-slate-350 shadow-2xs font-extrabold'
-                    : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600'
+                    ? 'bg-slate-200 text-slate-800 border-slate-300 shadow-2xs font-extrabold'
+                    : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-700'
                 }`}
               >
                 Pendente
@@ -720,7 +720,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
                     status === 'RECEBIDO'
                       ? 'bg-emerald-500/10 text-emerald-700 border-emerald-300 shadow-2xs font-extrabold'
-                      : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600'
+                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-700'
                   }`}
                 >
                   Recebido
@@ -732,7 +732,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
                     status === 'PAGO'
                       ? 'bg-amber-500/10 text-amber-700 border-amber-300 shadow-2xs font-extrabold'
-                      : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600'
+                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-700'
                   }`}
                 >
                   Pago
@@ -745,7 +745,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all cursor-pointer ${
                   status === 'POSTERGAR'
                     ? 'bg-sky-500/10 text-sky-700 border-sky-300 shadow-2xs font-extrabold'
-                    : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600'
+                    : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-700'
                 }`}
               >
                 Postergar
@@ -773,10 +773,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-xl space-y-2 shadow-2xs">
               <div className="flex items-center justify-between">
                 <label className="text-slate-500 text-xs font-bold uppercase">Juros / Multa por Atraso</label>
-                <span className="text-[10px] text-slate-400 font-bold">Opcional</span>
+                <span className="text-[10px] text-slate-500 font-bold">Opcional</span>
               </div>
               <div className="relative">
-                <span className="absolute left-3 top-2 text-sm font-bold text-slate-450">R$</span>
+                <span className="absolute left-3 top-2 text-sm font-bold text-slate-500">R$</span>
                 <input
                   type="number"
                   step="0.01"
@@ -786,7 +786,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   className="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-slate-800 font-semibold focus:outline-none focus:border-blue-500"
                 />
               </div>
-              <p className="text-[10px] text-slate-400 font-medium">Os juros acumulados serão adicionados ao total pago da despesa.</p>
+              <p className="text-[10px] text-slate-500 font-medium">Os juros acumulados serão adicionados ao total pago da despesa.</p>
             </div>
           )}
 
@@ -805,7 +805,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     }
                   }
                 }}
-                className="flex-1 py-3.5 rounded-xl bg-rose-950/40 border border-rose-900/40 hover:bg-rose-900/30 text-rose-400 font-bold text-xs transition-all cursor-pointer animate-fade-in"
+                className="flex-1 py-3.5 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 font-bold text-xs transition-all cursor-pointer animate-fade-in"
               >
                 Excluir
               </button>
@@ -813,7 +813,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
             <button
               type="submit"
-              className={`py-3.5 rounded-xl text-white font-bold text-xs shadow-revolut-glow flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 ${editingTransaction && onDelete ? 'flex-[2]' : 'w-full'}`}
+              className={`py-3.5 rounded-xl text-white font-bold text-xs shadow-revolut-glow flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 ${editingTransaction && onDelete ? 'flex-[2]' : 'w-full'}`}
             >
               <Check size={16} />
               {editingTransaction ? 'Salvar Lançamento' : 'Confirmar Lançamento'}
@@ -826,13 +826,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       {/* CONFIRMATION POPUP 1: SAVE DIALOG (ONLY THIS vs THIS & NEXT) */}
       {showSaveScopeDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
-            <div className="flex items-center gap-3 text-purple-400">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
+            <div className="flex items-center gap-3 text-blue-600">
               <RefreshCw size={24} className="animate-spin select-none" style={{ animationDuration: '3s' }} />
-              <h4 className="text-sm font-black text-white uppercase tracking-wider">Alterar Lançamento Fixo/Parcela</h4>
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alterar Lançamento Fixo/Parcela</h4>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-500 leading-relaxed">
               Você está alterando um lançamento que pertence a uma recorrência ou parcelamento. Deseja aplicar as alterações apenas a este registro ou estendê-las para todos os lançamentos futuros deste grupo?
             </p>
 
@@ -840,21 +840,21 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleConfirmSave('ONLY_THIS')}
-                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer text-center"
+                className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer text-center"
               >
                 Alterar apenas este lançamento
               </button>
               <button
                 type="button"
                 onClick={() => handleConfirmSave('THIS_AND_FUTURE')}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-750 text-white font-bold text-xs cursor-pointer text-center shadow-md"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white font-bold text-xs cursor-pointer text-center shadow-md"
               >
                 Alterar este e todos os próximos
               </button>
               <button
                 type="button"
                 onClick={() => setShowSaveScopeDialog(false)}
-                className="w-full py-2.5 text-center text-xs text-slate-500 hover:text-slate-350 font-bold cursor-pointer"
+                className="w-full py-2.5 text-center text-xs text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
               >
                 Cancelar
               </button>
@@ -866,13 +866,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       {/* CONFIRMATION POPUP 2: DELETE DIALOG (ONLY THIS vs THIS & NEXT) */}
       {showDeleteScopeDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
-            <div className="flex items-center gap-3 text-rose-400">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-2xl max-w-sm w-full text-left space-y-4 animate-slide-up">
+            <div className="flex items-center gap-3 text-rose-500">
               <X size={24} className="text-rose-500" />
-              <h4 className="text-sm font-black text-white uppercase tracking-wider">Excluir Lançamento Fixo/Parcela</h4>
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Excluir Lançamento Fixo/Parcela</h4>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-500 leading-relaxed">
               Você deseja excluir apenas esta parcela/lançamento específico ou prefere remover esta ocorrência e todas as futuras deste grupo de recorrência?
             </p>
 
@@ -880,7 +880,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleConfirmDelete('ONLY_THIS')}
-                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer text-center"
+                className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer text-center"
               >
                 Excluir apenas este lançamento
               </button>
@@ -894,7 +894,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowDeleteScopeDialog(false)}
-                className="w-full py-2.5 text-center text-xs text-slate-500 hover:text-slate-350 font-bold cursor-pointer"
+                className="w-full py-2.5 text-center text-xs text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
               >
                 Cancelar
               </button>

@@ -253,7 +253,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col p-4 space-y-5 bg-slate-55 overflow-y-auto pb-28 animate-fade-in font-sans">
+    <div className="w-full flex-1 flex flex-col p-4 space-y-5 bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
       
       {/* Header */}
       <header className="flex items-center justify-between">
@@ -279,32 +279,32 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
       </header>
 
       {/* Patrimônio Resumo Card */}
-      <div className="bg-slate-900 border border-slate-950 text-white p-5 rounded-3xl shadow-lg text-left relative overflow-hidden">
+      <div className="bg-white border border-slate-200 text-slate-800 p-5 rounded-3xl shadow-lg text-left relative overflow-hidden">
         {/* Glow Effects */}
-        <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full filter blur-xl" />
+        <div className="absolute top-0 right-0 w-24 h-24 bg-[#0e69b2]/5 rounded-full filter blur-xl" />
         
-        <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 block">Patrimônio Consolidado</span>
+        <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-500 block">Patrimônio Consolidado</span>
         <h2 className="text-2xl font-black mt-1 leading-none">
           {formatCurrency(saldoConsolidado)}
         </h2>
 
         {/* Sub-balances PF/PJ grid */}
-        <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t border-white/10">
+        <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t border-slate-200">
           <div>
-            <span className="text-[9px] uppercase font-bold text-slate-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+            <span className="text-[9px] uppercase font-bold text-slate-500 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
               Pessoa Física (PF)
             </span>
-            <span className="text-sm font-extrabold block mt-0.5">
+            <span className="text-sm font-extrabold text-slate-800 block mt-0.5">
               {formatCurrency(saldoPF)}
             </span>
           </div>
           <div>
-            <span className="text-[9px] uppercase font-bold text-slate-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+            <span className="text-[9px] uppercase font-bold text-slate-500 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
               Pessoa Jurídica (PJ)
             </span>
-            <span className="text-sm font-extrabold block mt-0.5">
+            <span className="text-sm font-extrabold text-slate-800 block mt-0.5">
               {formatCurrency(saldoPJ)}
             </span>
           </div>
@@ -319,9 +319,9 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
 
         {accounts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-white border border-slate-200 rounded-3xl">
-            <Landmark className="text-slate-350 mb-3" size={28} />
+            <Landmark className="text-slate-500 mb-3" size={28} />
             <p className="text-slate-700 text-xs font-bold">Nenhuma conta cadastrada.</p>
-            <p className="text-slate-400 text-[10px] mt-1">Toque no botão superior para criar sua primeira conta bancária.</p>
+            <p className="text-slate-500 text-[10px] mt-1">Toque no botão superior para criar sua primeira conta bancária.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -362,7 +362,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
                             {acc.tipoPessoa}
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">
                           {getAccountTypeName(acc.tipo)} {acc.banco ? `• ${acc.banco}` : ''}
                         </p>
                       </div>
@@ -370,8 +370,8 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
 
                     {/* Balance */}
                     <div className="text-right">
-                      <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">Saldo Disponível</span>
-                      <span className="text-sm font-black text-slate-850">
+                      <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold block">Saldo Disponível</span>
+                      <span className="text-sm font-black text-slate-800">
                         {formatCurrency(acc.saldoAtual)}
                       </span>
                     </div>
@@ -430,7 +430,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
               <button 
                 type="button" 
                 onClick={() => setIsAccountModalOpen(false)}
-                className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-655 hover:bg-slate-200 cursor-pointer"
+                className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -480,7 +480,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
                 <div>
                   <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Tipo de Pessoa (Titularidade)</label>
                   <div className="flex gap-4 mt-2">
-                    <label className="flex items-center gap-1.5 text-xs text-slate-650 font-bold cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-700 font-bold cursor-pointer">
                       <input
                         type="radio"
                         name="accTipoPessoa"
@@ -490,7 +490,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
                       />
                       Pessoa Física (PF)
                     </label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-655 font-bold cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-700 font-bold cursor-pointer">
                       <input
                         type="radio"
                         name="accTipoPessoa"
@@ -581,7 +581,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
               <button 
                 type="button" 
                 onClick={() => setIsTransferModalOpen(false)}
-                className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-655 hover:bg-slate-200 cursor-pointer"
+                className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -641,7 +641,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
                     type="date"
                     value={trData}
                     onChange={(e) => setTrData(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-805 font-bold focus:outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none"
                     required
                   />
                 </div>
@@ -679,7 +679,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
 
             <div className="flex items-center justify-between mb-4">
               <div className="text-left">
-                <span className="text-[9px] uppercase font-black text-slate-400">Extrato Consolidado</span>
+                <span className="text-[9px] uppercase font-black text-slate-500">Extrato Consolidado</span>
                 <h3 className="text-sm font-black text-slate-800 uppercase">
                   {selectedStatementAccount.nome}
                 </h3>
@@ -687,7 +687,7 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
               <button 
                 type="button" 
                 onClick={() => setIsStatementModalOpen(false)}
-                className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-655 hover:bg-slate-200 cursor-pointer"
+                className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -700,9 +700,9 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
                 if (list.length === 0) {
                   return (
                     <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white border border-slate-200 rounded-2xl">
-                      <Info className="text-slate-300 mb-2" size={24} />
+                      <Info className="text-slate-500 mb-2" size={24} />
                       <p className="text-slate-700 text-xs font-bold">Nenhuma movimentação registrada.</p>
-                      <p className="text-slate-400 text-[9px] mt-0.5">As transações e transferências vinculadas aparecerão aqui.</p>
+                      <p className="text-slate-500 text-[9px] mt-0.5">As transações e transferências vinculadas aparecerão aqui.</p>
                     </div>
                   );
                 }
@@ -720,10 +720,10 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
                         </span>
                         
                         <div className="flex items-center gap-1.5 mt-1">
-                          <span className="text-[9px] text-slate-400 font-bold">
+                          <span className="text-[9px] text-slate-500 font-bold">
                             {formatDate(item.data)}
                           </span>
-                          <span className="text-[9px] text-slate-300 font-black">•</span>
+                          <span className="text-[9px] text-slate-500 font-black">•</span>
                           <span className={`text-[8px] font-black px-1 py-0.2 rounded-md ${
                             item.origem === 'Carteira' 
                               ? 'bg-blue-50 text-blue-600' 

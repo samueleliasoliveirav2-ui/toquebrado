@@ -111,7 +111,7 @@ function App() {
   const defaultSampleCards: CreditCard[] = [
     { id: 'itau-sample', userId: '', nome: 'Itaú Visa Platinum', bandeira: 'VISA', limiteTotal: 12000, diaFechamento: 3, diaVencimento: 10, cor: '#f97316' },
     { id: 'c6-sample', userId: '', nome: 'C6 Bank Silver', bandeira: 'MASTERCARD', limiteTotal: 8500, diaFechamento: 5, diaVencimento: 15, cor: '#475569' },
-    { id: 'revolut-sample', userId: '', nome: 'Revolut Ultra', bandeira: 'VISA', limiteTotal: 25000, diaFechamento: 1, diaVencimento: 8, cor: '#6d28d9' },
+    { id: 'revolut-sample', userId: '', nome: 'Revolut Ultra', bandeira: 'VISA', limiteTotal: 25000, diaFechamento: 1, diaVencimento: 8, cor: '#0e69b2' },
     { id: 'nubank-sample', userId: '', nome: 'Nubank Ultravioleta', bandeira: 'MASTERCARD', limiteTotal: 15000, diaFechamento: 2, diaVencimento: 7, cor: '#3b0764' }
   ];
 
@@ -123,15 +123,15 @@ function App() {
       return 'from-orange-500 via-orange-600 to-amber-700';
     }
     if (name.includes('c6')) {
-      return 'from-slate-700 via-zinc-800 to-slate-900';
+      return 'from-slate-300 via-zinc-200 to-white';
     }
     if (name.includes('revolut')) {
-      return 'from-purple-800 via-indigo-900 to-slate-950';
+      return 'from-blue-850 via-blue-900 to-slate-950';
     }
     if (name.includes('nubank') || name.includes('roxo')) {
-      return 'from-purple-950 via-violet-950 to-slate-950';
+      return 'from-blue-950 via-violet-950 to-slate-950';
     }
-    return 'from-slate-800 via-slate-850 to-slate-900';
+    return 'from-slate-200 via-slate-100 to-white';
   };
 
   const getActiveCardLabel = () => {
@@ -193,7 +193,7 @@ function App() {
         title: 'Cartão Ultra Ativo & Protegido',
         desc: 'Uso internacional liberado. Sem taxas de IOF sobre câmbio.',
         icon: 'globe',
-        iconClass: 'text-purple-400 bg-purple-500/10',
+        iconClass: 'text-blue-500 bg-blue-600/10',
         btnText: 'Gerenciar Limite Global',
         action: () => triggerToast('Abrindo limites internacionais...')
       };
@@ -1624,13 +1624,13 @@ function App() {
   const activeEvents = workShifts.filter(e => e.tipo === 'ENTRADA' && e.atividade === 'Evento');
 
   return (
-    <div className="w-full min-h-screen flex justify-center bg-slate-900 select-none">
+    <div className="w-full min-h-screen flex justify-center bg-white select-none">
       {/* Centered responsive container */}
-      <div className="relative w-full max-w-md h-[100dvh] bg-slate-950 flex flex-col shadow-2xl md:border-x md:border-slate-800 overflow-hidden">
+      <div className="relative w-full max-w-md h-[100dvh] bg-slate-50 flex flex-col shadow-2xl md:border-x md:border-slate-200 overflow-hidden">
         
         {/* Dynamic New Version Available Alert Banner */}
         {newVersionAvailable && (
-          <div className="absolute top-4 left-4 right-4 z-50 bg-[#6d28d9]/95 backdrop-blur-md border border-purple-500/30 rounded-2xl p-3.5 shadow-xl animate-slide-down flex items-center justify-between gap-3 text-white">
+          <div className="absolute top-4 left-4 right-4 z-50 bg-[#0e69b2]/95 backdrop-blur-md border border-blue-600/30 rounded-2xl p-3.5 shadow-xl animate-slide-down flex items-center justify-between gap-3 text-white">
             <div className="flex items-center gap-2.5 text-left">
               <div className="p-1.5 rounded-lg bg-white/10 shrink-0 text-amber-300">
                 <Info size={16} />
@@ -1642,7 +1642,7 @@ function App() {
             </div>
             <button
               onClick={() => window.location.reload()}
-              className="px-3 py-1.5 rounded-lg bg-white text-purple-900 text-[10px] font-extrabold hover:bg-slate-100 transition-colors shadow-sm cursor-pointer shrink-0 font-sans"
+              className="px-3 py-1.5 rounded-lg bg-white text-blue-900 text-[10px] font-extrabold hover:bg-slate-100 transition-colors shadow-sm cursor-pointer shrink-0 font-sans"
             >
               Atualizar
             </button>
@@ -1659,31 +1659,31 @@ function App() {
             />
 
             {/* Drawer container (slides from left) */}
-            <div className="relative w-64 max-w-[80vw] h-full bg-slate-900 text-white flex flex-col p-5 shadow-2xl border-r border-slate-800 z-10 animate-slide-right">
+            <div className="relative w-64 max-w-[80vw] h-full bg-white text-slate-800 flex flex-col p-5 shadow-2xl border-r border-slate-200 z-10 animate-slide-right">
               {/* Header section with close and branding */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
                 <div className="flex items-center gap-3 text-left">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-white font-black text-base shadow-revolut-glow">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-rose-400 flex items-center justify-center text-white font-black text-base shadow-revolut-glow">
                     R
                   </div>
                   <div>
-                    <h2 className="font-extrabold text-sm leading-tight text-white font-sans">Samuel Finanças</h2>
-                    <span className="text-[10px] text-purple-400 font-bold font-sans">Conta Ultra</span>
+                    <h2 className="font-extrabold text-sm leading-tight text-slate-800 font-sans">Samuel Finanças</h2>
+                    <span className="text-[10px] text-blue-500 font-bold font-sans">Conta Ultra</span>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
                 >
                   <X size={16} />
                 </button>
               </div>
 
               {/* User Identity info inside drawer */}
-              <div className="py-4 border-b border-slate-800 mb-4 text-left font-sans">
+              <div className="py-4 border-b border-slate-200 mb-4 text-left font-sans">
                 <p className="text-[9px] uppercase font-bold text-slate-500">Logado como</p>
-                <p className="text-xs font-bold text-slate-300 truncate mt-0.5">{currentUser}</p>
-                <p className="text-[10px] text-slate-550 font-semibold truncate">{userEmail}</p>
+                <p className="text-xs font-bold text-slate-600 truncate mt-0.5">{currentUser}</p>
+                <p className="text-[10px] text-slate-500 font-semibold truncate">{userEmail}</p>
               </div>
 
               {/* Navigation list items */}
@@ -1696,8 +1696,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'INICIO'
-                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
-                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
+                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
                   <Home size={16} />
@@ -1712,8 +1712,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'DIARIAS'
-                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
-                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
+                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
                   <Briefcase size={16} />
@@ -1728,8 +1728,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'RELATORIOS'
-                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
-                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
+                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
                   <BarChart2 size={16} />
@@ -1744,8 +1744,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'CONTAS'
-                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
-                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
+                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
                   <Wallet size={16} />
@@ -1760,8 +1760,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'CARTOES'
-                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
-                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
+                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
                   <CreditCardIcon size={16} />
@@ -1776,8 +1776,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'PERFIL'
-                      ? 'bg-purple-900/40 text-purple-300 border border-purple-800/40 shadow-inner'
-                      : 'text-slate-400 hover:bg-slate-850 hover:text-white'
+                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
                   <Settings size={16} />
@@ -1786,7 +1786,7 @@ function App() {
               </nav>
 
               {/* Bottom Drawer actions */}
-              <div className="border-t border-slate-800 pt-4 space-y-2 font-sans">
+              <div className="border-t border-slate-200 pt-4 space-y-2 font-sans">
                 {/* Refresh/Sync button */}
                 <button
                   onClick={() => {
@@ -1794,9 +1794,9 @@ function App() {
                     setIsDrawerOpen(false);
                   }}
                   disabled={isSyncing}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:bg-slate-800 transition-all disabled:opacity-60 cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-all disabled:opacity-60 cursor-pointer"
                 >
-                  <RefreshCw size={14} className={isSyncing ? "animate-spin text-purple-400" : ""} />
+                  <RefreshCw size={14} className={isSyncing ? "animate-spin text-blue-500" : ""} />
                   <span>Atualizar Dados</span>
                 </button>
 
@@ -1818,8 +1818,8 @@ function App() {
 
         {/* Conditional rendering based on loading session */}
         {loading ? (
-          <div className="flex-1 bg-slate-950 flex flex-col items-center justify-center text-slate-500 h-full">
-            <Loader2 className="animate-spin text-purple-500 mb-3" size={32} />
+          <div className="flex-1 bg-slate-50 flex flex-col items-center justify-center text-slate-500 h-full">
+            <Loader2 className="animate-spin text-blue-600 mb-3" size={32} />
             <span className="text-sm font-semibold font-sans text-slate-405">Carregando carteira...</span>
           </div>
         ) : !currentUser ? (
@@ -1866,7 +1866,7 @@ function App() {
                         <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                         </svg>
-                        <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-pink-500 rounded-full ring-1 ring-purple-900"></span>
+                        <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-rose-400 rounded-full ring-1 ring-blue-900"></span>
                       </button>
                     </div>
                   </div>
@@ -1913,11 +1913,11 @@ function App() {
 
                     {/* Main Balance Display */}
                     <div className="text-center space-y-1 mt-2">
-                      <div className="flex items-center justify-center space-x-1.5 text-xs text-purple-200 font-bold tracking-wide uppercase font-sans">
+                      <div className="flex items-center justify-center space-x-1.5 text-xs text-blue-100 font-bold tracking-wide uppercase font-sans">
                         <span>Conta Principal • BRL</span>
                         <button 
                           onClick={() => setIsBalanceVisible(!isBalanceVisible)} 
-                          className="text-purple-200/80 hover:text-white transition cursor-pointer"
+                          className="text-blue-100/80 hover:text-white transition cursor-pointer"
                         >
                           {isBalanceVisible ? <Eye size={12} /> : <EyeOff size={12} />}
                         </button>
@@ -1930,7 +1930,7 @@ function App() {
                       </div>
 
                       <div className="pt-1">
-                        <span className="inline-block px-3 py-0.5 rounded-full glass-pill text-[10px] text-purple-100 font-bold font-sans">
+                        <span className="inline-block px-3 py-0.5 rounded-full glass-pill text-[10px] text-blue-50 font-bold font-sans">
                           Lançamentos Efetivados
                         </span>
                       </div>
@@ -1945,7 +1945,7 @@ function App() {
                         <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
                           <Plus size={18} className="stroke-[2.5]" />
                         </div>
-                        <span className="text-[11px] font-bold text-purple-100 font-sans">Entrada</span>
+                        <span className="text-[11px] font-bold text-blue-50 font-sans">Entrada</span>
                       </button>
 
                       <button 
@@ -1955,7 +1955,7 @@ function App() {
                         <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
                           <Minus size={18} className="stroke-[2.5]" />
                         </div>
-                        <span className="text-[11px] font-bold text-purple-100 font-sans">Saída</span>
+                        <span className="text-[11px] font-bold text-blue-50 font-sans">Saída</span>
                       </button>
 
                       <button 
@@ -1965,7 +1965,7 @@ function App() {
                         <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
                           <BarChart2 size={18} />
                         </div>
-                        <span className="text-[11px] font-bold text-purple-100 font-sans">
+                        <span className="text-[11px] font-bold text-blue-50 font-sans">
                           {inicioViewMode === 'LIST' ? 'Gráficos' : 'Lista'}
                         </span>
                       </button>
@@ -1977,14 +1977,14 @@ function App() {
                         <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
                           <CreditCardIcon size={18} />
                         </div>
-                        <span className="text-[11px] font-bold text-purple-100 font-sans">Cartões</span>
+                        <span className="text-[11px] font-bold text-blue-50 font-sans">Cartões</span>
                       </button>
                     </div>
                   </div>
                 </header>
 
                 {/* Scrollable Content Pane */}
-                <main className={`flex-1 overflow-y-auto p-4 space-y-5 bg-slate-950 scrollbar-thin pb-28 transition-all duration-500 ease-out ${isHeaderCollapsed ? 'pt-2' : ''}`}>
+                <main className={`flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28 transition-all duration-500 ease-out ${isHeaderCollapsed ? 'pt-2' : ''}`}>
                   
                   {/* Stats Header Summary Cards (Inputs vs Expenses) - HIDE on collapse */}
                   <div className={`overflow-hidden transition-all duration-500 ease-out ${isHeaderCollapsed ? 'max-h-0 opacity-0 mb-0 pointer-events-none scale-95 origin-top' : 'max-h-[280px] opacity-100'}`}>
@@ -1997,14 +1997,14 @@ function App() {
 
                   {/* Warning/Cleanup Banner for Mock Data */}
                   {mockTransactionsCount > 0 && (
-                    <div className="bg-amber-950/30 border border-amber-900/30 rounded-[24px] p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0 text-left font-sans">
+                    <div className="bg-amber-50 border border-amber-200 rounded-[24px] p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0 text-left font-sans">
                       <div className="flex items-start gap-3">
                         <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
                           <AlertTriangle size={18} />
                         </div>
                         <div className="space-y-1">
-                          <h4 className="text-xs font-extrabold text-amber-400">Dados fictícios detectados</h4>
-                          <p className="text-[10px] text-amber-300/80 font-bold leading-normal">
+                          <h4 className="text-xs font-extrabold text-amber-700">Dados fictícios detectados</h4>
+                          <p className="text-[10px] text-amber-600/80 font-bold leading-normal">
                             Identificamos {mockTransactionsCount} {mockTransactionsCount === 1 ? 'lançamento' : 'lançamentos'} de teste na sua conta. Deseja removê-los e manter apenas seus dados originais?
                           </p>
                         </div>
@@ -2023,14 +2023,14 @@ function App() {
 
                   {/* Onboarding Empty State Seeding Card */}
                   {transactions.length === 0 && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-[24px] p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0 text-left font-sans">
+                    <div className="bg-white border border-slate-200 rounded-[24px] p-4 flex flex-col gap-3 shadow-xs animate-fade-in shrink-0 text-left font-sans">
                       <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 shrink-0">
+                        <div className="p-2 rounded-xl bg-blue-600/10 text-blue-500 shrink-0">
                           <Info size={18} />
                         </div>
                         <div className="space-y-1">
-                          <h4 className="text-xs font-extrabold text-purple-300">Primeiros passos</h4>
-                          <p className="text-[10px] text-slate-400 font-bold leading-normal">
+                          <h4 className="text-xs font-extrabold text-blue-300">Primeiros passos</h4>
+                          <p className="text-[10px] text-slate-500 font-bold leading-normal">
                             Sua carteira está vazia! Deseja carregar alguns lançamentos fictícios para experimentar as funcionalidades do Tô Quebrado?
                           </p>
                         </div>
@@ -2039,7 +2039,7 @@ function App() {
                         <button
                           onClick={handleSeedMockData}
                           disabled={isSyncing}
-                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
+                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-700 to-blue-700 text-white text-[10px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-60"
                         >
                           Carregar dados de teste
                         </button>
@@ -2058,17 +2058,17 @@ function App() {
                         placeholder="Buscar por descrição ou categoria..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:bg-slate-900 transition-all font-semibold shadow-inner"
+                        className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all font-semibold shadow-inner"
                       />
                     </div>
 
-                    <div className="flex items-center justify-between gap-1 bg-slate-900 border border-slate-800 p-1 rounded-2xl text-xs font-bold shadow-inner">
+                    <div className="flex items-center justify-between gap-1 bg-white border border-slate-200 p-1 rounded-2xl text-xs font-bold shadow-inner">
                       <button
                         onClick={() => setFilterType('TODOS')}
                         className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all cursor-pointer ${
                           filterType === 'TODOS'
-                            ? 'bg-slate-800 text-white shadow-sm'
-                            : 'text-slate-500 hover:text-slate-350'
+                            ? 'bg-slate-200 text-slate-800 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-600'
                         }`}
                       >
                         Todos
@@ -2077,8 +2077,8 @@ function App() {
                         onClick={() => setFilterType('ENTRADA')}
                         className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
                           filterType === 'ENTRADA'
-                            ? 'bg-slate-800 text-emerald-400 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-350'
+                            ? 'bg-slate-200 text-emerald-400 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-600'
                         }`}
                       >
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -2088,8 +2088,8 @@ function App() {
                         onClick={() => setFilterType('SAIDA')}
                         className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
                           filterType === 'SAIDA'
-                            ? 'bg-slate-800 text-rose-455 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-350'
+                            ? 'bg-slate-200 text-rose-455 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-600'
                         }`}
                       >
                         <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
@@ -2111,7 +2111,7 @@ function App() {
                   ) : (
                     /* VISUAL CHARTS SECTION (Gráficos/Análises) */
                     <div className="space-y-4 animate-fade-in font-sans">
-                      <div className="bg-slate-900 p-5 rounded-[28px] border border-slate-800 shadow-sm space-y-3">
+                      <div className="bg-white p-5 rounded-[28px] border border-slate-200 shadow-sm space-y-3">
                         <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 text-left">
                           Gastos por Categoria
                         </h4>
@@ -2139,36 +2139,36 @@ function App() {
                             <div className="flex items-center justify-between text-xs">
                               <div className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 block shrink-0" />
-                                <span className="text-slate-400 font-bold">Alimentação</span>
+                                <span className="text-slate-500 font-bold">Alimentação</span>
                               </div>
-                              <span className="font-mono text-white font-bold">52.3%</span>
+                              <span className="font-mono text-slate-800 font-bold">52.3%</span>
                             </div>
                             <div className="flex items-center justify-between text-xs">
                               <div className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full bg-slate-550 block shrink-0" />
-                                <span className="text-slate-400 font-bold">Outros</span>
+                                <span className="text-slate-500 font-bold">Outros</span>
                               </div>
-                              <span className="font-mono text-white font-bold">30.0%</span>
+                              <span className="font-mono text-slate-800 font-bold">30.0%</span>
                             </div>
                             <div className="flex items-center justify-between text-xs">
                               <div className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 block shrink-0" />
-                                <span className="text-slate-400 font-bold">Lazer / Assinaturas</span>
+                                <span className="w-2.5 h-2.5 rounded-full bg-blue-600 block shrink-0" />
+                                <span className="text-slate-500 font-bold">Lazer / Assinaturas</span>
                               </div>
-                              <span className="font-mono text-white font-bold">11.5%</span>
+                              <span className="font-mono text-slate-800 font-bold">11.5%</span>
                             </div>
                             <div className="flex items-center justify-between text-xs">
                               <div className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 block shrink-0" />
-                                <span className="text-slate-400 font-bold">Transporte</span>
+                                <span className="text-slate-500 font-bold">Transporte</span>
                               </div>
-                              <span className="font-mono text-white font-bold">6.2%</span>
+                              <span className="font-mono text-slate-800 font-bold">6.2%</span>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-slate-900 p-5 rounded-[28px] border border-slate-800 shadow-sm space-y-3">
+                      <div className="bg-white p-5 rounded-[28px] border border-slate-200 shadow-sm space-y-3">
                         <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 text-left">
                           Fluxo Mensal Semana a Semana
                         </h4>
@@ -2178,10 +2178,10 @@ function App() {
                           <div className="flex flex-col items-center gap-1.5 flex-1">
                             <div className="w-full flex justify-center gap-1 items-end h-24">
                               <div className="w-3 bg-emerald-500 rounded-t-md h-full relative group">
-                                <span className="absolute -top-7 bg-slate-800 text-[8px] text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold">R$ 4.192</span>
+                                <span className="absolute -top-7 bg-slate-200 text-[8px] text-slate-800 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold">R$ 4.192</span>
                               </div>
                               <div className="w-3 bg-rose-500 rounded-t-md h-[84%] relative group">
-                                <span className="absolute -top-7 bg-slate-800 text-[8px] text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold">R$ 3.540</span>
+                                <span className="absolute -top-7 bg-slate-200 text-[8px] text-slate-800 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold">R$ 3.540</span>
                               </div>
                             </div>
                             <span className="text-[10px] text-slate-500 font-bold">Sem 1</span>
@@ -2476,19 +2476,19 @@ function App() {
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-end justify-center animate-fade-in">
           <div className="absolute inset-0" onClick={() => setIsWalletModalOpen(false)} />
           
-          <div className="relative w-full max-w-md h-[90vh] bg-slate-950 rounded-t-[36px] flex flex-col overflow-hidden border-t border-slate-800 shadow-2xl z-10 animate-slide-up">
+          <div className="relative w-full max-w-md h-[90vh] bg-white rounded-t-[36px] flex flex-col overflow-hidden border-t border-slate-200 shadow-2xl z-10 animate-slide-up">
             {/* Top Navigation */}
-            <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30 font-sans">
+            <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-30 font-sans">
               <div className="flex items-center space-x-3">
                 {selectedWalletCard && (
                   <button 
                     onClick={() => setSelectedWalletCard(null)} 
-                    className="w-8 h-8 rounded-full bg-slate-850 text-white flex items-center justify-center hover:bg-slate-800 transition cursor-pointer"
+                    className="w-8 h-8 rounded-full bg-slate-100 text-slate-800 flex items-center justify-center hover:bg-slate-200 transition cursor-pointer"
                   >
                     <ChevronLeft size={16} />
                   </button>
                 )}
-                <h2 className="text-xl font-black text-white tracking-tight">
+                <h2 className="text-xl font-black text-slate-800 tracking-tight">
                   {selectedWalletCard ? 'Detalhes' : 'Carteira'}
                 </h2>
               </div>
@@ -2500,7 +2500,7 @@ function App() {
                     setEditingCreditCard(null);
                     setIsCreditCardModalOpen(true);
                   }} 
-                  className="w-8 h-8 rounded-full bg-slate-850 text-white flex items-center justify-center hover:bg-slate-800 transition cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-800 flex items-center justify-center hover:bg-slate-200 transition cursor-pointer"
                   title="Novo Cartão"
                 >
                   <Plus size={16} />
@@ -2510,7 +2510,7 @@ function App() {
                     setIsWalletModalOpen(false);
                     setSelectedWalletCard(null);
                   }} 
-                  className="w-8 h-8 rounded-full bg-slate-850 text-white flex items-center justify-center hover:bg-slate-800 transition cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-800 flex items-center justify-center hover:bg-slate-200 transition cursor-pointer"
                 >
                   <X size={16} />
                 </button>
@@ -2523,20 +2523,20 @@ function App() {
                 /* STACKED CARDS VIEW */
                 <div className="space-y-5 text-left">
                   {/* Financial Tip Card */}
-                  <div className="bg-gradient-to-r from-purple-950/60 to-indigo-950/60 rounded-[24px] p-4 border border-purple-800/40 flex items-center space-x-4 shadow-lg backdrop-blur-md font-sans">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white text-lg shrink-0">
+                  <div className="bg-gradient-to-r from-blue-950/60 to-blue-950/60 rounded-[24px] p-4 border border-blue-850/40 flex items-center space-x-4 shadow-lg backdrop-blur-md font-sans">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-blue-600 flex items-center justify-center text-white text-lg shrink-0">
                       <Sparkles size={18} />
                     </div>
                     <div className="flex-1 text-left">
                       <div className="flex items-center space-x-1.5 mb-0.5">
-                        <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">Dica Financeira</span>
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-blue-600/20 text-blue-300 rounded-full border border-blue-600/30">Dica Financeira</span>
                       </div>
                       <h4 className="text-xs font-extrabold text-white leading-tight">Atenção ao Teto de Gastos</h4>
-                      <p className="text-[10px] text-slate-350 leading-tight mt-0.5">Você atingiu 84% do limite mensal estipulado nos cartões. Priorize gastos essenciais até o final do mês!</p>
+                      <p className="text-[10px] text-slate-600 leading-tight mt-0.5">Você atingiu 84% do limite mensal estipulado nos cartões. Priorize gastos essenciais até o final do mês!</p>
                     </div>
                     <button 
                       onClick={() => triggerToast('Dica marcada como lida')} 
-                      className="px-2.5 py-1 bg-purple-650 hover:bg-purple-600 text-white rounded-full text-[10px] font-bold transition shrink-0 cursor-pointer"
+                      className="px-2.5 py-1 bg-blue-700 hover:bg-blue-700 text-white rounded-full text-[10px] font-bold transition shrink-0 cursor-pointer"
                     >
                       Entendi
                     </button>
@@ -2599,7 +2599,7 @@ function App() {
                       <p className="text-[10px] text-white/80 font-medium">Limite Total: R$ {selectedWalletCard.limiteTotal.toFixed(2).replace('.', ',')}</p>
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-mono font-bold tracking-widest">•••• {selectedWalletCard.id.slice(-4)}</span>
-                        <span className="text-xs font-bold text-slate-350">Vence dia {selectedWalletCard.diaVencimento}</span>
+                        <span className="text-xs font-bold text-slate-600">Vence dia {selectedWalletCard.diaVencimento}</span>
                       </div>
                     </div>
                   </div>
@@ -2608,14 +2608,14 @@ function App() {
                   {(() => {
                     const status = getCardStatus(selectedWalletCard.id);
                     return (
-                      <div className="bg-slate-900 rounded-3xl p-5 border border-slate-800 space-y-3">
+                      <div className="bg-white rounded-3xl p-5 border border-slate-200 space-y-3">
                         <div className="flex items-start space-x-3.5 text-left">
                           <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 ${status.iconClass}`}>
                             {status.icon === 'shield' ? <Info size={20} /> : <AlertTriangle size={20} />}
                           </div>
                           <div>
-                            <h4 className="text-sm font-bold text-white">{status.title}</h4>
-                            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{status.desc}</p>
+                            <h4 className="text-sm font-bold text-slate-800">{status.title}</h4>
+                            <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{status.desc}</p>
                           </div>
                         </div>
                         <button 
@@ -2632,27 +2632,27 @@ function App() {
                   <div className="grid grid-cols-3 gap-2">
                     <button 
                       onClick={() => triggerToast(`CVV: 482 - Vence em: 08/29`)} 
-                      className="p-3 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-800 text-center transition cursor-pointer"
+                      className="p-3 bg-white hover:bg-slate-200 rounded-2xl border border-slate-200 text-center transition cursor-pointer"
                     >
-                      <Info size={16} className="text-purple-400 mx-auto mb-1 block" />
-                      <span className="text-[10px] font-bold text-slate-300 block">Ver Dados</span>
+                      <Info size={16} className="text-blue-500 mx-auto mb-1 block" />
+                      <span className="text-[10px] font-bold text-slate-600 block">Ver Dados</span>
                     </button>
                     <button 
                       onClick={() => triggerToast('Cartão temporariamente bloqueado')} 
-                      className="p-3 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-800 text-center transition cursor-pointer"
+                      className="p-3 bg-white hover:bg-slate-200 rounded-2xl border border-slate-200 text-center transition cursor-pointer"
                     >
                       <AlertTriangle size={16} className="text-amber-400 mx-auto mb-1 block" />
-                      <span className="text-[10px] font-bold text-slate-300 block">Bloquear</span>
+                      <span className="text-[10px] font-bold text-slate-600 block">Bloquear</span>
                     </button>
                     <button 
                       onClick={() => {
                         setActiveCardId(selectedWalletCard.id);
                         triggerToast(`${selectedWalletCard.nome} definido como principal!`);
                       }} 
-                      className="p-3 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-800 text-center transition cursor-pointer"
+                      className="p-3 bg-white hover:bg-slate-200 rounded-2xl border border-slate-200 text-center transition cursor-pointer"
                     >
                       <Sparkles size={16} className="text-emerald-400 mx-auto mb-1 block" />
-                      <span className="text-[10px] font-bold text-slate-300 block">Definir Principal</span>
+                      <span className="text-[10px] font-bold text-slate-600 block">Definir Principal</span>
                     </button>
                   </div>
 
@@ -2697,10 +2697,10 @@ function App() {
 
                         if (cardTxs.length > 0) {
                           return cardTxs.map(tx => (
-                            <div key={tx.id} className="flex items-center justify-between p-3.5 rounded-[20px] bg-slate-900 border border-slate-800">
+                            <div key={tx.id} className="flex items-center justify-between p-3.5 rounded-[20px] bg-white border border-slate-200">
                               <div>
-                                <div className="text-xs font-bold text-white">{tx.descricao}</div>
-                                <div className="text-[9px] text-slate-400">{tx.data.split('-').reverse().slice(0, 2).join('/')} • {tx.categoria}</div>
+                                <div className="text-xs font-bold text-slate-800">{tx.descricao}</div>
+                                <div className="text-[9px] text-slate-500">{tx.data.split('-').reverse().slice(0, 2).join('/')} • {tx.categoria}</div>
                               </div>
                               <span className="font-mono text-xs font-bold text-rose-400">- R$ {tx.valor.toFixed(2).replace('.', ',')}</span>
                             </div>
@@ -2708,10 +2708,10 @@ function App() {
                         }
 
                         return defaultTxs.map((dtx, i) => (
-                          <div key={i} className="flex items-center justify-between p-3.5 rounded-[20px] bg-slate-900 border border-slate-800">
+                          <div key={i} className="flex items-center justify-between p-3.5 rounded-[20px] bg-white border border-slate-200">
                             <div>
-                              <div className="text-xs font-bold text-white">{dtx.desc}</div>
-                              <div className="text-[9px] text-slate-400">{dtx.date} • {dtx.cat}</div>
+                              <div className="text-xs font-bold text-slate-800">{dtx.desc}</div>
+                              <div className="text-[9px] text-slate-500">{dtx.date} • {dtx.cat}</div>
                             </div>
                             <span className="font-mono text-xs font-bold text-rose-400">- R$ {dtx.amt.toFixed(2).replace('.', ',')}</span>
                           </div>
@@ -2728,8 +2728,8 @@ function App() {
 
       {/* Global Toast Notification */}
       {showToast && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-2.5 z-55 border border-slate-800 animate-slide-up">
-          <Info size={14} className="text-purple-400" />
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-white text-slate-800 text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-2.5 z-55 border border-slate-200 animate-slide-up">
+          <Info size={14} className="text-blue-500" />
           <span className="font-sans font-bold">{toastMsg}</span>
         </div>
       )}

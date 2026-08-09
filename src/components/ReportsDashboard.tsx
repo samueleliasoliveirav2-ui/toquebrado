@@ -153,7 +153,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   let accumulatedPercentage = 0;
 
   return (
-    <div className="w-full flex-1 flex flex-col p-4 space-y-5 bg-slate-55 overflow-y-auto pb-28 animate-fade-in font-sans">
+    <div className="w-full flex-1 flex flex-col p-4 space-y-5 bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
       
       {/* Header bar */}
       <header className="flex items-center justify-between">
@@ -180,7 +180,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
         <div className="grid grid-cols-2 gap-3">
           {/* Period Selection */}
           <div>
-            <label className="block text-slate-450 text-[9px] font-bold uppercase mb-1">Período</label>
+            <label className="block text-slate-500 text-[9px] font-bold uppercase mb-1">Período</label>
             <select
               value={periodFilter}
               onChange={(e: any) => setPeriodFilter(e.target.value)}
@@ -195,7 +195,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
 
           {/* Data Source Selection */}
           <div>
-            <label className="block text-slate-450 text-[9px] font-bold uppercase mb-1">Origem dos Dados</label>
+            <label className="block text-slate-500 text-[9px] font-bold uppercase mb-1">Origem dos Dados</label>
             <select
               value={dataSource}
               onChange={(e: any) => setDataSource(e.target.value)}
@@ -212,21 +212,21 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
         {periodFilter === 'PERSONALIZADO' && (
           <div className="grid grid-cols-2 gap-3 pt-1 animate-fade-in">
             <div>
-              <label className="block text-slate-450 text-[9px] font-bold uppercase mb-1">Data Início</label>
+              <label className="block text-slate-500 text-[9px] font-bold uppercase mb-1">Data Início</label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-850 font-bold focus:outline-none focus:border-blue-500 shadow-3xs"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-bold focus:outline-none focus:border-blue-500 shadow-3xs"
               />
             </div>
             <div>
-              <label className="block text-slate-450 text-[9px] font-bold uppercase mb-1">Data Fim</label>
+              <label className="block text-slate-500 text-[9px] font-bold uppercase mb-1">Data Fim</label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-850 font-bold focus:outline-none focus:border-blue-500 shadow-3xs"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-bold focus:outline-none focus:border-blue-500 shadow-3xs"
               />
             </div>
           </div>
@@ -237,22 +237,22 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
       <div className="grid grid-cols-2 gap-2.5">
         <div className="bg-white border border-slate-200/60 p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left">
           <div>
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block">Total Gasto</span>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500 block">Total Gasto</span>
           </div>
-          <span className="text-sm font-black text-rose-550 truncate mt-1">
+          <span className="text-sm font-black text-rose-600 truncate mt-1">
             {formatCurrency(totalGasto)}
           </span>
         </div>
 
         <div className="bg-white border border-slate-200/60 p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left">
           <div>
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block truncate">Maior Gasto</span>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500 block truncate">Maior Gasto</span>
           </div>
           <div className="mt-1 truncate min-w-0">
-            <span className="text-slate-850 font-black text-xs block truncate leading-none">
+            <span className="text-slate-800 font-black text-xs block truncate leading-none">
               {maiorCategoria.name}
             </span>
-            <span className="text-slate-450 text-[10px] font-bold mt-1 block">
+            <span className="text-slate-500 text-[10px] font-bold mt-1 block">
               {formatCurrency(maiorCategoria.total)}
             </span>
           </div>
@@ -262,15 +262,15 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
       {/* Empty State */}
       {allExpenses.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white border border-slate-200 rounded-3xl shadow-3xs">
-          <TrendingDown className="text-slate-300 mb-3 animate-pulse" size={32} />
+          <TrendingDown className="text-slate-500 mb-3 animate-pulse" size={32} />
           <p className="text-slate-700 text-xs font-bold">Nenhum custo registrado neste período.</p>
-          <p className="text-slate-400 text-[10px] mt-1">Ajuste os filtros acima ou registre novas despesas.</p>
+          <p className="text-slate-500 text-[10px] mt-1">Ajuste os filtros acima ou registre novas despesas.</p>
         </div>
       ) : (
         <>
           {/* Donut Chart Visual Section */}
           <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-3xs flex flex-col items-center justify-center relative">
-            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-4 font-sans text-center">
+            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-4 font-sans text-center">
               Composição Percentual
             </h4>
             
@@ -302,8 +302,8 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
               
               {/* Central text block */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[8px] uppercase font-extrabold text-slate-400">Total Gasto</span>
-                <span className="text-xs font-black text-rose-550 mt-0.5">
+                <span className="text-[8px] uppercase font-extrabold text-slate-500">Total Gasto</span>
+                <span className="text-xs font-black text-rose-600 mt-0.5">
                   {formatCurrency(totalGasto)}
                 </span>
               </div>
@@ -312,7 +312,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
 
           {/* List and Breakdown of Categories */}
           <div className="space-y-2">
-            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 text-left pl-1">
+            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500 text-left pl-1">
               Despesas por Categoria
             </h4>
             
@@ -338,7 +338,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                           <span className="text-xs font-extrabold text-slate-700 block">
                             {cat.name}
                           </span>
-                          <span className="text-[9px] text-slate-400 font-bold block mt-0.5">
+                          <span className="text-[9px] text-slate-500 font-bold block mt-0.5">
                             {cat.percentage.toFixed(1)}% do total
                           </span>
                         </div>
@@ -348,7 +348,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                         <span className="text-xs font-black text-slate-800">
                           {formatCurrency(cat.total)}
                         </span>
-                        {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                        {isExpanded ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
                       </div>
                     </div>
 
@@ -368,7 +368,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                     {/* Expandable item transactions list */}
                     {isExpanded && (
                       <div className="mx-1.5 my-1.5 bg-slate-50 border border-slate-200/50 rounded-xl p-3 space-y-2 animate-scale-up text-left">
-                        <span className="text-[9px] uppercase font-extrabold text-slate-400 block tracking-wider pb-1 border-b border-slate-200/50">
+                        <span className="text-[9px] uppercase font-extrabold text-slate-500 block tracking-wider pb-1 border-b border-slate-200/50">
                           Lançamentos em "{cat.name}"
                         </span>
                         
@@ -379,7 +379,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                                 <span className="font-extrabold text-slate-700 block truncate">
                                   {item.descricao}
                                 </span>
-                                <span className="text-[8px] text-slate-400 font-bold flex items-center gap-1 mt-0.5 uppercase">
+                                <span className="text-[8px] text-slate-500 font-bold flex items-center gap-1 mt-0.5 uppercase">
                                   <span>{formatDate(item.data)}</span>
                                   <span>•</span>
                                   <span className={item.origem === 'PESSOAL' ? 'text-blue-500' : 'text-orange-500'}>
@@ -387,7 +387,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                                   </span>
                                 </span>
                               </div>
-                              <span className="font-extrabold text-rose-550 shrink-0">
+                              <span className="font-extrabold text-rose-600 shrink-0">
                                 {formatCurrency(item.valor)}
                               </span>
                             </div>

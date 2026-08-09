@@ -118,7 +118,7 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
           <button 
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-655 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -221,7 +221,7 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
           <div>
             <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1.5">Limite Total</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-450">R$</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500">R$</span>
               <input
                 type="number"
                 step="0.01"
@@ -290,7 +290,7 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
                   onClick={() => setCor(c)}
                   className={`aspect-square rounded-full transition-all duration-200 cursor-pointer shadow-xs ${
                     cor === c
-                      ? 'ring-4 ring-slate-900 ring-offset-2 scale-110 shadow-md'
+                      ? 'ring-4 ring-slate-700 ring-offset-2 ring-offset-white scale-110 shadow-md'
                       : 'ring-2 ring-white hover:scale-105 hover:shadow-sm'
                   }`}
                   style={{ backgroundColor: c }}
@@ -305,7 +305,7 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
                 <label className="block text-slate-500 text-[10px] font-bold uppercase">
                   Conta para Pagamento Padrão
                 </label>
-                <span className="text-[9px] text-slate-400 font-bold uppercase">Opcional</span>
+                <span className="text-[9px] text-slate-500 font-bold uppercase">Opcional</span>
               </div>
               <select
                 value={contaPagamentoPadraoId}

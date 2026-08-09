@@ -128,7 +128,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
           <div className="space-y-1">
             <button
               onClick={onLogout}
-              className="w-full flex items-center justify-between py-2 text-left text-slate-700 hover:text-rose-650 transition-colors group cursor-pointer"
+              className="w-full flex items-center justify-between py-2 text-left text-slate-800 hover:text-rose-600 transition-colors group cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-rose-50 text-rose-500 group-hover:bg-rose-100 transition-colors">
@@ -136,10 +136,10 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
                 </div>
                 <div>
                   <p className="text-xs font-bold">Sair do Aplicativo</p>
-                  <p className="text-[9px] text-slate-400 font-semibold">Desconecta a sessão ativa com segurança</p>
+                  <p className="text-[9px] text-slate-500 font-semibold">Desconecta a sessão ativa com segurança</p>
                 </div>
               </div>
-              <ArrowRight size={14} className="text-slate-350 group-hover:text-rose-500 transition-transform group-hover:translate-x-1" />
+              <ArrowRight size={14} className="text-slate-500 group-hover:text-rose-600 transition-transform group-hover:translate-x-1" />
             </button>
           </div>
         </div>
@@ -147,8 +147,8 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
 
       {/* Footer Branding credits */}
       <div className="pt-4 text-center space-y-1">
-        <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">tô quebrado v1.0.0</p>
-        <p className="text-[9px] text-slate-400 font-semibold flex items-center justify-center gap-1">
+        <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">tô quebrado v1.0.0</p>
+        <p className="text-[9px] text-slate-500 font-semibold flex items-center justify-center gap-1">
           Feito com <Heart size={10} className="text-rose-500 fill-rose-500" /> para controle pessoal
         </p>
       </div>

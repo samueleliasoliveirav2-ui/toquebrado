@@ -180,7 +180,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               </div>
               <div className="text-left">
                 <h3 className="text-lg font-black text-slate-800 leading-tight">{card.nome}</h3>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   {card.bandeira}
                 </p>
               </div>
@@ -188,7 +188,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+              className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition-colors cursor-pointer"
             >
               <X size={20} />
             </button>
@@ -196,9 +196,9 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
 
           <div className="flex items-center justify-between mb-5 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
             <div className="flex items-center gap-2">
-              <Calendar size={16} className="text-slate-400" />
+              <Calendar size={16} className="text-slate-500" />
               <div className="text-left">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Datas da Fatura</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Datas da Fatura</p>
                 <p className="text-xs font-bold text-slate-700">
                   Fechamento: {formatDate(invoice.dataFechamento)} • Vencimento: {formatDate(invoice.dataVencimento)}
                 </p>
@@ -226,8 +226,8 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               <ChevronLeft size={18} />
             </button>
 
-            <div className="flex-1 py-2.5 px-4 bg-slate-900 rounded-xl text-center shadow-md">
-              <p className="text-xs font-black uppercase tracking-wider text-white">{currentMonthLabel}</p>
+            <div className="flex-1 py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-center shadow-2xs">
+              <p className="text-xs font-black uppercase tracking-wider text-slate-800">{currentMonthLabel}</p>
             </div>
 
             <button
@@ -247,8 +247,8 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           <div className="grid grid-cols-2 gap-3 mb-5">
             <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
               <div className="flex items-center gap-1.5 mb-2">
-                <ShoppingCart size={12} className="text-slate-400" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total de Compras</span>
+                <ShoppingCart size={12} className="text-slate-500" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total de Compras</span>
               </div>
               <div className="flex items-center">
                 <span className="text-sm font-bold text-slate-500 mr-1">R$</span>
@@ -264,8 +264,8 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Valor Pago</span>
               </div>
               <div className="flex items-center">
-                <span className="text-sm font-bold text-emerald-400 mr-1">R$</span>
-                <span className={`text-xl font-black tracking-tight ${invoice.valorPago ? 'text-emerald-700' : 'text-slate-300'}`}>
+                <span className="text-sm font-bold text-emerald-600 mr-1">R$</span>
+                <span className={`text-xl font-black tracking-tight ${invoice.valorPago ? 'text-emerald-700' : 'text-slate-500'}`}>
                   {formatCurrency(invoice.valorPago || 0).replace('R$', '').trim()}
                 </span>
               </div>
@@ -277,7 +277,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Saldo da Fatura</span>
               </div>
               <div className="flex items-center">
-                <span className="text-sm font-bold text-rose-400 mr-1">R$</span>
+                <span className="text-sm font-bold text-rose-600 mr-1">R$</span>
                 <span className={`text-xl font-black tracking-tight ${saldoFatura > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
                   {formatCurrency(Math.max(saldoFatura, 0)).replace('R$', '').trim()}
                 </span>
@@ -312,10 +312,10 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           {transactions.length === 0 ? (
             <div className="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-8 text-center mb-5">
               <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-slate-100 flex items-center justify-center">
-                <ShoppingCart size={24} className="text-slate-350" />
+                <ShoppingCart size={24} className="text-slate-500" />
               </div>
-              <p className="text-sm font-bold text-slate-500 mb-1">Nenhuma compra nesta fatura</p>
-              <p className="text-[11px] text-slate-400 font-semibold">
+              <p className="text-sm font-bold text-slate-600 mb-1">Nenhuma compra nesta fatura</p>
+              <p className="text-[11px] text-slate-500 font-semibold">
                 As compras do cartão aparecerão aqui.
               </p>
             </div>
@@ -348,7 +348,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                     <p className="text-sm font-bold text-slate-800 truncate">
                       {tx.descricao}
                       {tx.totalParcelas && tx.totalParcelas > 1 && (
-                        <span className="text-slate-400 ml-1">
+                        <span className="text-slate-500 ml-1">
                           ({tx.parcelaAtual || 1}/{tx.totalParcelas})
                         </span>
                       )}
@@ -356,7 +356,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                   </div>
 
                   <div className="flex-shrink-0 text-right">
-                    <span className="text-[10px] font-bold text-slate-400 block">R$</span>
+                    <span className="text-[10px] font-bold text-slate-500 block">R$</span>
                     <span className="text-base font-black text-rose-600 leading-tight">
                       {formatCurrency(tx.valor).replace('R$', '').trim()}
                     </span>
@@ -412,7 +412,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                   </span>
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-slate-400">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-slate-500">
                     R$
                   </span>
                   <input
@@ -423,7 +423,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                     onChange={(e) =>
                       setPaymentValue(e.target.value === '' ? '' : parseFloat(e.target.value))
                     }
-                    className="w-full bg-white border border-slate-200 rounded-xl pl-12 pr-4 py-3 text-right text-slate-800 font-black text-xl placeholder-slate-300 focus:outline-none focus:border-blue-500 shadow-2xs"
+                    className="w-full bg-white border border-slate-200 rounded-xl pl-12 pr-4 py-3 text-right text-slate-800 font-black text-xl placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs"
                     placeholder="0,00"
                   />
                 </div>

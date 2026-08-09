@@ -81,7 +81,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
         {/* Ganho Bruto do Mês */}
         <div className="glass bg-white/95 border border-slate-200/60 p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">Ganho Bruto</span>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500">Ganho Bruto</span>
             <div className="w-5 h-5 rounded-lg bg-slate-55 text-slate-500 flex items-center justify-center">
               <ArrowUpRight size={12} className="stroke-[3]" />
             </div>
@@ -99,7 +99,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
         }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
-              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">A Receber</span>
+              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500">A Receber</span>
               {pendingCount > 0 && (
                 <span className="bg-amber-500 text-white text-[7px] font-black px-1 py-0.5 rounded-md leading-none">
                   {pendingCount}
@@ -113,7 +113,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
             </div>
           </div>
           <span className={`text-sm font-black truncate mt-1 ${
-            totalAReceber > 0 ? 'text-amber-650' : 'text-slate-800'
+            totalAReceber > 0 ? 'text-amber-700' : 'text-slate-800'
           }`}>
             {formatCurrency(totalAReceber)}
           </span>
@@ -126,7 +126,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
             : 'bg-rose-55/10 border-rose-150/70'
         }`}>
           <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-455">Lucro Líq. Realizado</span>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500">Lucro Líq. Realizado</span>
             <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
               lucroRealizado >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
             }`}>
@@ -147,7 +147,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
             : 'bg-rose-55/10 border-rose-150/70'
         }`}>
           <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-455">Lucro Líq. Projetado</span>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500">Lucro Líq. Projetado</span>
             <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
               lucroProjetado >= 0 ? 'bg-blue-500/10 text-blue-600' : 'bg-rose-500/10 text-rose-600'
             }`}>
@@ -166,16 +166,16 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
       <div className="space-y-4">
         <div className="flex items-center justify-between pl-1 pr-1">
           <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Histórico de Turnos</h3>
-          <span className="text-[10px] text-slate-400 font-semibold uppercase">
-            Custo total de rua: <span className="font-extrabold text-rose-550">{formatCurrency(custosRua)}</span>
+          <span className="text-[10px] text-slate-500 font-semibold uppercase">
+            Custo total de rua: <span className="font-extrabold text-rose-600">{formatCurrency(custosRua)}</span>
           </span>
         </div>
         
         {sortedDates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center glass rounded-3xl border border-slate-200/80 bg-white/60">
-            <Briefcase className="text-slate-350 mb-3 animate-pulse" size={28} />
+            <Briefcase className="text-slate-500 mb-3 animate-pulse" size={28} />
             <p className="text-slate-700 text-xs font-bold">Nenhum turno registrado neste mês.</p>
-            <p className="text-slate-400 text-[10px] mt-1">Utilize o botão + no rodapé para adicionar uma diária ou despesa de rua.</p>
+            <p className="text-slate-500 text-[10px] mt-1">Utilize o botão + no rodapé para adicionar uma diária ou despesa de rua.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -209,13 +209,13 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                   <div className="bg-slate-50/65 px-4 py-3 flex items-center justify-between border-b border-slate-100">
                     <div className="flex flex-col">
                       <span className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
-                        <Calendar size={11} className="text-slate-400" />
+                        <Calendar size={11} className="text-slate-500" />
                         {formatDate(dateKey)} - {getWeekdayName(dateKey)}
                       </span>
                     </div>
 
                     <div className="text-right">
-                      <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">Líquido Projetado</span>
+                      <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold block">Líquido Projetado</span>
                       <span className={`text-xs font-black ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {formatCurrency(saldoDia)}
                       </span>
@@ -259,7 +259,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                                   ? isPending
                                     ? 'bg-amber-50/50 border-amber-100 text-amber-600'
                                     : 'bg-emerald-50/60 border-emerald-100 text-emerald-600' 
-                                  : 'bg-rose-55/10 border-rose-100/50 text-rose-550'
+                                  : 'bg-rose-50 border-rose-100/50 text-rose-600'
                               }`}>
                                 {isGanho ? <Car size={14} /> : <ArrowDownRight size={14} />}
                               </div>
@@ -289,7 +289,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
 
                                 {/* Link Indicator for costs */}
                                 {!isGanho && entry.vinculoId && (
-                                  <p className="text-[8px] text-slate-400 font-extrabold mt-0.5 flex items-center gap-0.5 uppercase tracking-wide">
+                                  <p className="text-[8px] text-slate-500 font-extrabold mt-0.5 flex items-center gap-0.5 uppercase tracking-wide">
                                     <Link size={8} />
                                     Custo Vinculado
                                   </p>
@@ -303,12 +303,12 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                                   </p>
                                 )}
                                 {entry.observacao && !isEvento && (
-                                  <p className="text-[10px] text-slate-450 truncate font-semibold mt-0.5">
+                                  <p className="text-[10px] text-slate-500 truncate font-semibold mt-0.5">
                                     {entry.observacao}
                                   </p>
                                 )}
                                 {isEvento && entry.quantidadeDias && entry.quantidadeDias > 1 && (
-                                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">
+                                  <p className="text-[9px] text-slate-500 font-bold mt-0.5">
                                     Pacote de {entry.quantidadeDias} dias {entry.valorDiaria ? `(R$ ${entry.valorDiaria}/dia)` : ''}
                                   </p>
                                 )}
@@ -317,7 +317,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
 
                             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                               {/* Value */}
-                              <span className={`text-xs font-extrabold ${isGanho ? 'text-emerald-650' : 'text-rose-550'}`}>
+                              <span className={`text-xs font-extrabold ${isGanho ? 'text-emerald-700' : 'text-rose-600'}`}>
                                 {isGanho ? '+' : '-'} {formatCurrency(entry.valor)}
                               </span>
 
@@ -326,7 +326,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                                 <button
                                   type="button"
                                   onClick={(e) => toggleEventExpand(entry.id, e)}
-                                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-450 cursor-pointer"
+                                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer"
                                 >
                                   {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 </button>
@@ -343,7 +343,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => onEditEntry(entry)}
-                                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-650 transition-colors ml-1 cursor-pointer"
+                                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors ml-1 cursor-pointer"
                                   title="Editar"
                                 >
                                   <Edit3 size={11} />
@@ -356,7 +356,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                           {isEvento && isExpanded && (
                             <div className="mx-2 my-1 bg-slate-50 border border-slate-200/50 rounded-xl p-3.5 space-y-3 animate-scale-up text-left">
                               <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                                <span className="text-[10px] uppercase font-bold text-slate-450 tracking-wider">Detalhamento DRE do Evento</span>
+                                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Detalhamento DRE do Evento</span>
                                 <button
                                   onClick={() => onEditEntry(entry)}
                                   className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-1 cursor-pointer"
@@ -368,9 +368,9 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
 
                               {/* Costs linked list */}
                               <div className="space-y-1.5">
-                                <span className="text-[9px] uppercase font-extrabold text-slate-400 block tracking-wider">Custos Operacionais Vinculados</span>
+                                <span className="text-[9px] uppercase font-extrabold text-slate-500 block tracking-wider">Custos Operacionais Vinculados</span>
                                 {linkedCosts.length === 0 ? (
-                                  <span className="text-[10px] text-slate-400 italic block">Nenhum custo vinculado a este evento.</span>
+                                  <span className="text-[10px] text-slate-500 italic block">Nenhum custo vinculado a este evento.</span>
                                 ) : (
                                   <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
                                     {linkedCosts.map(cost => (
@@ -380,10 +380,10 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                                         className="flex items-center justify-between text-[10px] text-slate-700 bg-white border border-slate-150 p-1.5 rounded-lg cursor-pointer hover:bg-slate-50"
                                       >
                                         <span className="font-semibold flex items-center gap-1">
-                                          <Tag size={8} className="text-slate-450" />
+                                          <Tag size={8} className="text-slate-500" />
                                           {cost.categoria} {cost.observacao ? `(${cost.observacao})` : ''}
                                         </span>
-                                        <span className="font-extrabold text-rose-550">-{formatCurrency(cost.valor)}</span>
+                                        <span className="font-extrabold text-rose-600">-{formatCurrency(cost.valor)}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -393,16 +393,16 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                               {/* Financial DRE Summary */}
                               <div className="bg-white border border-slate-200/80 p-2.5 rounded-xl space-y-1.5 text-xs">
                                 <div className="flex justify-between">
-                                  <span className="font-semibold text-slate-450">Ganho Bruto:</span>
+                                  <span className="font-semibold text-slate-500">Ganho Bruto:</span>
                                   <span className="font-bold text-slate-800">{formatCurrency(entry.valor)}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="font-semibold text-slate-450">Despesas Vinculadas:</span>
-                                  <span className="font-bold text-rose-550">-{formatCurrency(totalLinkedCostsVal)}</span>
+                                  <span className="font-semibold text-slate-500">Despesas Vinculadas:</span>
+                                  <span className="font-bold text-rose-600">-{formatCurrency(totalLinkedCostsVal)}</span>
                                 </div>
                                 <div className="flex justify-between pt-1.5 border-t border-slate-100 font-extrabold">
                                   <span className="text-slate-800">Lucro Líquido:</span>
-                                  <span className={eventNetProfit >= 0 ? 'text-emerald-600' : 'text-rose-650'}>
+                                  <span className={eventNetProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
                                     {formatCurrency(eventNetProfit)}
                                   </span>
                                 </div>

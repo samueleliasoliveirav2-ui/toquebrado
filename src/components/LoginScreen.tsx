@@ -185,7 +185,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <div className="space-y-1.5">
               <label className="block text-slate-500 text-xs font-bold uppercase">Nome Completo</label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
                   <User size={16} />
                 </span>
                 <input
@@ -205,7 +205,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           <div className="space-y-1.5">
             <label className="block text-slate-500 text-xs font-bold uppercase">E-mail</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
                 <Mail size={16} />
               </span>
               <input
@@ -224,7 +224,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           <div className="space-y-1.5">
             <label className="block text-slate-500 text-xs font-bold uppercase">Senha</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
                 <Lock size={16} />
               </span>
               <input
@@ -289,10 +289,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           <div className="p-1 rounded-lg bg-blue-100 text-blue-600 shrink-0">
             <Info size={14} />
           </div>
-          <div className="text-[10px] text-slate-550 leading-normal">
+          <div className="text-[10px] text-slate-600 leading-normal select-text">
             <p className="font-bold text-slate-700">Autenticação com Supabase:</p>
             <p>Seus dados agora são validados diretamente na nuvem no banco do Supabase.</p>
-            <p className="mt-1 text-slate-450">Obs: Crie uma conta usando o formulário acima para testar o fluxo de registro completo!</p>
+            <p className="mt-1 text-slate-500">Obs: Crie uma conta usando o formulário acima para testar o fluxo de registro completo!</p>
           </div>
         </div>
       )}
