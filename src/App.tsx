@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles } from 'lucide-react';
 import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice } from './types';
 import { INITIAL_TRANSACTIONS } from './types';
@@ -81,6 +81,7 @@ function App() {
   // Revolut & Apple Wallet states
   const [isBalanceVisible, setIsBalanceVisible] = useState(true);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+  const mainInicioScrollRef = useRef<number>(0);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [selectedWalletCard, setSelectedWalletCard] = useState<CreditCard | null>(null);
@@ -2141,7 +2142,21 @@ function App() {
                 </header>
 
                 {/* Scrollable Content Pane */}
-                <main className={`flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28 transition-all duration-500 ease-out ${isHeaderCollapsed ? 'pt-2' : ''}`}>
+                <main
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    const y = el.scrollTop;
+                    const lastY = mainInicioScrollRef.current;
+                    const dy = y - lastY;
+                    if (y < 20) {
+                      if (isHeaderCollapsed) setIsHeaderCollapsed(false);
+                    } else if (dy > 14) {
+                      if (!isHeaderCollapsed) setIsHeaderCollapsed(true);
+                    }
+                    mainInicioScrollRef.current = y;
+                  }}
+                  className={`flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28 transition-all duration-500 ease-out ${isHeaderCollapsed ? 'pt-2' : ''}`}
+                >
                   
                   {/* Stats Header Summary Cards (Inputs vs Expenses) - HIDE on collapse */}
                   <div className={`overflow-hidden transition-all duration-500 ease-out ${isHeaderCollapsed ? 'max-h-0 opacity-0 mb-0 pointer-events-none scale-95 origin-top' : 'max-h-[280px] opacity-100'}`}>
