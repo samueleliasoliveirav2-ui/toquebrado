@@ -86,7 +86,6 @@ function App() {
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [selectedWalletCard, setSelectedWalletCard] = useState<CreditCard | null>(null);
   const [inicioViewMode, setInicioViewMode] = useState<'LIST' | 'CHART'>('LIST');
-  const [verifiedCardIds, setVerifiedCardIds] = useState<string[]>([]);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('SAIDA');
@@ -146,88 +145,60 @@ function App() {
   };
 
   const getCardStatus = (cardId: string) => {
-    const isVerified = verifiedCardIds.includes(cardId);
-    if (cardId.includes('itau') && !isVerified) {
+    const card = creditCards.find(c => c.id === cardId);
+    if (!card) {
       return {
-        title: 'Verificação Necessária',
-        desc: 'Seu cartão está aguardando para ser verificado para pagamentos aproximados.',
-        icon: 'shield',
-        iconClass: 'text-amber-500 bg-amber-500/10',
-        btnText: 'Complete a Verificação',
-        action: () => {
-          setVerifiedCardIds(prev => [...prev, cardId]);
-          triggerToast('Cartão Itaú verificado com sucesso!');
-        }
+        title: 'Cartão',
+        desc: 'Sem dados disponíveis.',
+        icon: 'shield' as const,
+        iconClass: 'text-slate-500 bg-slate-500/10',
+        btnText: 'Ver Detalhes',
+        action: () => triggerToast('Sem cartão selecionado.')
       };
     }
-    
-    if (cardId.includes('itau') && isVerified) {
-      return {
-        title: 'Cartão Verificado & Ativo',
-        desc: 'Pronto para pagamentos aproximados e Apple Pay.',
-        icon: 'check',
-        iconClass: 'text-emerald-400 bg-emerald-500/10',
-        btnText: 'Ver Detalhes de Segurança',
-        action: () => triggerToast('Segurança reforçada por tokenização.')
-      };
-    }
+    const hoje = new Date();
+    const mesAnoAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+    const txsFaturaAtual = transactions.filter(
+      (t) => t.cartaoId === card.id && t.data.startsWith(mesAnoAtual) && t.tipo === 'SAIDA'
+    );
+    const totalFaturaAtual = txsFaturaAtual.reduce((s, t) => s + Number(t.valor) + Number(t.juros || 0), 0);
+    const limiteUtilizado = totalFaturaAtual;
+    const limiteDisponivel = Math.max(0, card.limiteTotal - limiteUtilizado);
+    const fmt = (v: number) =>
+      new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+    const diaVenc = String(card.diaVencimento).padStart(2, '0');
+    const mesVenc = String(hoje.getMonth() + 1).padStart(2, '0');
+    const fatura = creditCardInvoices.find(
+      (i) => i.cartaoId === card.id && i.mesAno === mesAnoAtual
+    );
+    const statusPago = fatura?.status === 'PAGA';
+    const temFatura = totalFaturaAtual > 0.0049;
 
-    if (cardId.includes('c6')) {
-      const isPaid = verifiedCardIds.includes('c6-paid');
-      return {
-        title: 'Limite Disponível: R$ 8.500,00',
-        desc: isPaid ? 'Nenhuma fatura em aberto.' : 'Fatura atual em R$ 262,50 com vencimento para 15/Ago.',
-        icon: 'check',
-        iconClass: 'text-emerald-400 bg-emerald-500/10',
-        btnText: isPaid ? 'Ver Histórico de Faturas' : 'Pagar Fatura Antecipada',
-        action: () => {
-          if (!isPaid) {
-            setVerifiedCardIds(prev => [...prev, 'c6-paid']);
-            triggerToast('Fatura C6 paga antecipadamente!');
-          } else {
-            triggerToast('Nenhuma fatura em aberto.');
-          }
-        }
-      };
-    }
-
-    if (cardId.includes('revolut')) {
-      return {
-        title: 'Cartão Ultra Ativo & Protegido',
-        desc: 'Uso internacional liberado. Sem taxas de IOF sobre câmbio.',
-        icon: 'globe',
-        iconClass: 'text-blue-500 bg-blue-600/10',
-        btnText: 'Gerenciar Limite Global',
-        action: () => triggerToast('Abrindo limites internacionais...')
-      };
-    }
-
-    if (cardId.includes('nubank')) {
-      const isRescued = verifiedCardIds.includes('nu-rescued');
-      return {
-        title: 'Cashback 1% Rendendo 200% CDI',
-        desc: isRescued ? 'Cashback resgatado com sucesso.' : 'Você acumulou R$ 148,20 de cashback no último mês.',
-        icon: 'coins',
-        iconClass: 'text-amber-400 bg-amber-500/10',
-        btnText: isRescued ? 'Ver Histórico de Resgates' : 'Resgatar Cashback',
-        action: () => {
-          if (!isRescued) {
-            setVerifiedCardIds(prev => [...prev, 'nu-rescued']);
-            triggerToast('Cashback transferido para a conta!');
-          } else {
-            triggerToast('Histórico de resgates em dia.');
-          }
-        }
-      };
+    let title = `Limite Disponível: ${fmt(limiteDisponivel)}`;
+    let desc = '';
+    if (temFatura) {
+      if (statusPago) {
+        desc = `Fatura de ${mesVenc}/${hoje.getFullYear()} paga. Total ${fmt(totalFaturaAtual)}.`;
+      } else {
+        desc = `Fatura atual em ${fmt(totalFaturaAtual)} com vencimento para ${diaVenc}/${mesVenc}.`;
+      }
+    } else {
+      desc = `Sem compras lançadas no cartão. Limite total: ${fmt(card.limiteTotal)}.`;
     }
 
     return {
-      title: 'Cartão Ativo',
-      desc: 'Pronto para uso e integrado ao gerenciamento de gastos.',
-      icon: 'check',
-      iconClass: 'text-emerald-400 bg-emerald-500/10',
-      btnText: 'Ver Limites',
-      action: () => triggerToast('Limites e faturas em dia.')
+      title,
+      desc,
+      icon: 'shield' as const,
+      iconClass: 'text-emerald-600 bg-emerald-500/10',
+      btnText: temFatura && !statusPago ? 'Pagar Fatura Antecipada' : 'Ver Histórico de Faturas',
+      action: () => {
+        if (temFatura && !statusPago) {
+          triggerToast(`Pagamento antecipado de ${fmt(totalFaturaAtual)} agendado!`);
+        } else {
+          triggerToast('Histórico de faturas em breve.');
+        }
+      }
     };
   };
 
@@ -2869,53 +2840,24 @@ function App() {
                     <div className="space-y-2">
                       {(() => {
                         const cardTxs = transactions.filter(tx => tx.cartaoId === selectedWalletCard.id);
-                        const defaultTxs = selectedWalletCard.id.includes('itau') 
-                          ? [
-                              { desc: 'Supermercado Carrefour', date: '03 Ago', amt: 1850.00, cat: 'Alimentação' },
-                              { desc: 'Assinaturas Streaming', date: '06 Ago', amt: 405.28, cat: 'Lazer' },
-                              { desc: 'Drogaria São Paulo', date: '07 Ago', amt: 194.72, cat: 'Saúde' }
-                            ]
-                          : selectedWalletCard.id.includes('c6')
-                          ? [
-                              { desc: 'Posto Shell - Gasolina', date: '05 Ago', amt: 220.00, cat: 'Transporte' },
-                              { desc: 'Starbucks Café', date: '02 Ago', amt: 42.50, cat: 'Alimentação' }
-                            ]
-                          : selectedWalletCard.id.includes('revolut')
-                          ? [
-                              { desc: 'Apple Store Online', date: '04 Ago', amt: 899.00, cat: 'Tecnologia' },
-                              { desc: 'Uber Ride', date: '06 Ago', amt: 86.50, cat: 'Transporte' },
-                              { desc: 'Restaurante Coco Bambu', date: '07 Ago', amt: 264.50, cat: 'Alimentação' }
-                            ]
-                          : selectedWalletCard.id.includes('nubank')
-                          ? [
-                              { desc: 'iFood Gourmet', date: '05 Ago', amt: 145.00, cat: 'Alimentação' },
-                              { desc: 'Passagem LATAM', date: '01 Ago', amt: 475.00, cat: 'Viagens' }
-                            ]
-                          : [];
-
-                        if (cardTxs.length === 0 && defaultTxs.length === 0) {
-                          return <p className="text-xs text-slate-500 py-4 text-center">Nenhum lançamento vinculado.</p>;
-                        }
-
-                        if (cardTxs.length > 0) {
-                          return cardTxs.map(tx => (
-                            <div key={tx.id} className="flex items-center justify-between p-3.5 rounded-[20px] bg-white border border-slate-200">
-                              <div>
-                                <div className="text-xs font-bold text-slate-800">{tx.descricao}</div>
-                                <div className="text-[9px] text-slate-500">{tx.data.split('-').reverse().slice(0, 2).join('/')} • {tx.categoria}</div>
-                              </div>
-                              <span className="font-mono text-xs font-bold text-rose-400">- R$ {tx.valor.toFixed(2).replace('.', ',')}</span>
+                        if (cardTxs.length === 0) {
+                          return (
+                            <div className="py-6 text-center space-y-2 bg-white border border-dashed border-slate-200 rounded-[20px]">
+                              <AlertTriangle size={22} className="text-slate-300 mx-auto" />
+                              <p className="text-xs font-bold text-slate-500">Nenhum lançamento vinculado.</p>
+                              <p className="text-[10px] font-bold text-slate-400 max-w-[75%] mx-auto leading-relaxed">
+                                Ao cadastrar uma saída com forma de pagamento "Cartão de Crédito", ela aparecerá aqui automaticamente.
+                              </p>
                             </div>
-                          ));
+                          );
                         }
-
-                        return defaultTxs.map((dtx, i) => (
-                          <div key={i} className="flex items-center justify-between p-3.5 rounded-[20px] bg-white border border-slate-200">
+                        return cardTxs.map(tx => (
+                          <div key={tx.id} className="flex items-center justify-between p-3.5 rounded-[20px] bg-white border border-slate-200">
                             <div>
-                              <div className="text-xs font-bold text-slate-800">{dtx.desc}</div>
-                              <div className="text-[9px] text-slate-500">{dtx.date} • {dtx.cat}</div>
+                              <div className="text-xs font-bold text-slate-800">{tx.descricao}</div>
+                              <div className="text-[9px] text-slate-500">{tx.data.split('-').reverse().slice(0, 2).join('/')} • {tx.categoria}</div>
                             </div>
-                            <span className="font-mono text-xs font-bold text-rose-400">- R$ {dtx.amt.toFixed(2).replace('.', ',')}</span>
+                            <span className="font-mono text-xs font-bold text-rose-400">- R$ {tx.valor.toFixed(2).replace('.', ',')}</span>
                           </div>
                         ));
                       })()}
