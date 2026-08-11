@@ -2132,10 +2132,10 @@ function App() {
                     >
                       <span className="block h-1.5 w-14 rounded-full bg-white/95 shadow-[0_2px_14px_rgba(15,23,42,0.15)] transition-all group-hover:w-16 group-hover:bg-white" />
                       {isHeaderCollapsed && (
-                        <ChevronUp size={12} className="text-white animate-fade-in" strokeWidth={3} />
+                        <ChevronDown size={11} className="text-white/85 animate-fade-in" strokeWidth={3} />
                       )}
                       {!isHeaderCollapsed && (
-                        <ChevronDown size={11} className="text-white/85 animate-fade-in" strokeWidth={3} />
+                        <ChevronUp size={12} className="text-white animate-fade-in" strokeWidth={3} />
                       )}
                     </button>
                   </div>
