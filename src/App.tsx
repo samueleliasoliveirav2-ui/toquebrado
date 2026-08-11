@@ -1850,7 +1850,7 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'INICIO'
-                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
@@ -1866,7 +1866,7 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'DIARIAS'
-                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
@@ -1882,7 +1882,7 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'RELATORIOS'
-                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
@@ -1898,7 +1898,7 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'CONTAS'
-                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
@@ -1914,7 +1914,7 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'CARTOES'
-                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
@@ -1930,7 +1930,7 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'PERFIL'
-                      ? 'bg-blue-900/40 text-blue-300 border border-blue-850/40 shadow-inner'
+                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
@@ -2099,15 +2099,15 @@ function App() {
                       </button>
 
                       <button 
-                        onClick={() => setInicioViewMode(inicioViewMode === 'LIST' ? 'CHART' : 'LIST')} 
+                        onClick={() => {
+                          setActiveTab('RELATORIOS');
+                        }}
                         className="flex flex-col items-center space-y-1.5 group cursor-pointer"
                       >
                         <div className="w-12 h-12 rounded-full glass-btn flex items-center justify-center text-white text-base shadow-lg">
                           <BarChart2 size={18} />
                         </div>
-                        <span className="text-[11px] font-bold text-blue-50 font-sans">
-                          {inicioViewMode === 'LIST' ? 'Gráficos' : 'Lista'}
-                        </span>
+                        <span className="text-[11px] font-bold text-blue-50 font-sans">Relatórios</span>
                       </button>
 
                       <button 
@@ -2251,6 +2251,34 @@ function App() {
                       >
                         <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                         Despesas
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Summary filter toggle view inside INICIO (small top-left) */}
+                  <div className="flex items-center justify-between -mb-1">
+                    <div className="inline-flex bg-white border border-slate-200 rounded-xl p-0.5 shadow-3xs gap-0.5">
+                      <button
+                        onClick={() => setInicioViewMode('LIST')}
+                        className={[
+                          'px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer',
+                          inicioViewMode === 'LIST'
+                            ? 'bg-[#0e69b2] text-white shadow-sm shadow-blue-500/20'
+                            : 'text-slate-500 hover:text-slate-700'
+                        ].join(' ')}
+                      >
+                        Lista
+                      </button>
+                      <button
+                        onClick={() => setInicioViewMode('CHART')}
+                        className={[
+                          'px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer',
+                          inicioViewMode === 'CHART'
+                            ? 'bg-[#0e69b2] text-white shadow-sm shadow-blue-500/20'
+                            : 'text-slate-500 hover:text-slate-700'
+                        ].join(' ')}
+                      >
+                        Gráficos
                       </button>
                     </div>
                   </div>
