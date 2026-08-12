@@ -1742,9 +1742,14 @@ function App() {
     cardId: string,
     mesAno: string
   ): Transaction[] => {
-    return transactions.filter(
-      (t) => t.cartaoId === cardId && t.data.startsWith(mesAno) && t.tipo === 'SAIDA'
-    );
+    const fatura = getInvoiceForCardMonth(cardId, mesAno);
+    return transactions.filter((t) => {
+      if (t.cartaoId !== cardId || t.tipo !== 'SAIDA') return false;
+      if (fatura && t.faturaId) {
+        return t.faturaId === fatura.id;
+      }
+      return t.data.startsWith(mesAno);
+    });
   };
 
   const recalcInvoiceTotals = async (cardId: string, mesAno: string) => {
@@ -2302,8 +2307,16 @@ function App() {
           for (const mesAno of Array.from(mesAnoSet)) {
             const inv = invoicesMap[mesAno] || getInvoiceForCardMonth(card.id, mesAno);
             if (inv) {
-              const existingTxs = transactions.filter(t => t.cartaoId === card.id && t.data.startsWith(mesAno) && t.tipo === 'SAIDA');
-              const incomingTxs = novasTransacoes.filter(t => t.cartaoId === card.id && t.data.startsWith(mesAno) && t.tipo === 'SAIDA');
+              const existingTxs = transactions.filter(t => {
+                if (t.cartaoId !== card.id || t.tipo !== 'SAIDA') return false;
+                if (t.faturaId) return t.faturaId === inv.id;
+                return t.data.startsWith(mesAno);
+              });
+              const incomingTxs = novasTransacoes.filter(t => {
+                if (t.cartaoId !== card.id || t.tipo !== 'SAIDA') return false;
+                if (t.faturaId) return t.faturaId === inv.id;
+                return t.data.startsWith(mesAno);
+              });
               const allTxs = [...existingTxs, ...incomingTxs];
               const total = allTxs.reduce((s, t) => s + Number(t.valor), 0);
               
