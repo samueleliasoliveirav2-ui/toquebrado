@@ -72,7 +72,7 @@ export interface CreditCard {
 // ============================================================
 // FATURA DE CARTÃO DE CRÉDITO
 // ============================================================
-export type InvoiceStatus = 'ABERTA' | 'FECHADA' | 'PAGA' | 'ATRASADA';
+export type InvoiceStatus = 'ABERTA' | 'FECHADA' | 'PAGA' | 'ATRASADA' | 'POSTERGADA';
 
 export interface CreditCardInvoice {
   id: string;

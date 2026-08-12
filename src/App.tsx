@@ -783,11 +783,36 @@ function App() {
   ) => {
     if (!userId) return;
 
+    const calcularMesAlocacao = (dataRef: string, cc: CreditCard): string => {
+      const d = new Date(dataRef + 'T12:00:00');
+      const dia = d.getDate();
+      let mes = d.getMonth();
+      let ano = d.getFullYear();
+      if (dia >= cc.diaFechamento) {
+        mes++;
+        if (mes > 11) { mes = 0; ano++; }
+      }
+      return `${ano}-${String(mes + 1).padStart(2, '0')}`;
+    };
+
+    const obterFaturaId = async (cc: CreditCard, dataRef: string): Promise<string | null> => {
+      const mesAlvo = calcularMesAlocacao(dataRef, cc);
+      const inv = await getOrCreateInvoiceFor(cc, mesAlvo);
+      return inv?.id || null;
+    };
+
     try {
       // ==============================
       // CASO 1: EDIÇÃO (payload.id existe)
       // ==============================
       if (payload.id) {
+        const oldTx = transactions.find(t => t.id === payload.id);
+        const cartao = payload.cartaoId ? creditCards.find((c) => c.id === payload.cartaoId) : null;
+        let faturaId: string | null = null;
+        if (cartao) {
+          faturaId = await obterFaturaId(cartao, payload.data);
+        }
+
         const baseDbPayload = {
           user_id: userId,
           data: payload.data,
@@ -805,7 +830,8 @@ function App() {
           total_parcelas: payload.totalParcelas || null,
           grupo_recorrencia_id: payload.grupoRecorrenciaId || null,
           cartao_id: payload.cartaoId || null,
-          data_compra: payload.dataCompra || null
+          fatura_id: faturaId,
+          data_compra: payload.dataCompra || (payload.cartaoId ? payload.data : null)
         };
 
         // Sub-caso A: Edição com grupo_recorrenciaId e scope THIS_AND_FUTURE
@@ -845,6 +871,24 @@ function App() {
         }
 
         await fetchTransactions();
+
+        // Recalcular totais das faturas antiga e nova
+        if (payload.cartaoId && cartao) {
+          const newMes = calcularMesAlocacao(payload.data, cartao);
+          await recalcInvoiceTotals(payload.cartaoId, newMes);
+        }
+
+        if (oldTx && oldTx.cartaoId) {
+          const oldCard = creditCards.find(c => c.id === oldTx.cartaoId);
+          if (oldCard) {
+            const oldMes = calcularMesAlocacao(oldTx.data, oldCard);
+            const newMes = payload.cartaoId && cartao ? calcularMesAlocacao(payload.data, cartao) : '';
+            if (oldTx.cartaoId !== payload.cartaoId || oldMes !== newMes) {
+              await recalcInvoiceTotals(oldTx.cartaoId, oldMes);
+            }
+          }
+        }
+
         return;
       }
 
@@ -853,24 +897,6 @@ function App() {
       // ==============================
       const frequencia = payload.frequencia || 'AVULSO';
       const cartao = payload.cartaoId ? creditCards.find((c) => c.id === payload.cartaoId) : null;
-
-      const calcularMesAlocacao = (dataRef: string, cc: CreditCard): string => {
-        const d = new Date(dataRef + 'T12:00:00');
-        const dia = d.getDate();
-        let mes = d.getMonth();
-        let ano = d.getFullYear();
-        if (dia >= cc.diaFechamento) {
-          mes++;
-          if (mes > 11) { mes = 0; ano++; }
-        }
-        return `${ano}-${String(mes + 1).padStart(2, '0')}`;
-      };
-
-      const obterFaturaId = async (cc: CreditCard, dataRef: string): Promise<string | null> => {
-        const mesAlvo = calcularMesAlocacao(dataRef, cc);
-        const inv = await getOrCreateInvoiceFor(cc, mesAlvo);
-        return inv?.id || null;
-      };
 
       // ----- 2A: Lançamento Avulso / Único -----
       if (frequencia === 'AVULSO') {
@@ -1073,8 +1099,12 @@ function App() {
           .from('transactions')
           .delete()
           .eq('id', id);
-
         if (error) throw error;
+      }
+      await fetchTransactions();
+      if (targetTx && targetTx.cartaoId) {
+        const mesAno = targetTx.data.slice(0, 7);
+        await recalcInvoiceTotals(targetTx.cartaoId, mesAno);
       }
     } catch (err: any) {
       console.error('Error deleting transaction from database:', err);
@@ -1704,6 +1734,63 @@ function App() {
     } catch (err: any) {
       console.error('Error paying invoice:', err);
       alert('Erro ao pagar fatura: ' + (err.message || JSON.stringify(err)));
+    }
+  };
+
+  const handlePostponeInvoice = async (
+    invoiceId: string,
+    targetMesAno: string
+  ) => {
+    if (!userId) return;
+    try {
+      const invoice = creditCardInvoices.find((i) => i.id === invoiceId);
+      const card = creditCards.find((c) => c.id === invoice?.cartaoId);
+      if (!invoice || !card) return;
+
+      // 1. Criar ou recuperar a fatura de destino
+      const targetInvoice = await getOrCreateInvoiceFor(card, targetMesAno);
+      if (!targetInvoice) {
+        throw new Error('Não foi possível criar a fatura de destino.');
+      }
+
+      // 2. Atualizar o status da fatura atual para 'POSTERGADA'
+      const { error: errorInv } = await supabase
+        .from('faturas_cartao')
+        .update({ status: 'POSTERGADA' })
+        .eq('id', invoiceId);
+      if (errorInv) throw errorInv;
+
+      // 3. Encontrar transações pendentes/saídas desta fatura e transferir para a de destino
+      const txsToMove = transactions.filter(
+        (t) => t.faturaId === invoiceId && t.tipo === 'SAIDA' && t.status !== 'PAGO'
+      );
+
+      if (txsToMove.length > 0) {
+        const txIds = txsToMove.map(t => t.id);
+        const { error: errorTxs } = await supabase
+          .from('transactions')
+          .update({ fatura_id: targetInvoice.id })
+          .in('id', txIds);
+        if (errorTxs) throw errorTxs;
+      }
+
+      // 4. Sincronizar dados e recalcular totais de ambas as faturas
+      await fetchTransactions();
+      await fetchCreditCardInvoices();
+
+      // Recalcular no banco
+      await recalcInvoiceTotals(card.id, invoice.mesAno);
+      await recalcInvoiceTotals(card.id, targetMesAno);
+
+      triggerToast(`Fatura postergada com sucesso para ${targetMesAno}!`);
+      
+      // Update selected modal view month if currently open
+      if (selectedInvoiceCard?.id === card.id) {
+        setInvoiceDetailMonth(targetMesAno);
+      }
+    } catch (err: any) {
+      console.error('Error postponing invoice:', err);
+      alert('Erro ao postergar fatura: ' + (err.message || JSON.stringify(err)));
     }
   };
 
@@ -3250,6 +3337,16 @@ function App() {
           }
         }}
         onPayInvoice={handlePayInvoice}
+        onPostponeInvoice={handlePostponeInvoice}
+        onEditTransaction={(tx) => {
+          setEditingTransaction(tx);
+          setIsModalOpen(true);
+        }}
+        onDeleteTransaction={async (id) => {
+          if (confirm('Tem certeza que deseja excluir esta compra da fatura?')) {
+            await handleDeleteTransaction(id);
+          }
+        }}
       />
 
       {/* Apple Wallet Modal */}

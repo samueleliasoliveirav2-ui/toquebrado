@@ -10,7 +10,9 @@ import {
   Clock,
   ShoppingCart,
   ArrowDownUp,
-  Wallet
+  Wallet,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import type {
   CreditCard,
@@ -30,6 +32,9 @@ interface InvoiceDetailModalProps {
   months: { key: string; label: string }[];
   onMonthChange: (m: string) => void;
   onPayInvoice: (invoiceId: string, accountId: string, valorPago: number) => void;
+  onPostponeInvoice: (invoiceId: string, targetMesAno: string) => void;
+  onEditTransaction: (tx: Transaction) => void;
+  onDeleteTransaction: (id: string) => void;
 }
 
 export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
@@ -42,17 +47,41 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
   selectedMonth,
   months,
   onMonthChange,
-  onPayInvoice
+  onPayInvoice,
+  onPostponeInvoice,
+  onEditTransaction,
+  onDeleteTransaction
 }) => {
   const [showPayForm, setShowPayForm] = useState(false);
   const [paymentAccountId, setPaymentAccountId] = useState('');
   const [paymentValue, setPaymentValue] = useState<number | ''>('');
+  const [showPostponeForm, setShowPostponeForm] = useState(false);
+  const [targetPostponeMonth, setTargetPostponeMonth] = useState('');
 
   if (!isOpen || !card || !invoice) return null;
 
   const saldoFatura = invoice.valorTotal - (invoice.valorPago || 0);
   const currentMonthIndex = months.findIndex((m) => m.key === selectedMonth);
   const currentMonthLabel = months.find((m) => m.key === selectedMonth)?.label || '';
+
+  const getPostponeOptions = () => {
+    const [yearStr, monthStr] = selectedMonth.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10) - 1; // 0-indexed
+    
+    const options: { key: string; label: string }[] = [];
+    const ptMonths = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    for (let i = 1; i <= 3; i++) {
+      const d = new Date(year, month + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${ptMonths[d.getMonth()]} de ${d.getFullYear()}`;
+      options.push({ key, label });
+    }
+    return options;
+  };
 
   const formatCurrency = (value: number) =>
     value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -112,6 +141,18 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           bigBg: 'bg-rose-500/10',
           bigText: 'text-rose-700',
           bigBorder: 'border-rose-200'
+        };
+      case 'POSTERGADA':
+        return {
+          label: 'Postergada',
+          bg: 'bg-orange-50',
+          text: 'text-orange-700',
+          border: 'border-orange-200',
+          icon: AlertCircle,
+          iconBg: 'bg-orange-500',
+          bigBg: 'bg-orange-500/10',
+          bigText: 'text-orange-700',
+          bigBorder: 'border-orange-200'
         };
       default:
         return {
@@ -324,7 +365,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
               {transactions.map((tx) => (
                 <div
                   key={tx.id}
-                  className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50/50 transition-all shadow-2xs"
+                  className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50/50 transition-all shadow-2xs group"
                 >
                   <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-rose-50 border border-rose-150 flex items-center justify-center">
                     <span className="text-[10px] font-black text-rose-600 leading-tight text-center">
@@ -345,7 +386,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-bold text-slate-800 truncate">
+                    <p className="text-sm font-bold text-slate-800 truncate text-left">
                       {tx.descricao}
                       {tx.totalParcelas && tx.totalParcelas > 1 && (
                         <span className="text-slate-500 ml-1">
@@ -355,26 +396,67 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex-shrink-0 text-right">
-                    <span className="text-[10px] font-bold text-slate-500 block">R$</span>
-                    <span className="text-base font-black text-rose-600 leading-tight">
-                      {formatCurrency(tx.valor).replace('R$', '').trim()}
-                    </span>
+                  <div className="flex-shrink-0 text-right flex items-center gap-2">
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-500 block">R$</span>
+                      <span className="text-base font-black text-rose-600 leading-tight">
+                        {formatCurrency(tx.valor).replace('R$', '').trim()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-0.5 opacity-80 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditTransaction(tx);
+                        }}
+                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        title="Editar lançamento"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteTransaction(tx.id);
+                        }}
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Excluir lançamento"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {invoice.status !== 'PAGA' && !showPayForm && (
-            <button
-              type="button"
-              onClick={handleOpenPayForm}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white font-black text-sm shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Wallet size={18} />
-              Pagar Fatura
-            </button>
+          {invoice.status !== 'PAGA' && invoice.status !== 'POSTERGADA' && !showPayForm && !showPostponeForm && (
+            <div className="grid grid-cols-2 gap-2.5 mt-2">
+              <button
+                type="button"
+                onClick={handleOpenPayForm}
+                className="py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Wallet size={16} />
+                Pagar Fatura
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPostponeForm(true);
+                  const opts = getPostponeOptions();
+                  setTargetPostponeMonth(opts[0]?.key || '');
+                }}
+                className="py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Calendar size={16} />
+                Postergar Fatura
+              </button>
+            </div>
           )}
 
           {showPayForm && (
@@ -459,6 +541,61 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                 >
                   <CheckCircle2 size={15} />
                   Confirmar Pagamento
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showPostponeForm && (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4 shadow-sm animate-fade-in mb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Calendar size={16} className="text-amber-500" />
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                  Postergar Fatura
+                </h4>
+              </div>
+
+              <div>
+                <label className="block text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1.5">
+                  Nova Fatura de Destino
+                </label>
+                <select
+                  value={targetPostponeMonth}
+                  onChange={(e) => setTargetPostponeMonth(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-3 text-slate-800 focus:outline-none focus:border-blue-500 text-sm font-bold cursor-pointer shadow-2xs"
+                >
+                  {getPostponeOptions().map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <p className="text-[10px] text-slate-500 font-semibold leading-relaxed text-left">
+                A fatura atual será marcada como <strong>POSTERGADA</strong>. Todas as compras pendentes nesta fatura serão migradas e reagendadas para a fatura do mês selecionado acima.
+              </p>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPostponeForm(false)}
+                  className="flex-1 py-3.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (targetPostponeMonth) {
+                      onPostponeInvoice(invoice.id, targetPostponeMonth);
+                      setShowPostponeForm(false);
+                    }
+                  }}
+                  className="flex-[2] py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 size={15} />
+                  Confirmar Postergação
                 </button>
               </div>
             </div>
