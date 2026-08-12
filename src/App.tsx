@@ -1981,14 +1981,23 @@ function App() {
     try {
       // Import dinamico para nao aumentar o bundle inicial
       const pdfjs = await import('pdfjs-dist');
-      // Carrega o worker padrao via unpkg CDN (evita erro de resolve worker no Vite local buildado)
+      // Carrega o worker padrao via unpkg CDN com fallback de Blob para contornar restrições de CORS
       try {
-        // @ts-ignore - __VITE__
         if (typeof pdfjs.GlobalWorkerOptions !== 'undefined') {
-          // @ts-ignore
-          pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+          const workerUrl = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+          try {
+            const resp = await fetch(workerUrl);
+            const blob = await resp.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            pdfjs.GlobalWorkerOptions.workerSrc = blobUrl;
+          } catch (corsErr) {
+            console.warn('[pdf.js] blob fallback falhou, usando URL direta:', corsErr);
+            pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+          }
         }
-      } catch { /* noop */ }
+      } catch (err) {
+        console.warn('[pdf.js] erro ao configurar worker:', err);
+      }
       const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
         const fr = new FileReader();
         fr.onload = () => resolve(fr.result as ArrayBuffer);
@@ -2020,8 +2029,12 @@ function App() {
       console.warn('[pdf.js] falhou ao ler pdf, caindo em fallback:', err);
     }
 
-    // TENTATIVA 2: fallback antigo (texto puro ou stream bytes)
+    // TENTATIVA 2: fallback antigo (apenas se NÃO for PDF)
+    const isPDF = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
     if (!pdfJsUsedOk) {
+      if (isPDF) {
+        throw new Error('Não foi possível ler este PDF localmente. O arquivo pode estar protegido, ser baseado em imagens escaneadas sem texto selecionável (OCR) ou o leitor de PDF foi bloqueado pelo celular.');
+      }
       const tryAsText = async (): Promise<string> => {
         return await new Promise((resolve) => {
           const fr = new FileReader();
@@ -2115,11 +2128,11 @@ function App() {
       }
       // Avanca para REVIEW automatico
       setPdfImportStep('REVIEW');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      triggerToast('Não foi possível ler o PDF. Preencha manualmente.');
+      triggerToast(e?.message || 'Não foi possível ler o PDF. Preencha manualmente.');
       setPdfImportExtracted({ itens: [] });
-      setPdfImportStep('REVIEW');
+      setPdfImportStep('UPLOAD');
     } finally {
       setPdfImportIsParsing(false);
     }
