@@ -1989,14 +1989,18 @@ function App() {
       } catch (err) {
         console.warn('[pdf.js] erro ao configurar workerSrc local:', err);
       }
-      const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
-        const fr = new FileReader();
-        fr.onload = () => resolve(fr.result as ArrayBuffer);
-        fr.onerror = () => reject(fr.error);
-        fr.readAsArrayBuffer(file);
-      });
+      const arrayBuffer = await file.arrayBuffer();
+      const typedarray = new Uint8Array(arrayBuffer);
+
       // Promise race com timeout de 8 segundos para evitar travamento infinito no celular
-      const docPromise = pdfjs.getDocument({ data: ab, useSystemFonts: true, enableXfa: true }).promise;
+      const docPromise = pdfjs.getDocument({
+        data: typedarray,
+        disableFontFace: true,
+        cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/cmaps/`,
+        cMapPacked: true,
+        useSystemFonts: true,
+        enableXfa: true
+      }).promise;
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Tempo limite excedido ao ler o PDF. O leitor local travou devido a conexão lenta ou restrições do navegador.')), 8000)
       );
