@@ -552,18 +552,25 @@ function App() {
       if (error) {
         console.error('Error fetching credit cards:', error);
       } else if (data) {
-        const mapped: CreditCard[] = data.map((item: any) => ({
-          id: item.id,
-          userId: item.user_id,
-          nome: item.nome,
-          bandeira: item.bandeira || 'OUTROS',
-          limiteTotal: Number(item.limite_total) || 0,
-          diaFechamento: Number(item.dia_fechamento) || 1,
-          diaVencimento: Number(item.dia_vencimento) || 5,
-          cor: item.cor || '#0f172a',
-          banco: item.banco || undefined,
-          contaPagamentoPadraoId: item.conta_pagamento_padrao_id || undefined
-        }));
+        const mapped: CreditCard[] = data.map((item: any) => {
+          const rawCor = item.cor || '';
+          const parts = rawCor.split('|');
+          const hasPreset = parts.length > 1;
+          const banco = hasPreset ? parts[0] : undefined;
+          const cor = hasPreset ? parts[1] : (rawCor || '#0f172a');
+          return {
+            id: item.id,
+            userId: item.user_id,
+            nome: item.nome,
+            bandeira: item.bandeira || 'OUTROS',
+            limiteTotal: Number(item.limite_total) || 0,
+            diaFechamento: Number(item.dia_fechamento) || 1,
+            diaVencimento: Number(item.dia_vencimento) || 5,
+            cor,
+            banco,
+            contaPagamentoPadraoId: item.conta_pagamento_padrao_id || undefined
+          };
+        });
         setCreditCards(mapped);
       }
     } catch (err) {
@@ -1554,8 +1561,7 @@ function App() {
       limite_total: payload.limiteTotal,
       dia_fechamento: payload.diaFechamento,
       dia_vencimento: payload.diaVencimento,
-      cor: payload.cor,
-      banco: payload.banco || null,
+      cor: payload.banco ? `${payload.banco}|${payload.cor}` : payload.cor,
       conta_pagamento_padrao_id: payload.contaPagamentoPadraoId || null
     };
 
