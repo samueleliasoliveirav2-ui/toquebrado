@@ -12,7 +12,7 @@ import { WorkShiftModal } from './components/WorkShiftModal';
 import { ReportsDashboard } from './components/ReportsDashboard';
 import { AccountsDashboard } from './components/AccountsDashboard';
 import { CreditCardsDashboard } from './components/CreditCardsDashboard';
-import { CreditCardModal } from './components/CreditCardModal';
+import { CreditCardModal, BANK_PRESETS } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
 import type { TemaVisual, UserProfile } from './types';
 import { supabase } from './lib/supabaseClient';
@@ -123,30 +123,30 @@ function App() {
   }, [showToast]);
 
   const defaultSampleCards: CreditCard[] = [
-    { id: 'itau-sample', userId: '', nome: 'Itaú Visa Platinum', bandeira: 'VISA', limiteTotal: 12000, diaFechamento: 3, diaVencimento: 10, cor: '#f97316' },
-    { id: 'c6-sample', userId: '', nome: 'C6 Bank Silver', bandeira: 'MASTERCARD', limiteTotal: 8500, diaFechamento: 5, diaVencimento: 15, cor: '#475569' },
-    { id: 'revolut-sample', userId: '', nome: 'Revolut Ultra', bandeira: 'VISA', limiteTotal: 25000, diaFechamento: 1, diaVencimento: 8, cor: '#0e69b2' },
-    { id: 'nubank-sample', userId: '', nome: 'Nubank Ultravioleta', bandeira: 'MASTERCARD', limiteTotal: 15000, diaFechamento: 2, diaVencimento: 7, cor: '#3b0764' }
+    { id: 'itau-sample', userId: '', nome: 'Itaú Visa Platinum', bandeira: 'VISA', limiteTotal: 12000, diaFechamento: 3, diaVencimento: 10, cor: '#f97316', banco: 'Itaú' },
+    { id: 'c6-sample', userId: '', nome: 'C6 Bank Silver', bandeira: 'MASTERCARD', limiteTotal: 8500, diaFechamento: 5, diaVencimento: 15, cor: '#475569', banco: 'C6 Bank' },
+    { id: 'revolut-sample', userId: '', nome: 'Revolut Ultra', bandeira: 'VISA', limiteTotal: 25000, diaFechamento: 1, diaVencimento: 8, cor: '#0e69b2', banco: 'Outro / Personalizado' },
+    { id: 'nubank-sample', userId: '', nome: 'Nubank Ultravioleta', bandeira: 'MASTERCARD', limiteTotal: 15000, diaFechamento: 2, diaVencimento: 7, cor: '#3b0764', banco: 'Nubank' }
   ];
 
   const cardsToDisplay = creditCards.length > 0 ? creditCards : defaultSampleCards;
 
-  const getCardGradient = (card: CreditCard) => {
+  const getCardPreset = (card: CreditCard) => {
+    if (card.banco && BANK_PRESETS[card.banco]) {
+      return BANK_PRESETS[card.banco];
+    }
     const name = card.nome.toLowerCase();
-    if (name.includes('itau') || name.includes('itaú')) {
-      return 'from-orange-500 via-orange-600 to-amber-700';
-    }
-    if (name.includes('c6')) {
-      return 'from-slate-300 via-zinc-200 to-white';
-    }
-    if (name.includes('revolut')) {
-      return 'from-blue-850 via-blue-900 to-slate-950';
-    }
-    if (name.includes('nubank') || name.includes('roxo')) {
-      return 'from-blue-950 via-violet-950 to-slate-950';
-    }
-    return 'from-slate-200 via-slate-100 to-white';
+    if (name.includes('itau') || name.includes('itaú')) return BANK_PRESETS['Itaú'];
+    if (name.includes('nubank') || name.includes('roxo')) return BANK_PRESETS['Nubank'];
+    if (name.includes('c6')) return BANK_PRESETS['C6 Bank'];
+    if (name.includes('mercado pago') || name.includes('mercadopago')) return BANK_PRESETS['Mercado Pago'];
+    if (name.includes('banco do brasil') || name.includes('bb ')) return BANK_PRESETS['Banco do Brasil'];
+    if (name.includes('bradesco')) return BANK_PRESETS['Bradesco'];
+    if (name.includes('santander')) return BANK_PRESETS['Santander'];
+    if (name.includes('inter')) return BANK_PRESETS['Inter'];
+    return { gradient: '', logo: '' };
   };
+
 
   const getActiveCardLabel = () => {
     const card = creditCards.find(c => c.id === activeCardId) || creditCards[0] || defaultSampleCards[0];
@@ -561,6 +561,7 @@ function App() {
           diaFechamento: Number(item.dia_fechamento) || 1,
           diaVencimento: Number(item.dia_vencimento) || 5,
           cor: item.cor || '#0f172a',
+          banco: item.banco || undefined,
           contaPagamentoPadraoId: item.conta_pagamento_padrao_id || undefined
         }));
         setCreditCards(mapped);
@@ -1554,6 +1555,7 @@ function App() {
       dia_fechamento: payload.diaFechamento,
       dia_vencimento: payload.diaVencimento,
       cor: payload.cor,
+      banco: payload.banco || null,
       conta_pagamento_padrao_id: payload.contaPagamentoPadraoId || null
     };
 
@@ -3248,7 +3250,7 @@ function App() {
                     {/* OVERLAPPING STACK OF CARDS */}
                     <div className="relative space-y-[-115px] pt-1 pb-24 font-sans">
                       {cardsToDisplay.map((card, idx) => {
-                        const gradient = getCardGradient(card);
+                        const preset = getCardPreset(card);
                         const isSample = card.id.includes('sample');
                         return (
                           <div 
@@ -3256,19 +3258,44 @@ function App() {
                             onClick={() => setSelectedWalletCard(card)}
                             style={{ 
                               zIndex: 10 + idx,
-                              background: card.cor && !isSample ? `linear-gradient(135deg, ${card.cor} 0%, #0f172a 100%)` : undefined
+                              backgroundColor: preset.gradient ? undefined : card.cor
                             }}
-                            className={`card-stack-item cursor-pointer relative rounded-[24px] p-5 h-44 bg-gradient-to-br ${gradient} text-white shadow-2xl border border-white/10 flex flex-col justify-between overflow-hidden`}
+                            className={`card-stack-item cursor-pointer relative rounded-[24px] p-5 h-44 text-white shadow-2xl border border-white/10 flex flex-col justify-between overflow-hidden transition-all duration-300 ${
+                              preset.gradient ? `bg-gradient-to-br ${preset.gradient}` : ''
+                            }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <span className="font-extrabold text-sm tracking-wide">{card.nome}</span>
+                            <div className="absolute top-0 left-0 right-0 bottom-0 opacity-15 pointer-events-none"
+                              style={{
+                                background: 'radial-gradient(circle at 20% 80%, rgba(255,255,255,0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 40%)'
+                              }}
+                            />
+                            
+                            <div className="relative z-10 flex items-start justify-between">
+                              <div className="flex items-center gap-2">
+                                {preset.logo ? (
+                                  <span className="text-[10px] font-black tracking-tight select-none font-sans bg-black/15 px-2 py-0.5 rounded border border-white/10">
+                                    {preset.logo}
+                                  </span>
+                                ) : (
+                                  <span className="font-extrabold text-sm tracking-wide">{card.nome}</span>
+                                )}
+                              </div>
                               <span className="text-[10px] font-black bg-black/25 px-2.5 py-0.5 rounded-full border border-white/10">{card.bandeira}</span>
                             </div>
-                            <div className="space-y-1">
-                              <p className="text-[10px] text-white/70 font-medium">{isSample ? 'Cartão de Demonstração' : 'Cartão de Crédito'}</p>
+                            
+                            {preset.logo && (
+                              <div className="relative z-10 space-y-0.5 text-left mb-1.5">
+                                <span className="font-extrabold text-sm tracking-wide text-white/95">{card.nome}</span>
+                              </div>
+                            )}
+                            
+                            <div className="relative z-10 space-y-1">
+                              <p className="text-[10px] text-white/70 font-medium text-left">
+                                {isSample ? 'Cartão de Demonstração' : 'Cartão de Crédito'}
+                              </p>
                               <div className="flex items-center justify-between">
                                 <span className="text-base font-mono font-bold tracking-wider">•••• {card.id.slice(-4)}</span>
-                                <span className="text-xs opacity-75 font-semibold">Limite: R$ {card.limiteTotal}</span>
+                                <span className="text-xs opacity-90 font-bold">Limite: R$ {card.limiteTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                               </div>
                             </div>
                           </div>
@@ -3281,26 +3308,54 @@ function App() {
                 /* SINGLE SELECTED CARD DETAIL VIEW */
                 <div className="space-y-5 text-left animate-fade-in font-sans">
                   {/* Selected Card Graphic */}
-                  <div 
-                    style={{ 
-                      background: selectedWalletCard.cor && !selectedWalletCard.id.includes('sample') 
-                        ? `linear-gradient(135deg, ${selectedWalletCard.cor} 0%, #0f172a 100%)` 
-                        : undefined
-                    }}
-                    className={`rounded-[28px] p-6 h-48 text-white shadow-2xl border border-white/10 flex flex-col justify-between bg-gradient-to-br ${getCardGradient(selectedWalletCard)}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-black text-base tracking-wide">{selectedWalletCard.nome}</span>
-                      <span className="text-[10px] font-bold bg-black/25 px-3 py-1 rounded-full border border-white/10">{selectedWalletCard.bandeira}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-white/80 font-medium">Limite Total: R$ {selectedWalletCard.limiteTotal.toFixed(2).replace('.', ',')}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg font-mono font-bold tracking-widest">•••• {selectedWalletCard.id.slice(-4)}</span>
-                        <span className="text-xs font-bold text-slate-600">Vence dia {selectedWalletCard.diaVencimento}</span>
+                  {(() => {
+                    const preset = getCardPreset(selectedWalletCard);
+                    return (
+                      <div 
+                        style={{ 
+                          backgroundColor: preset.gradient ? undefined : selectedWalletCard.cor 
+                        }}
+                        className={`relative rounded-[28px] p-6 h-48 text-white shadow-2xl border border-white/10 flex flex-col justify-between overflow-hidden transition-all duration-300 ${
+                          preset.gradient ? `bg-gradient-to-br ${preset.gradient}` : ''
+                        }`}
+                      >
+                        <div className="absolute top-0 left-0 right-0 bottom-0 opacity-15 pointer-events-none"
+                          style={{
+                            background: 'radial-gradient(circle at 20% 80%, rgba(255,255,255,0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 40%)'
+                          }}
+                        />
+
+                        <div className="relative z-10 flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            {preset.logo ? (
+                              <span className="text-xs font-black tracking-tight select-none font-sans bg-black/15 px-2.5 py-1 rounded-md border border-white/10">
+                                {preset.logo}
+                              </span>
+                            ) : (
+                              <span className="font-black text-base tracking-wide">{selectedWalletCard.nome}</span>
+                            )}
+                          </div>
+                          <span className="text-[10px] font-bold bg-black/25 px-3 py-1 rounded-full border border-white/10">{selectedWalletCard.bandeira}</span>
+                        </div>
+
+                        {preset.logo && (
+                          <div className="relative z-10 space-y-0.5 text-left mb-1.5">
+                            <span className="font-black text-base tracking-wide text-white/95">{selectedWalletCard.nome}</span>
+                          </div>
+                        )}
+
+                        <div className="relative z-10 space-y-1">
+                          <p className="text-[10px] text-white/80 font-medium">
+                            Limite Total: R$ {selectedWalletCard.limiteTotal.toFixed(2).replace('.', ',')}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-lg font-mono font-bold tracking-widest">•••• {selectedWalletCard.id.slice(-4)}</span>
+                            <span className="text-xs font-bold text-white/80">Vence dia {selectedWalletCard.diaVencimento}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* Status / Verification Box */}
                   {(() => {

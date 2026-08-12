@@ -65,6 +65,7 @@ export interface CreditCard {
   diaFechamento: number; // 1-28
   diaVencimento: number; // 1-28
   cor: string;           // "#000000"
+  banco?: string;        // "Itaú" | "Nubank" | "C6 Bank" | etc.
   contaPagamentoPadraoId?: string; // Conta bancária padrão para pagar a fatura
 }
 

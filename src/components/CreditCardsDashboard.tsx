@@ -19,6 +19,25 @@ import type {
   Transaction,
   BankAccount
 } from '../types';
+import { BANK_PRESETS } from './CreditCardModal';
+
+const getCardPreset = (card: CreditCardType) => {
+  if (card.banco && BANK_PRESETS[card.banco]) {
+    return BANK_PRESETS[card.banco];
+  }
+  // Fallback: tenta detectar pelo nome para retrocompatibilidade
+  const name = card.nome.toLowerCase();
+  if (name.includes('itau') || name.includes('itaú')) return BANK_PRESETS['Itaú'];
+  if (name.includes('nubank') || name.includes('roxo')) return BANK_PRESETS['Nubank'];
+  if (name.includes('c6')) return BANK_PRESETS['C6 Bank'];
+  if (name.includes('mercado pago') || name.includes('mercadopago')) return BANK_PRESETS['Mercado Pago'];
+  if (name.includes('banco do brasil') || name.includes('bb ')) return BANK_PRESETS['Banco do Brasil'];
+  if (name.includes('bradesco')) return BANK_PRESETS['Bradesco'];
+  if (name.includes('santander')) return BANK_PRESETS['Santander'];
+  if (name.includes('inter')) return BANK_PRESETS['Inter'];
+  
+  return { gradient: '', logo: '' };
+};
 
 interface CreditCardsDashboardProps {
   cards: CreditCardType[];
@@ -278,40 +297,59 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
                   ? 'bg-amber-500'
                   : 'bg-emerald-500';
 
+              const preset = getCardPreset(card);
+
               return (
                 <div
                   key={card.id}
                   className="space-y-0 overflow-hidden rounded-2xl shadow-md border border-slate-200 bg-white"
                 >
                   <div
-                    className="p-4 relative overflow-hidden text-white"
+                    className={`p-5 relative overflow-hidden text-white transition-all duration-300 ${preset.gradient ? `bg-gradient-to-br ${preset.gradient}` : ''}`}
                     style={{
-                      background: `linear-gradient(135deg, ${card.cor} 0%, ${card.cor}dd 60%, ${card.cor}aa 100%)`
+                      background: preset.gradient ? undefined : `linear-gradient(135deg, ${card.cor} 0%, ${card.cor}dd 60%, ${card.cor}aa 100%)`
                     }}
                   >
-                    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/10 blur-xl" />
-                    <div className="absolute -bottom-8 -left-4 w-20 h-20 rounded-full bg-white/5 blur-lg" />
+                    <div className="absolute top-0 left-0 right-0 bottom-0 opacity-15 pointer-events-none"
+                      style={{
+                        background: 'radial-gradient(circle at 20% 80%, rgba(255,255,255,0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 40%)'
+                      }}
+                    />
 
-                    <div className="relative flex items-start justify-between mb-6">
+                    <div className="relative flex items-start justify-between mb-8 z-10">
                       <div className="text-left">
-                        <div className="flex items-center gap-1.5 mb-1 opacity-90">
-                          <CreditCard size={14} />
-                        </div>
-                        <h4 className="text-sm font-black leading-none tracking-tight drop-shadow-sm">
-                          {card.nome}
-                        </h4>
+                        {preset.logo ? (
+                          <span className="text-xs font-black tracking-tight select-none font-sans bg-black/15 px-2.5 py-1 rounded-md border border-white/10">
+                            {preset.logo}
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1.5 opacity-90">
+                            <CreditCard size={14} />
+                            <span className="text-xs font-bold leading-none tracking-tight">
+                              {card.nome}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <div
-                        className={`bg-white/20 backdrop-blur-sm px-2 py-1 rounded-lg text-[10px] font-black text-white shrink-0 ${bandeira.style}`}
+                        className={`bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] font-black text-white shrink-0 ${bandeira.style}`}
                       >
                         {bandeira.text}
                       </div>
                     </div>
 
-                    <div className="relative space-y-2">
+                    {preset.logo && (
+                      <div className="relative z-10 mb-4 text-left">
+                        <h4 className="text-sm font-black leading-none tracking-tight drop-shadow-sm">
+                          {card.nome}
+                        </h4>
+                      </div>
+                    )}
+
+                    <div className="relative space-y-2 z-10">
                       <div className="flex items-end justify-between">
                         <div className="text-left">
-                          <span className="text-[8px] uppercase font-bold opacity-75 block leading-none">
+                          <span className="text-[8px] uppercase font-bold opacity-75 block leading-none mb-1">
                             Limite Total
                           </span>
                           <span className="text-[11px] font-black leading-tight">
@@ -319,7 +357,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
                           </span>
                         </div>
                         <div className="text-right">
-                          <span className="text-[8px] uppercase font-bold opacity-75 block leading-none">
+                          <span className="text-[8px] uppercase font-bold opacity-75 block leading-none mb-1">
                             Disponível
                           </span>
                           <span className="text-[11px] font-black leading-tight">

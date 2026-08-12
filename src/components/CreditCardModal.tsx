@@ -11,6 +11,35 @@ interface CreditCardModalProps {
   accounts: BankAccount[];
 }
 
+interface BankPreset {
+  gradient: string;
+  logo: string;
+}
+
+export const BANK_PRESETS: Record<string, BankPreset> = {
+  'Itaú': { gradient: 'from-orange-500 to-amber-600', logo: 'itaú' },
+  'Nubank': { gradient: 'from-purple-900 to-violet-950', logo: 'nu' },
+  'C6 Bank': { gradient: 'from-zinc-800 to-slate-900', logo: 'C6 BANK' },
+  'Mercado Pago': { gradient: 'from-sky-600 to-blue-700', logo: 'mercado pago' },
+  'Banco do Brasil': { gradient: 'from-blue-800 to-amber-500', logo: 'Banco do Brasil' },
+  'Bradesco': { gradient: 'from-red-600 to-rose-700', logo: 'Bradesco' },
+  'Santander': { gradient: 'from-red-700 to-rose-800', logo: 'Santander' },
+  'Inter': { gradient: 'from-orange-500 to-orange-600', logo: 'inter' },
+  'Outro / Personalizado': { gradient: '', logo: '' }
+};
+
+export const BANCOS = [
+  'Itaú',
+  'Nubank',
+  'C6 Bank',
+  'Mercado Pago',
+  'Banco do Brasil',
+  'Bradesco',
+  'Santander',
+  'Inter',
+  'Outro / Personalizado'
+];
+
 const CORES_CARTAO = [
   '#0f172a',
   '#1e293b',
@@ -48,6 +77,7 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
   const [diaVencimento, setDiaVencimento] = useState<number | ''>('');
   const [cor, setCor] = useState(CORES_CARTAO[0]);
   const [contaPagamentoPadraoId, setContaPagamentoPadraoId] = useState<string>('');
+  const [banco, setBanco] = useState<string>('Itaú');
 
   useEffect(() => {
     if (editingCard) {
@@ -57,6 +87,7 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
       setDiaFechamento(editingCard.diaFechamento);
       setDiaVencimento(editingCard.diaVencimento);
       setCor(editingCard.cor || CORES_CARTAO[0]);
+      setBanco(editingCard.banco || 'Itaú');
       setContaPagamentoPadraoId(editingCard.contaPagamentoPadraoId || '');
     } else {
       setNome('');
@@ -65,6 +96,7 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
       setDiaFechamento('');
       setDiaVencimento('');
       setCor(CORES_CARTAO[0]);
+      setBanco('Itaú');
       setContaPagamentoPadraoId('');
     }
   }, [editingCard, isOpen]);
@@ -90,6 +122,7 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
       diaFechamento: Number(diaFechamento),
       diaVencimento: Number(diaVencimento),
       cor,
+      banco,
       contaPagamentoPadraoId: contaPagamentoPadraoId || undefined
     };
 
@@ -100,6 +133,8 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
     onSave(payload);
     onClose();
   };
+
+  const preset = BANK_PRESETS[banco] || { gradient: '', logo: '' };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-xs animate-fade-in font-sans">
@@ -125,8 +160,8 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
         </div>
 
         <div
-          className="relative w-full aspect-[1.6/1] rounded-2xl p-5 mb-6 shadow-lg overflow-hidden"
-          style={{ backgroundColor: cor }}
+          className={`relative w-full aspect-[1.6/1] rounded-2xl p-5 mb-6 shadow-lg overflow-hidden transition-all duration-300 ${preset.gradient ? `bg-gradient-to-br ${preset.gradient}` : ''}`}
+          style={{ backgroundColor: preset.gradient ? undefined : cor }}
         >
           <div className="absolute top-0 left-0 right-0 bottom-0 opacity-20"
             style={{
@@ -137,7 +172,13 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
           <div className="relative z-10 flex flex-col justify-between h-full text-white">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
-                <CreditCardIcon size={24} className="text-white/90" />
+                {preset.logo ? (
+                  <span className="text-xs font-black tracking-tight select-none font-sans bg-black/15 px-2.5 py-1 rounded-md border border-white/10">
+                    {preset.logo}
+                  </span>
+                ) : (
+                  <CreditCardIcon size={24} className="text-white/90" />
+                )}
               </div>
               <div className="text-right">
                 <span className="text-sm font-black tracking-wider uppercase text-white/95">
@@ -188,6 +229,22 @@ export const CreditCardModal: React.FC<CreditCardModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 text-left">
+
+          <div>
+            <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1.5">Instituição Financeira / Banco</label>
+            <select
+              value={banco}
+              onChange={(e) => setBanco(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-slate-800 focus:outline-none focus:border-blue-500 text-sm font-semibold cursor-pointer shadow-2xs"
+              required
+            >
+              {BANCOS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
           
           <div>
             <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1.5">Nome do Cartão</label>
