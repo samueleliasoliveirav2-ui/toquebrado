@@ -1690,7 +1690,7 @@ function App() {
       const despesa: Omit<Transaction, 'id'> = {
         tipo: 'SAIDA',
         descricao: `Pagamento Fatura ${card.nome} - ${invoice.mesAno}`,
-        categoria: 'Cartão',
+        categoria: 'Outros',
         valor: Number(valorPago.toFixed(2)),
         data: hoje,
         status: 'PAGO',
@@ -1822,19 +1822,26 @@ function App() {
   };
 
   const suggCatFromDesc = (desc: string): string => {
-    const d = desc.toLowerCase();
+    const d = (desc || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const allowed = new Set<string>(CATEGORIES.SAIDA);
     const rules: [RegExp, string][] = [
-      [/(carrefour|pao de açucar|pao de acucar|extra|supermer|mercado|hortifruti|atacadao|atacadão|sonda)/, 'Supermercado'],
-      [/(ifood|i-food|uber\s*eats|rappi|restaurante|lanche|hamburguer|pizza|café|cafe|starbucks|padaria|picanha|rodizio|jantar|almoço|almoco)/, 'Alimentação'],
-      [/(netflix|spotify|prime video|hbomax|hbo max|disney|hulu|youtube|globo play|globoplay|deezer|assinatura|icloud|google one|dropbox|office 365)/, 'Assinaturas'],
-      [/(posto|gasolina|combustivel|combustível|shell|ipiranga|branca|petrobras|autoposto|uber|99pop|99 pop|taxi|táxi|transporte|onibus|ônibus|metro|metrô|estaciona|pedagio|pedágio)/, 'Transporte'],
-      [/(farmacia|farmácia|drogaria|são paulo|saude|saúde|hospital|medico|médico|consulta|plano de saude|plano de saúde|odontologico|odontológico|exame)/, 'Saúde'],
-      [/(cinema|show|teatro|viagem|airbnb|hote|hotel|jogo|barzinho|bar|boate|festa|lazer)/, 'Lazer'],
-      [/(roupa|loja|magazine|marisa|renner|cec|cea|decathlon|calçado|calcado|sapato|shopping)/, 'Outros'],
-      [/(aluguel|condominio|condomínio|iptu|energia|luz|água|agua|internet|telefone|celular|vivo|claro|tim|oi)/, 'Aluguel']
+      [/(carrefour|pao de acucar|pao d[ae] acucar|extra hiperm|supermer|mercado|hortifruti|atacadao|sonda|assai|atacadista|makro|perini|cooper|dia%)/, 'Supermercado'],
+      [/(ifood|i-food|uber\s*eats|rappi|restaurante|lanche|hamburguer|pizza|cafe|starbucks|padaria|picanha|rodizio|jantar|almoco|burger|sanduiche|sushi|japa|churrasco)/, 'Alimentação'],
+      [/(posto|gasolina|combustivel|shell|ipiranga|branca\s*preta|petrobras|autoposto|auto posto|uber|99\s*pop|99pop|taxi|transporte|onibus|metro|estaciona|pedagio|estacionamento|graal|shellbox|simoldes)/, 'Transporte'],
+      [/(netflix|spotify|prime video|hbomax|hbo max|disney\+?|hulu|youtube premium|youtube music|globo play|globoplay|deezer|assinatura|icloud|google one|dropbox|office 365|microsoft 365|app store|itunes|playstore|play store|alelo|flash|premium|plano\s*de\s*saude|odontoprev|sulamerica|saude|bradesco\s*saude|amil)/, 'Serviços/Assinaturas'],
+      [/(farmacia|farmacia|drogaria|sao paulo drogaria|saude|hospital|medico|consulta|plano de saude|odontologico|exame|clinica|laboratorio|dental|odont)/, 'Saúde'],
+      [/(cinema|show|teatro|viagem|airbnb|hotel|motel|jogo|barzinho|barzinho|bar|boate|festa|lazer|ingresso|comic|geek|evento|parque)/, 'Lazer'],
+      [/(roupa|loja|magazine luiza|magalu|marisa|renner|cea|cec|decathlon|calcado|sapato|tenis|shopping|riachuelo|cea|centauro|nike|adidas|puma|camicado|triton|tricot|moda)/, 'Compras/Vestuário'],
+      [/(cursos?|udemy|coursera|alura|descomplica|puc|usp|universidad|faculdade|escola|colégio|colegio|material\s*escolar|educacional|idiomas|cultura|ingles|livraria|livro|educa)/, 'Educação'],
+      [/(aluguel|condominio|iptu|energia|luz|aes eletropaulo|enel|cemig|copel|light|eletrobrás|água|agua|sanasa|sabesp|caesb|internet|telefone|celular|vivo|claro|tim|oi|net|sky|net combo|supervia|predial|moradia|conserto|pedreiro|marido\s*de\s*aluguel)/, 'Casa/Moradia'],
+      [/(aluguel)/, 'Aluguel'],
+      [/(emprest|consignado|parcelado.*emprest|saque|bmg|panamericano|ole consigna|sim|credito pessoal|sim digital)/, 'Empréstimo'],
+      [/(info.*app|infopay|infopag|pag\s*seguro|mercado pago|mp\s*[- ]|picpay|inter medium|conta digital|banco\s*inter)/, 'Outros']
     ];
-    for (const [re, cat] of rules) if (re.test(d)) return cat;
-    return 'Cartão';
+    for (const [re, cat] of rules) {
+      if (re.test(d) && allowed.has(cat)) return cat;
+    }
+    return 'Outros';
   };
 
   // Heuristic parser for ANY text
@@ -2141,7 +2148,7 @@ function App() {
       id: `pdf-manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       data: d,
       descricao: '',
-      categoria: 'Cartão',
+      categoria: 'Outros',
       valor: 0,
       selected: true
     };
@@ -2198,16 +2205,41 @@ function App() {
         await getOrCreateInvoiceFor(card, mesAno);
       }
 
+      const allowedSet = new Set<string>(CATEGORIES.SAIDA);
+      const normalizarCategoria = (c?: string): string => {
+        const raw = (c || '').trim();
+        if (!raw || raw.toLowerCase() === 'cartão' || raw.toLowerCase() === 'cartao') return 'Outros';
+        // Mapeamentos conhecidos -> nomes da nova lista
+        const map: Record<string, string> = {
+          'Assinaturas': 'Serviços/Assinaturas',
+          'Moradia': 'Casa/Moradia',
+          'Moda': 'Compras/Vestuário',
+          'Vestuário': 'Compras/Vestuário',
+          'Roupa': 'Compras/Vestuário',
+          'Tecnologia': 'Serviços/Assinaturas'
+        };
+        const m0 = map[raw] ?? raw;
+        if (allowedSet.has(m0)) return m0;
+        // Tenta casar ignorando case e acentos
+        for (const op of allowedSet) {
+          const norm = (s: string) =>
+            s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+          if (norm(op) === norm(raw)) return op;
+        }
+        return 'Outros';
+      };
+
       const novasTransacoes: Transaction[] = selectedItems.map((it, idx) => {
         const mesAno = alocarParaMesAno(it.data);
         const fatura = getInvoiceForCardMonth(card.id, mesAno);
         const valorCorrigido = Number(it.valor) > 0 ? Number(it.valor) : 0;
+        const categoriaFinal = normalizarCategoria(it.categoria);
         return {
           id: `tx-import-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
           data: mesAno + `-01`, // aloca na fatura (dia 1 do mes de referencia)
           dataCompra: it.data, // salva data real da compra
           descricao: it.descricao.trim() || 'Compra Cartão',
-          categoria: it.categoria || 'Cartão',
+          categoria: categoriaFinal,
           tipo: 'SAIDA',
           valor: valorCorrigido,
           status: 'PENDENTE',

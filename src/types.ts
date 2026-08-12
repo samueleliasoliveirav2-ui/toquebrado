@@ -89,7 +89,20 @@ export interface CreditCardInvoice {
 
 export const CATEGORIES = {
   ENTRADA: ['Pró-Labore', 'Salário', 'Investimentos', 'Freelance', 'Outros'],
-  SAIDA: ['Aluguel', 'Supermercado', 'Assinaturas', 'Transporte', 'Lazer', 'Saúde', 'Cartão', 'Empréstimo', 'Outros']
+  SAIDA: [
+    'Alimentação',
+    'Supermercado',
+    'Transporte',
+    'Serviços/Assinaturas',
+    'Saúde',
+    'Lazer',
+    'Educação',
+    'Compras/Vestuário',
+    'Casa/Moradia',
+    'Aluguel',
+    'Empréstimo',
+    'Outros'
+  ]
 };
 
 export const INITIAL_TRANSACTIONS: Transaction[] = [
