@@ -1910,6 +1910,8 @@ MODELO:
   ]
 }`.trim();
 
+  let lastLlmErrorStr = '';
+
   // Chama LLM se disponivel (chave configurada), retorna JSON padrao universal
   const parseInvoiceUniversalLLM = async (texto: string): Promise<ExtractedInvoiceData | null> => {
     const trimmed = texto?.trim?.();
@@ -1986,9 +1988,18 @@ MODELO:
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 45_000);
+      lastLlmErrorStr = '';
       const res = await fetch(baseUrl, { ...requestInit, signal: controller.signal });
       clearTimeout(timeoutId);
       if (!res.ok) {
+        let detail = '';
+        try {
+          const detailJson = await res.json();
+          detail = JSON.stringify(detailJson);
+        } catch {
+          detail = await res.text();
+        }
+        lastLlmErrorStr = `HTTP ${res.status}: ${detail.slice(0, 100)}`;
         console.warn('[LLM] HTTP status', res.status, 'ao extrair fatura, fallback heuristica...');
         return null;
       }
@@ -2068,7 +2079,8 @@ MODELO:
       }
       out.itens.sort((a, b) => a.data.localeCompare(b.data));
       return out;
-    } catch (err) {
+    } catch (err: any) {
+      lastLlmErrorStr = err?.message || String(err);
       console.warn('[LLM parser falhou:', err);
       return null;
     }
@@ -2083,7 +2095,11 @@ MODELO:
       return llmResult;
     }
     const heuristicResult = parseInvoiceTextHeuristic(texto);
-    if (opts?.methodLabelRef) opts.methodLabelRef.label = 'Heurística local (Regex)';
+    if (opts?.methodLabelRef) {
+      opts.methodLabelRef.label = lastLlmErrorStr 
+        ? `Heurística local (Falha IA: ${lastLlmErrorStr})` 
+        : 'Heurística local (Sem chaves de IA)';
+    }
     return heuristicResult;
   };
 
@@ -2142,14 +2158,9 @@ MODELO:
 
     for (const line of lines) {
       if (line.length < 8) continue;
-      // Evita pegar linhas de "total", "saldo", "vencimento" como item
-      if (/^(total|valor|vencimento|saldo|fatura|data|lançamento|lancamento|cartao|cartão|nome|cliente|cpf|cnpj|agencia|agência|conta|limite|juros|multa|iof|mora)\b/i.test(line)) continue;
-
-      // Filtros adicionais para ignorar informativos, termos regulatórios, opções de parcelamento e pagamentos da fatura
-      if (/\b(pagamento da fatura|pagamento de fatura|pagamento efetuado|pagamento recebido|pagamento de julho|pagamento de agosto|pagamento de setembro|pagamento de outubro|pagamento de novembro|pagamento de dezembro|pagamentos e creditos|pagamento da fatura de)\b/i.test(line)) continue;
-      if (/\b(teto de juros|teto de juro|encargos|juros do rotativo|juros de mora|parcelar a fatura|parcelamento de fatura|opções de pagamento|opcao de pagamento)\b/i.test(line)) continue;
-      if (/\b(limite utilizado|limite disponível|saques com seu cartão|saque utilizado|saque disponível|melhor dia de compra|fechamento da fatura|próximo fechamento)\b/i.test(line)) continue;
-      if (/\b(compras parceladas|fatura parcelada|tarifa de saque|saque em dinheiro|saque no caixa)\b/i.test(line)) continue;
+      
+      // Filtro estrito: ignorar linhas contendo palavras de resumo financeiro, limites ou cabeçalhos em qualquer parte da linha
+      if (/\b(limite|vencimento|vence em|total a pagar|pagamento minimo|pagamento mínimo|saque total|resumo da fatura|fatura de|fatura anterior|encargos|tarifas e encargos|juros|multas por atraso|pagamentos e creditos|pagamentos e créditos|compras parceladas|fatura parcelada|demonstração|demonstracao|falar com a gente|ouvidoria|sac)\b/i.test(line)) continue;
 
       const dataMatch = line.match(/(\d{1,2}[\/\.\-]\d{1,2}(?:[\/\.\-]\d{2,4})?)/) || line.match(/(\d{1,2}\s+(?:de\s+)?[A-Za-zçãõáéíóúâêîôû]{3,}(?:\s+(?:de\s+)?\d{2,4})?)/);
       if (!dataMatch) continue;
