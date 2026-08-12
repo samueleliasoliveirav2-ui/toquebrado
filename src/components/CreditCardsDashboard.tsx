@@ -10,7 +10,8 @@ import {
   ChevronRight,
   AlertCircle,
   CheckCircle2,
-  Clock
+  Clock,
+  FileUp
 } from 'lucide-react';
 import type {
   CreditCard as CreditCardType,
@@ -34,6 +35,7 @@ interface CreditCardsDashboardProps {
     card: CreditCardType,
     invoice: CreditCardInvoice
   ) => void;
+  onImportPdfInvoice?: () => void;
 }
 
 export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
@@ -45,7 +47,8 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
   onAddCard,
   onEditCard,
   onViewInvoice,
-  onPayInvoice
+  onPayInvoice,
+  onImportPdfInvoice
 }) => {
   const currentIndex = months.findIndex((m) => m.key === selectedMonth);
 
@@ -223,13 +226,22 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
         </div>
       </div>
 
-      <button
-        onClick={onAddCard}
-        className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#0e69b2] hover:bg-[#0b5a9a] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
-      >
-        <Plus size={14} />
-        Adicionar Cartão
-      </button>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={onAddCard}
+          className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#0e69b2] hover:bg-[#0b5a9a] text-white text-[11px] font-bold transition-all shadow-sm cursor-pointer"
+        >
+          <Plus size={14} />
+          Adicionar Cartão
+        </button>
+        <button
+          onClick={onImportPdfInvoice}
+          className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold transition-all shadow-sm cursor-pointer"
+        >
+          <FileUp size={14} />
+          Importar Fatura (PDF)
+        </button>
+      </div>
 
       <div className="space-y-3">
         <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider text-left pl-1">

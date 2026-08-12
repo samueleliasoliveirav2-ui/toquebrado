@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles } from 'lucide-react';
-import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice } from './types';
-import { INITIAL_TRANSACTIONS } from './types';
+import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles, FileUp, CheckSquare, Square, Upload, FileText as FileTextIcon } from 'lucide-react';
+import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice, ExtractedInvoiceData, ExtractedInvoiceItem } from './types';
+import { CATEGORIES, INITIAL_TRANSACTIONS } from './types';
 import { StatsHeader } from './components/StatsHeader';
 import { WeeklyAccordion } from './components/WeeklyAccordion';
 import { TransactionModal } from './components/TransactionModal';
@@ -89,6 +89,14 @@ function App() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('SAIDA');
+
+  // --- Importacao Fatura PDF ---
+  const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
+  const [pdfImportStep, setPdfImportStep] = useState<'UPLOAD' | 'REVIEW'>('UPLOAD');
+  const [pdfImportFileName, setPdfImportFileName] = useState<string>('');
+  const [pdfImportExtracted, setPdfImportExtracted] = useState<ExtractedInvoiceData | null>(null);
+  const [pdfImportCartaoId, setPdfImportCartaoId] = useState<string>('');
+  const [pdfImportIsParsing, setPdfImportIsParsing] = useState(false);
 
   const openModalForType = (tipo: 'ENTRADA' | 'SAIDA') => {
     setEditingTransaction(null);
@@ -1749,6 +1757,439 @@ function App() {
   // Filter active Event type shifts for linking despesas
   const activeEvents = workShifts.filter(e => e.tipo === 'ENTRADA' && e.atividade === 'Evento');
 
+  // ============================================================
+  // IMPORTACAO INTELIGENTE DE FATURA PDF
+  // ============================================================
+  const normalizePtMonthToNum = (m: string): number | null => {
+    const map: Record<string, number> = {
+      jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6,
+      jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12,
+      janeiro: 1, fevereiro: 2, marco: 3, março: 3, abril: 4,
+      maio: 5, junho: 6, julho: 7, agosto: 8, setembro: 9,
+      outubro: 10, novembro: 11, dezembro: 12,
+      january: 1, february: 2, march: 3, april: 4, june: 6,
+      july: 7, august: 8, september: 9, october: 10,
+      november: 11, december: 12
+    };
+    const x = m.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    for (const k of Object.keys(map)) if (x.startsWith(k)) return map[k];
+    return null;
+  };
+
+  const parseDateSmart = (raw: string, referenceYear?: number): string | null => {
+    const s = raw.trim();
+    if (!s) return null;
+    let m: RegExpMatchArray | null;
+    m = s.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+    if (m) {
+      const d = Number(m[1]);
+      const mo = Number(m[2]);
+      let y = Number(m[3]);
+      if (y < 100) y += 2000;
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+      return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+    m = s.match(/(\d{1,2})\s+de\s+([A-Za-zçãõáéíóúâêîôû]+)(?:\s+de\s+(\d{2,4}))?/i);
+    if (m) {
+      const d = Number(m[1]);
+      const mo = normalizePtMonthToNum(m[2]);
+      if (!mo) return null;
+      let y = m[3] ? Number(m[3]) : (referenceYear ?? new Date().getFullYear());
+      if (y < 100) y += 2000;
+      return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+    m = s.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    return null;
+  };
+
+  const parseCurrencySmart = (raw: string): number | null => {
+    const s = raw.trim();
+    if (!s) return null;
+    const digits = s.replace(/[^\d,\-.]/g, '');
+    if (!digits) return null;
+    const lastComma = digits.lastIndexOf(',');
+    const lastDot = digits.lastIndexOf('.');
+    let clean = digits;
+    if (lastComma >= 0 && lastDot >= 0) {
+      if (lastComma > lastDot) {
+        clean = digits.replace(/\./g, '').replace(',', '.');
+      } else {
+        clean = digits.replace(/,/g, '');
+      }
+    } else if (lastComma >= 0) {
+      clean = digits.replace(/\./g, '').replace(',', '.');
+    }
+    const num = Number(clean);
+    if (Number.isFinite(num)) return Math.abs(num);
+    return null;
+  };
+
+  const suggCatFromDesc = (desc: string): string => {
+    const d = desc.toLowerCase();
+    const rules: [RegExp, string][] = [
+      [/(carrefour|pao de açucar|pao de acucar|extra|supermer|mercado|hortifruti|atacadao|atacadão|sonda)/, 'Supermercado'],
+      [/(ifood|i-food|uber\s*eats|rappi|restaurante|lanche|hamburguer|pizza|café|cafe|starbucks|padaria|picanha|rodizio|jantar|almoço|almoco)/, 'Alimentação'],
+      [/(netflix|spotify|prime video|hbomax|hbo max|disney|hulu|youtube|globo play|globoplay|deezer|assinatura|icloud|google one|dropbox|office 365)/, 'Assinaturas'],
+      [/(posto|gasolina|combustivel|combustível|shell|ipiranga|branca|petrobras|autoposto|uber|99pop|99 pop|taxi|táxi|transporte|onibus|ônibus|metro|metrô|estaciona|pedagio|pedágio)/, 'Transporte'],
+      [/(farmacia|farmácia|drogaria|são paulo|saude|saúde|hospital|medico|médico|consulta|plano de saude|plano de saúde|odontologico|odontológico|exame)/, 'Saúde'],
+      [/(cinema|show|teatro|viagem|airbnb|hote|hotel|jogo|barzinho|bar|boate|festa|lazer)/, 'Lazer'],
+      [/(roupa|loja|magazine|marisa|renner|cec|cea|decathlon|calçado|calcado|sapato|shopping)/, 'Outros'],
+      [/(aluguel|condominio|condomínio|iptu|energia|luz|água|agua|internet|telefone|celular|vivo|claro|tim|oi)/, 'Aluguel']
+    ];
+    for (const [re, cat] of rules) if (re.test(d)) return cat;
+    return 'Cartão';
+  };
+
+  // Heuristic parser for ANY text (fallback se pdf-parse nao estiver disponivel)
+  const parseInvoiceTextHeuristic = (text: string): ExtractedInvoiceData => {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const fullText = text;
+    const result: ExtractedInvoiceData = { itens: [] };
+
+    // 1) Vencimento
+    const vencRe = /vencimento[^0-9]{0,40}(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i;
+    const mv = fullText.match(vencRe) || fullText.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})\s*(?:venc|vcto|pagar|pagamento|até o dia|ate o dia)/i);
+    if (mv) {
+      const pv = parseDateSmart(mv[1]);
+      if (pv) result.vencimento = pv;
+    }
+
+    // 2) Valor total da fatura
+    const totRe = /(?:valor\s*(?:total|da\s*fatura)|total\s*da\s*fatura|total\s+geral|toral\s+da\s+fatura)[^0-9]{0,25}(R?\$?\s*[\d\.,\-\s]+)/i;
+    const mtot = fullText.match(totRe) || fullText.match(/(?:valor\s*a\s*pagar|total\s*a\s*pagar)[^0-9]{0,25}(R?\$?\s*[\d\.,\-\s]+)/i);
+    if (mtot) {
+      const v = parseCurrencySmart(mtot[1]);
+      if (v != null) result.valorTotalExtraido = v;
+    }
+
+    // 3) Nome do cartao sugerido (primeiros 40 chars: ITAU/BRADESCO/C6/NUBANK/REVOLUT/SANTANDER/SAFRA/INTER/BANCO...)
+    const head = lines.slice(0, Math.min(15, lines.length)).join(' ');
+    const bancoMatch = head.match(/(itaú|itau|nubank|nu\s*bank|c6\s*bank|c6bank|revolut|santander|safra|inter|bradesco|banco\s*do\s*brasil|bb|caixa|hipercard|sicoob|sicredi)/i);
+    if (bancoMatch) result.cartaoSugeridoNome = bancoMatch[0];
+
+    // 4) Itens: linha do tipo DATA   DESCRICAO...     VALOR
+    // Exemplos de linha validas em faturas reais brasileiras:
+    //   25/07  CARREFOUR SUPERMERCADO    10X 1/10   R$ 372,46
+    //   25/07/2026 SUPERMERCADO CARREFOUR 2/15 372.46
+    //   Uber Tecnologia 02 Ago 23 42,50
+    //   02/08 Starbucks Café Parcela 2 de 10 R$ 42,50
+    const parcelaRe = /(?:parcela\s*)?(\d{1,3})\s*(?:\/|de\s*)\s*(\d{1,3})/i;
+
+    const anoRef = (result.vencimento ? new Date(result.vencimento).getFullYear() : new Date().getFullYear()) || new Date().getFullYear();
+
+    for (const line of lines) {
+      if (line.length < 8) continue;
+      // Evita pegar linhas de "total", "saldo", "vencimento" como item
+      if (/^(total|valor|vencimento|saldo|fatura|data|lançamento|lancamento|cartao|cartão|nome|cliente|cpf|cnpj|agencia|agência|conta|limite|juros|multa|iof|mora)\b/i.test(line)) continue;
+
+      const dataMatch = line.match(/(\d{1,2}[\/\.\-]\d{1,2}(?:[\/\.\-]\d{2,4})?)/) || line.match(/(\d{1,2}\s+(?:de\s+)?[A-Za-zçãõáéíóúâêîôû]{3,}(?:\s+(?:de\s+)?\d{2,4})?)/);
+      const matchPrimarioValor = line.match(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{2})|\d+(?:,\d{2})|\d+\.\d{2})/);
+      const fallbacks = Array.from(line.matchAll(/(?:R\$\s*)?([\d\.,]{4,})/g)).map(mm => {
+        const v = parseCurrencySmart(mm[0] ?? mm[1] ?? '');
+        return v != null ? v : null;
+      }).filter((x): x is number => x != null);
+      if (!dataMatch) continue;
+      let valorNum: number | null = null;
+      if (matchPrimarioValor) {
+        valorNum = parseCurrencySmart(matchPrimarioValor[1] ?? matchPrimarioValor[0] ?? '');
+      } else if (fallbacks.length) {
+        valorNum = fallbacks[fallbacks.length - 1] ?? null;
+      }
+      if (valorNum == null || valorNum <= 0 || valorNum > 9999999.99) continue;
+
+      const dataStr = parseDateSmart(dataMatch[0], anoRef);
+      if (!dataStr) continue;
+
+      // Extrai parcela
+      let parcelaAtual: number | undefined;
+      let totalParcelas: number | undefined;
+      const pm = line.match(parcelaRe);
+      if (pm) {
+        parcelaAtual = Number(pm[1]);
+        totalParcelas = Number(pm[2]);
+        if (!(parcelaAtual >= 1 && totalParcelas >= parcelaAtual && totalParcelas <= 999)) {
+          parcelaAtual = undefined;
+          totalParcelas = undefined;
+        }
+      }
+
+      // Descricao: remove data, valor, parcela, espacos
+      let desc = line
+        .replace(/(?:R?\$?\s*)?\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})|\d+(?:,\d{2})|\d+\.\d{2}/g, ' ')
+        .replace(dataMatch[0], ' ')
+        .replace(/(?:parcela\s*)?\d{1,3}\s*(?:\/|de\s*)\s*\d{1,3}/gi, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+        .replace(/^[\s\-\.\,\:]+|[\s\-\.\,\:]+$/g, '');
+      if (!desc) desc = 'Compra Cartão';
+      if (desc.length > 120) desc = desc.slice(0, 117) + '...';
+
+      result.itens.push({
+        id: `pdf-item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        data: dataStr,
+        descricao: desc,
+        categoria: suggCatFromDesc(desc),
+        valor: Number(valorNum.toFixed(2)),
+        parcelaAtual,
+        totalParcelas,
+        selected: true
+      });
+    }
+
+    // Total extraido dos itens, se nao pegamos o total geral
+    if (result.valorTotalExtraido == null && result.itens.length > 0) {
+      result.valorTotalExtraido = Number(result.itens.reduce((s, i) => s + i.valor, 0).toFixed(2));
+    }
+    // Ordena por data
+    result.itens.sort((a, b) => a.data.localeCompare(b.data));
+    return result;
+  };
+
+  // Entrypoint do parser
+  const parsePdfInvoice = async (file: File): Promise<ExtractedInvoiceData> => {
+    let extractedText = '';
+    // Tenta ler como texto puro (bom quando for PDF exportado digitalmente e arrastado como txt ou for utf-8)
+    // Para arquivos binários PDF na verdade, a API FileReader text vai trazer lixo.
+    // Vamos tentar de toda forma e usar REGEX para extrair o texto quando houver.
+    const tryAsText = async (): Promise<string> => {
+      return await new Promise((resolve) => {
+        const fr = new FileReader();
+        fr.onload = () => { resolve(String(fr.result || '')); };
+        fr.onerror = () => { resolve(''); };
+        fr.readAsText(file, 'utf-8');
+      });
+    };
+    extractedText = await tryAsText();
+    // Heuristic: se a leitura deu muita coisa legivel -> OK. Senao tenta UTF-8 stream + fallback.
+    const printable = extractedText.replace(/[^\x20-\x7EáàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ\s\n\r\t.,:;!?()\-+@#$%&*_=<>/\\'"[\]{}|~^`]/g, '').length;
+    const ratio = extractedText.length ? printable / extractedText.length : 0;
+    if (ratio < 0.6) {
+      // Provavelmente PDF binario. Para nao depender de serverless function (ainda)
+      // vamos tentar extrair TODAS as sequencias legiveis (stream BT..ET / strings PDF)
+      try {
+        const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(fr.result as ArrayBuffer);
+          fr.onerror = () => reject(fr.error);
+          fr.readAsArrayBuffer(file);
+        });
+        const bytes = new Uint8Array(ab);
+        const decodedChunks: string[] = [];
+        let currentBuf: number[] = [];
+        const pushCurrent = () => {
+          if (currentBuf.length >= 6) {
+            try {
+              const s = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(currentBuf));
+              // filtra impressos + acentuados
+              const clean = s.replace(/[^\x20-\x7EáàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ\s\n\r\t.,:;!?()\-+@#$%&*_=<>/\\'"[\]{}|~^`]/g, ' ').trim();
+              if (clean.length >= 6) decodedChunks.push(clean);
+            } catch { /* noop */ }
+          }
+          currentBuf = [];
+        };
+        for (const b of bytes) {
+          const printableByte = (b >= 0x20 && b <= 0x7e) || (b >= 0x80 && b <= 0xff) || b === 0xa || b === 0xd || b === 0x9;
+          if (printableByte) currentBuf.push(b);
+          else pushCurrent();
+        }
+        pushCurrent();
+        extractedText = decodedChunks.join('\n');
+      } catch {
+        extractedText = '';
+      }
+    }
+    // Se ainda assim nao tem nada -> UI vai permitir editar manualmente. Nao bloqueia.
+    return parseInvoiceTextHeuristic(extractedText);
+  };
+
+  const handlePdfFileSelect = async (file: File) => {
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+      triggerToast('Por favor, selecione um arquivo PDF.');
+      return;
+    }
+    setPdfImportFileName(file.name);
+    setPdfImportIsParsing(true);
+    try {
+      const parsed = await parsePdfInvoice(file);
+      setPdfImportExtracted(parsed);
+      // Sugerir cartao se encontrou nome no PDF
+      if (parsed.cartaoSugeridoNome && !pdfImportCartaoId) {
+        const suggestion = (creditCards.length ? creditCards : defaultSampleCards).find(
+          c => c.nome.toLowerCase().includes(parsed.cartaoSugeridoNome!.toLowerCase()) || parsed.cartaoSugeridoNome!.toLowerCase().includes(c.nome.toLowerCase())
+        );
+        if (suggestion) setPdfImportCartaoId(suggestion.id);
+      }
+      // Avanca para REVIEW automatico
+      setPdfImportStep('REVIEW');
+    } catch (e) {
+      console.error(e);
+      triggerToast('Não foi possível ler o PDF. Preencha manualmente.');
+      setPdfImportExtracted({ itens: [] });
+      setPdfImportStep('REVIEW');
+    } finally {
+      setPdfImportIsParsing(false);
+    }
+  };
+
+  const togglePdfItem = (id: string) => {
+    if (!pdfImportExtracted) return;
+    setPdfImportExtracted({
+      ...pdfImportExtracted,
+      itens: pdfImportExtracted.itens.map(it => it.id === id ? { ...it, selected: !it.selected } : it)
+    });
+  };
+
+  const patchPdfItem = (id: string, patch: Partial<ExtractedInvoiceItem>) => {
+    if (!pdfImportExtracted) return;
+    setPdfImportExtracted({
+      ...pdfImportExtracted,
+      itens: pdfImportExtracted.itens.map(it => it.id === id ? { ...it, ...patch } : it)
+    });
+  };
+
+  const addBlankPdfItem = () => {
+    const hoje = new Date();
+    const d = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+    const item: ExtractedInvoiceItem = {
+      id: `pdf-manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      data: d,
+      descricao: '',
+      categoria: 'Cartão',
+      valor: 0,
+      selected: true
+    };
+    setPdfImportExtracted(prev => prev ? { ...prev, itens: [...prev.itens, item] } : { itens: [item] });
+  };
+
+  const toggleAllPdfItems = (checked: boolean) => {
+    if (!pdfImportExtracted) return;
+    setPdfImportExtracted({
+      ...pdfImportExtracted,
+      itens: pdfImportExtracted.itens.map(it => ({ ...it, selected: checked }))
+    });
+  };
+
+  const handleConfirmPdfImport = async () => {
+    if (!pdfImportExtracted || !pdfImportCartaoId) {
+      triggerToast('Selecione um cartão de crédito.');
+      return;
+    }
+    const selectedItems = pdfImportExtracted.itens.filter(it => it.selected);
+    if (selectedItems.length === 0) {
+      triggerToast('Selecione ao menos 1 lançamento para importar.');
+      return;
+    }
+    const card = (creditCards.length ? creditCards : defaultSampleCards).find(c => c.id === pdfImportCartaoId);
+    if (!card) {
+      triggerToast('Cartão não encontrado.');
+      return;
+    }
+    setPdfImportIsParsing(true);
+    try {
+      // Para cada item, determinar mesAno da fatura = mes da compra (ou mes referencia atual se faltar)
+      // Mas em fatura a regra é: compra ANTES do diaFechamento -> fatura mes corrente
+      // compra DEPOIS do diaFechamento -> fatura mes SEGUINTE
+      const alocarParaMesAno = (dataCompraISO: string): string => {
+        const [y, m, d] = dataCompraISO.split('-').map(Number);
+        if (!y) {
+          const h = new Date();
+          return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}`;
+        }
+        const dtComp = new Date(y, m - 1, d);
+        const fechamentoEsteMes = new Date(y, m - 1, card.diaFechamento);
+        if (dtComp <= fechamentoEsteMes) {
+          return `${y}-${String(m).padStart(2, '0')}`;
+        }
+        const prox = new Date(y, m, 1);
+        return `${prox.getFullYear()}-${String(prox.getMonth() + 1).padStart(2, '0')}`;
+      };
+
+      // Cria / recupera fatura para cada mesAno distinto
+      const mesAnoSet = new Set<string>();
+      selectedItems.forEach(it => mesAnoSet.add(alocarParaMesAno(it.data)));
+      for (const mesAno of Array.from(mesAnoSet)) {
+        await getOrCreateInvoiceFor(card, mesAno);
+      }
+
+      const novasTransacoes: Transaction[] = selectedItems.map((it, idx) => {
+        const mesAno = alocarParaMesAno(it.data);
+        const fatura = getInvoiceForCardMonth(card.id, mesAno);
+        const valorCorrigido = Number(it.valor) > 0 ? Number(it.valor) : 0;
+        return {
+          id: `tx-import-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+          data: mesAno + `-01`, // aloca na fatura (dia 1 do mes de referencia)
+          dataCompra: it.data, // salva data real da compra
+          descricao: it.descricao.trim() || 'Compra Cartão',
+          categoria: it.categoria || 'Cartão',
+          tipo: 'SAIDA',
+          valor: valorCorrigido,
+          status: 'PENDENTE',
+          cartaoId: card.id,
+          faturaId: fatura?.id,
+          frequencia: it.totalParcelas && it.totalParcelas > 1 ? 'PARCELADO' : 'AVULSO',
+          parcelaAtual: it.parcelaAtual,
+          totalParcelas: it.totalParcelas
+        };
+      });
+
+      // Persiste no estado local + Supabase (se conectado)
+      setTransactions(prev => [...prev, ...novasTransacoes]);
+      try {
+        if (userId && supabase) {
+          for (const tx of novasTransacoes) {
+            const payload = {
+              id: tx.id,
+              user_id: userId,
+              data: tx.data,
+              descricao: tx.descricao,
+              categoria: tx.categoria,
+              tipo: tx.tipo,
+              valor: tx.valor,
+              status: tx.status,
+              data_postergar: tx.dataPostergar ?? null,
+              juros: tx.juros ?? null,
+              conta_id: tx.contaId ?? null,
+              frequencia: tx.frequencia ?? 'AVULSO',
+              periodicidade: tx.periodicidade ?? null,
+              parcela_atual: tx.parcelaAtual ?? null,
+              total_parcelas: tx.totalParcelas ?? null,
+              grupo_recorrencia_id: tx.grupoRecorrenciaId ?? null,
+              cartao_id: tx.cartaoId ?? null,
+              fatura_id: tx.faturaId ?? null,
+              data_compra: tx.dataCompra ?? null
+            };
+            await supabase.from('transactions').upsert(payload, { onConflict: 'id', ignoreDuplicates: false });
+          }
+          await fetchTransactions();
+          await fetchCreditCardInvoices();
+          // Recalcula totais das faturas
+          for (const mesAno of Array.from(mesAnoSet)) {
+            await recalcInvoiceTotals(card.id, mesAno);
+          }
+        }
+      } catch (e) {
+        console.error('Erro persistindo importacao PDF no Supabase:', e);
+      }
+
+      triggerToast(`${novasTransacoes.length} lançamentos importados com sucesso no ${card.nome}!`);
+      setIsPdfImportOpen(false);
+      setPdfImportExtracted(null);
+      setPdfImportFileName('');
+      setPdfImportStep('UPLOAD');
+    } finally {
+      setPdfImportIsParsing(false);
+    }
+  };
+
+  // Sugere melhor categoria: chaveia entre SAIDA do CATEGORIES + custom
+  const categoriesListForPDF = Array.from(new Set([
+    ...(CATEGORIES?.SAIDA ?? []),
+    ...(customCategories?.SAIDA ?? [])
+  ]));
+
+
   return (
     <div className="w-full min-h-screen flex justify-center bg-white select-none">
       {/* Centered responsive container */}
@@ -2503,6 +2944,13 @@ function App() {
                     }}
                     onViewInvoice={handleViewInvoice}
                     onPayInvoice={handlePayInvoiceFromDashboard}
+                    onImportPdfInvoice={() => {
+                      setPdfImportStep('UPLOAD');
+                      setPdfImportExtracted(null);
+                      setPdfImportFileName('');
+                      setPdfImportCartaoId(creditCards[0]?.id || defaultSampleCards[0]?.id || '');
+                      setIsPdfImportOpen(true);
+                    }}
                   />
                 </div>
               </>
@@ -2863,6 +3311,387 @@ function App() {
                       })()}
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          MODAL DE IMPORTAÇÃO DE FATURA PDF
+         ========================================================= */}
+      {isPdfImportOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/55 animate-fade-in">
+          <div
+            className="relative w-full max-w-md max-h-[92dvh] bg-slate-50 sm:rounded-3xl rounded-t-[28px] shadow-2xl flex flex-col overflow-hidden animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabecalho modal */}
+            <div className="px-5 pt-4 pb-3 shrink-0 bg-white border-b border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#0e69b2]/10 text-[#0e69b2] flex items-center justify-center shrink-0">
+                    <FileUp size={18} />
+                  </div>
+                  <div className="text-left">
+                    <h2 className="text-sm font-extrabold text-slate-900 leading-tight">
+                      Importar Fatura
+                    </h2>
+                    <p className="text-[10px] font-bold text-slate-500 leading-tight">
+                      {pdfImportStep === 'UPLOAD' ? 'Passo 1 · Envie o PDF da fatura' : 'Passo 2 · Revise os lançamentos extraídos'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsPdfImportOpen(false);
+                    setPdfImportExtracted(null);
+                    setPdfImportFileName('');
+                    setPdfImportStep('UPLOAD');
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition cursor-pointer shrink-0"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Steps Indicator */}
+              <div className="flex items-center gap-2 mt-1">
+                <div className={`h-1.5 flex-1 rounded-full transition ${pdfImportStep === 'UPLOAD' ? 'bg-[#0e69b2]' : 'bg-emerald-500'}`} />
+                <div className={`h-1.5 flex-1 rounded-full transition ${pdfImportStep === 'REVIEW' ? 'bg-[#0e69b2]' : 'bg-slate-200'}`} />
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
+              {pdfImportStep === 'UPLOAD' && (
+                <>
+                  {/* Upload Area */}
+                  <label className={`w-full block cursor-pointer rounded-2xl border-2 border-dashed transition
+                    ${pdfImportIsParsing ? 'border-blue-400 bg-blue-50' : 'border-slate-300 bg-white hover:border-[#0e69b2] hover:bg-blue-50/40'}
+                    p-6 text-center`}>
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      className="hidden"
+                      disabled={pdfImportIsParsing}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handlePdfFileSelect(f);
+                        e.target.value = '';
+                      }}
+                    />
+                    {pdfImportIsParsing ? (
+                      <div className="flex flex-col items-center gap-2 py-4">
+                        <Loader2 size={28} className="animate-spin text-[#0e69b2]" />
+                        <p className="text-xs font-extrabold text-slate-800">
+                          Analisando PDF...
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-500 max-w-[85%]">
+                          Extraindo compras, datas, valores e parcelas.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-14 h-14 rounded-2xl bg-[#0e69b2]/10 text-[#0e69b2] flex items-center justify-center mx-auto mb-3">
+                          <Upload size={26} />
+                        </div>
+                        <p className="text-sm font-extrabold text-slate-800 mb-1">
+                          Envie a fatura em PDF
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-500 leading-relaxed max-w-[90%] mx-auto mb-3">
+                          Arraste & solte ou toque para selecionar. A leitura é feita localmente e os lançamentos extraídos aparecem na próxima etapa.
+                        </p>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#0e69b2] text-white text-[11px] font-bold">
+                          <Upload size={12} />
+                          Selecionar arquivo PDF
+                        </span>
+                        {pdfImportFileName && !pdfImportIsParsing && (
+                          <p className="text-[10px] font-bold text-emerald-600 mt-3">
+                            Arquivo atual: {pdfImportFileName}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </label>
+
+                  {/* Seletor de cartao OBRIGATORIO */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                      <CreditCardIcon size={11} />
+                      Destino · Cartão de Crédito
+                    </label>
+                    <select
+                      value={pdfImportCartaoId}
+                      onChange={(e) => setPdfImportCartaoId(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0e69b2]/40 focus:border-[#0e69b2] transition"
+                    >
+                      {(creditCards.length ? creditCards : defaultSampleCards).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome} · Limite {c.limiteTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </option>
+                      ))}
+                    </select>
+                    {pdfImportExtracted?.cartaoSugeridoNome && (
+                      <p className="text-[10px] font-bold text-[#0e69b2]">
+                        💡 Nome detectado no PDF: <strong>{pdfImportExtracted.cartaoSugeridoNome}</strong>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="rounded-2xl bg-blue-50 border border-blue-100 p-3 flex items-start gap-2.5">
+                    <Info size={16} className="text-[#0e69b2] shrink-0 mt-0.5" />
+                    <div className="text-left">
+                      <p className="text-[11px] font-extrabold text-[#0e69b2] leading-tight mb-0.5">
+                        Não tem o arquivo PDF ainda?
+                      </p>
+                      <p className="text-[10px] font-bold text-[#0e69b2]/80 leading-relaxed">
+                        Avance para a etapa de revisão e cadastre os lançamentos manualmente.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {pdfImportStep === 'REVIEW' && (
+                <>
+                  {/* Header com vencimento e total */}
+                  {(() => {
+                    const itens = pdfImportExtracted?.itens ?? [];
+                    const sel = itens.filter(i => i.selected);
+                    const totalSel = sel.reduce((s, i) => s + Number(i.valor || 0), 0);
+                    const totalGeral = pdfImportExtracted?.valorTotalExtraido;
+                    const venc = pdfImportExtracted?.vencimento;
+                    const fmt1 = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    const cartao = (creditCards.length ? creditCards : defaultSampleCards).find(c => c.id === pdfImportCartaoId);
+                    return (
+                      <>
+                        <div className="rounded-2xl p-4 border border-slate-200 bg-white shadow-3xs space-y-2.5">
+                          <div className="flex items-center gap-2">
+                            <CreditCardIcon size={14} className="text-[#0e69b2]" />
+                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                              Fatura a importar
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <span className="text-[9px] font-black uppercase text-slate-400">Cartão</span>
+                              <p className="text-xs font-extrabold text-slate-800 truncate">
+                                {cartao?.nome ?? 'Selecione um cartão'}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-black uppercase text-slate-400">Vencimento</span>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="date"
+                                  value={venc ?? ''}
+                                  onChange={(e) => setPdfImportExtracted(prev => prev ? { ...prev, vencimento: e.target.value || undefined } : prev)}
+                                  className="text-xs font-bold text-slate-800 bg-transparent border-b border-dashed border-slate-300 focus:outline-none focus:border-[#0e69b2] w-full px-0 py-0.5"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-black uppercase text-slate-400">Total Extraído PDF</span>
+                              <p className="text-xs font-extrabold text-slate-800">
+                                {totalGeral != null ? fmt1(Number(totalGeral)) : '—'}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-black uppercase text-slate-400">Total Selecionado ({sel.length})</span>
+                              <p className="text-sm font-black text-[#0e69b2]">
+                                {fmt1(totalSel)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Toolbar: selecinar todos + adicionar manual */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => toggleAllPdfItems(sel.length !== itens.length)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-[10px] font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                          >
+                            {sel.length === itens.length && itens.length > 0 ? <CheckSquare size={12} /> : <Square size={12} />}
+                            {sel.length === itens.length && itens.length > 0 ? 'Desmarcar todos' : 'Marcar todos'}
+                          </button>
+                          <button
+                            onClick={addBlankPdfItem}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0e69b2] text-white text-[10px] font-bold hover:bg-[#0b5a9a] transition cursor-pointer"
+                          >
+                            <Plus size={12} />
+                            Adicionar lançamento manual
+                          </button>
+                          <span className="text-[10px] font-bold text-slate-400 ml-auto">
+                            {sel.length}/{itens.length} lançamentos
+                          </span>
+                        </div>
+
+                        {/* Lista de itens EDITAVEIS */}
+                        <div className="space-y-2.5">
+                          {itens.length === 0 && (
+                            <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-7 text-center space-y-2">
+                              <FileTextIcon size={24} className="text-slate-300 mx-auto" />
+                              <p className="text-xs font-extrabold text-slate-500">
+                                Nenhum lançamento foi extraído do PDF
+                              </p>
+                              <p className="text-[10px] font-bold text-slate-400 max-w-[85%] mx-auto leading-relaxed">
+                                Toque em <strong>Adicionar lançamento manual</strong> acima para cadastrar as compras da fatura.
+                              </p>
+                            </div>
+                          )}
+                          {itens.map((it, idx) => (
+                            <div key={it.id} className={`rounded-2xl border transition p-3.5 space-y-3 bg-white
+                              ${it.selected ? 'border-slate-200' : 'border-slate-100 bg-slate-50/70 opacity-70'}`}>
+                              <div className="flex items-start gap-2.5">
+                                <button
+                                  onClick={() => togglePdfItem(it.id)}
+                                  className="shrink-0 mt-0.5 cursor-pointer"
+                                  aria-label="selecionar"
+                                >
+                                  {it.selected
+                                    ? <CheckSquare size={18} className="text-[#0e69b2]" />
+                                    : <Square size={18} className="text-slate-300" />
+                                  }
+                                </button>
+                                <div className="flex-1 grid grid-cols-2 gap-2">
+                                  <div className="col-span-2">
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                      #{idx + 1} · Descrição
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={it.descricao}
+                                      onChange={(e) => patchPdfItem(it.id, { descricao: e.target.value })}
+                                      placeholder="Ex: Carrefour Supermercado"
+                                      className="w-full px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0e69b2]/30 focus:border-[#0e69b2] transition"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                      Data da compra
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={it.data}
+                                      onChange={(e) => patchPdfItem(it.id, { data: e.target.value })}
+                                      className="w-full px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0e69b2]/30 focus:border-[#0e69b2] transition"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                      Valor (R$)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={Number(it.valor || 0)}
+                                      onChange={(e) => patchPdfItem(it.id, { valor: Number(Number(e.target.value || 0).toFixed(2)) })}
+                                      className="w-full px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0e69b2]/30 focus:border-[#0e69b2] transition"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                      Categoria
+                                    </label>
+                                    <select
+                                      value={it.categoria}
+                                      onChange={(e) => patchPdfItem(it.id, { categoria: e.target.value })}
+                                      className="w-full px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0e69b2]/30 focus:border-[#0e69b2] transition"
+                                    >
+                                      {categoriesListForPDF.map((cat) => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    <div>
+                                      <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                        Parcela
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max="999"
+                                        placeholder="Atual"
+                                        value={it.parcelaAtual ?? ''}
+                                        onChange={(e) => patchPdfItem(it.id, { parcelaAtual: e.target.value ? Number(e.target.value) : undefined })}
+                                        className="w-full px-2 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0e69b2]/30 focus:border-[#0e69b2] transition"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                        Total
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max="999"
+                                        placeholder="Total"
+                                        value={it.totalParcelas ?? ''}
+                                        onChange={(e) => patchPdfItem(it.id, { totalParcelas: e.target.value ? Number(e.target.value) : undefined })}
+                                        className="w-full px-2 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0e69b2]/30 focus:border-[#0e69b2] transition"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+
+            {/* Rodape botoes */}
+            <div className="px-4 pt-3 pb-4 shrink-0 bg-white border-t border-slate-200 space-y-2">
+              {pdfImportStep === 'UPLOAD' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      setIsPdfImportOpen(false);
+                      setPdfImportExtracted(null);
+                      setPdfImportFileName('');
+                    }}
+                    className="px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!pdfImportExtracted) setPdfImportExtracted({ itens: [] });
+                      setPdfImportStep('REVIEW');
+                    }}
+                    className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-extrabold transition cursor-pointer inline-flex items-center justify-center gap-1.5"
+                  >
+                    Revisar manualmente
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
+              {pdfImportStep === 'REVIEW' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setPdfImportStep('UPLOAD')}
+                    className="px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold transition cursor-pointer inline-flex items-center justify-center gap-1.5"
+                  >
+                    <ChevronLeft size={14} />
+                    Voltar
+                  </button>
+                  <button
+                    disabled={pdfImportIsParsing}
+                    onClick={handleConfirmPdfImport}
+                    className="px-4 py-3 rounded-xl bg-[#0e69b2] hover:bg-[#0b5a9a] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold transition cursor-pointer inline-flex items-center justify-center gap-1.5 shadow-md shadow-[#0e69b2]/20"
+                  >
+                    {pdfImportIsParsing ? <Loader2 size={14} className="animate-spin" /> : <CheckSquare size={14} />}
+                    {pdfImportIsParsing ? 'Importando...' : 'Confirmar Importação'}
+                  </button>
                 </div>
               )}
             </div>

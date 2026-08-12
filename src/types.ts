@@ -255,3 +255,24 @@ export const SHIFT_EXPENSE_CATEGORIES = [
   'Manutenção',
   'Outros'
 ];
+
+// ============================================================
+// IMPORTAÇÃO INTELIGENTE DE FATURA PDF
+// ============================================================
+export interface ExtractedInvoiceItem {
+  id: string;                  // temporario apenas para UI render
+  data: string;                // YYYY-MM-DD
+  descricao: string;
+  categoria: string;           // Sugerida / editavel
+  valor: number;
+  parcelaAtual?: number;       // 2  (de 2/15)
+  totalParcelas?: number;      // 15 (de 2/15)
+  selected: boolean;           // checkbox do usuário
+}
+
+export interface ExtractedInvoiceData {
+  cartaoSugeridoNome?: string;
+  vencimento?: string;          // YYYY-MM-DD
+  valorTotalExtraido?: number;
+  itens: ExtractedInvoiceItem[];
+}
