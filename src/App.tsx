@@ -98,6 +98,7 @@ function App() {
   const [pdfImportCartaoId, setPdfImportCartaoId] = useState<string>('');
   const [pdfImportIsParsing, setPdfImportIsParsing] = useState(false);
   const [pdfImportDebugText, setPdfImportDebugText] = useState<string>('');
+  const [pdfImportMethodUsed, setPdfImportMethodUsed] = useState<string>('');
 
   const openModalForType = (tipo: 'ENTRADA' | 'SAIDA') => {
     setEditingTransaction(null);
@@ -1826,6 +1827,248 @@ function App() {
     return null;
   };
 
+  // ============================================================
+  // PARSER UNIVERSAL FATURA CARTÃO (LLM prompt inteligente + fallback heuristica)
+  // ============================================================
+  const UNIVERSAL_INVOICE_SYSTEM_PROMPT = `Você é um assistente especialista em leitura de faturas e extratos de cartão de crédito de instituições financeiras brasileiras (Nubank, Itaú, C6, Bradesco, Inter, Safra, Mercado Pago, Santander, Sicoob, Sicredi, XP, etc).
+
+INSTRUÇÕES DE EXTRAÇÃO:
+
+1. Analise o TEXTO BRUTO fornecido (texto extraído de PDF ou colado pelo usuário) e extraia APENAS os LANÇAMENTOS / COMPRAS EFETIVAS do cliente.
+
+2. IGNORE COMPLETAMENTE os blocos de:
+   - Resumos financeiros, totais, subtotais, "Total da fatura", "Pagamento mínimo", "Pagamento da fatura anterior", "Juros do rotativo", "IOF", "Multas", "Encargos", "Tarifas" (exceto se for uma tarifa individual "Tarifa Mensal" que apareça na LISTA DE COMPRAS).
+   - Ofertas de crédito, opções de parcelamento DA FATURA, seguros, proteção, saques, avisos legais, "Aviso", "Contrato", "Ouvidoria", SAC, telefones, endereço, CPF, CNPJ, cartão número, titular, "Limite total disponível", "Fatura anterior", "Crédito de desconto", "Estorno" a menos que apareça como linha individual listada como lançamento).
+   - NÃO inclua a linha de "Pagamento efetuado" nem o "Total a pagar" nem nada que não seja uma compra do usuário final.
+
+3. Para cada LINHA / COMPRA encontrada extraia:
+   - data: sempre no formato YYYY-MM-DD (use a data de vencimento da fatura como referência de ANO se a data da compra tiver apenas DIA/MÊS).
+   - descricao: nome do estabelecimento COMPLETO, LIMPO, MAIÚSCULO. Exemplo: "ASSAI ATACADISTA LJ33" ou "NETFLIX *SERVICOS DE STREAMING".
+   - categoria_sugerida: uma destas (ESCOLHA A MELHOR):
+      * Supermercado
+      * Alimentação
+      * Assinaturas
+      * Transporte
+      * Saúde
+      * Lazer
+      * Tecnologia
+      * Moda
+      * Moradia
+      * Educação
+      * Outros.
+   - valor: sempre NÚMERO positivo EM FORMATO DE PONTO FLUTUANTE, usar '.' como separador decimal, 2 casas decimais (ex: 295.41).
+   - parcela: se houver indicação de parcela retorne STRING "X/Y". Se NÃO TIVER PARCELA retorne NULL. Exemplo "Parcela 2 de 15" -> "2/15". "11/12" -> "11/12".
+   - selecionado: sempre true.
+
+4. vencimento_fatura: data de vencimento geral DA FATURA (YYYY-MM-DD).
+5. valor_total_fatura: valor numérico com '.' decimal.
+6. sucesso: true se pelo menos 1 transação extraída, false em caso contrário.
+
+REGRAS DE DATA:
+- Se a compra tiver dia/mes/ano use ela mesma.
+- Se a compra tiver apenas dia e mês, use o ANO do vencimento como REFERENCIA. Se a compra for de DEZEMBRO e o vencimento for JANEIRO do ano seguinte use o ANO ANTERIOR.
+- Nunca deixe data incompleta.
+
+RETORNE APENAS um JSON VÁLIDO, no seguinte modelo. NENHUMA análise, NENHUMA explicação. NÃO use blocos de código crase json, NÃO use crase tripla.
+
+MODELO:
+{
+  "sucesso": true,
+  "vencimento_fatura": "YYYY-MM-DD",
+  "valor_total_fatura": 0.00,
+  "transacoes": [
+    {
+      "data": "YYYY-MM-DD",
+      "descricao": "NOME DO ESTABELECIMENTO",
+      "categoria_sugerida": "Categoria",
+      "valor": 295.41,
+      "parcela": "X/Y OU null",
+      "selecionado": true
+    }
+  ]
+}`.trim();
+
+  // Chama LLM se disponivel (chave configurada), retorna JSON padrao universal
+  const parseInvoiceUniversalLLM = async (texto: string): Promise<ExtractedInvoiceData | null> => {
+    const trimmed = texto?.trim?.();
+    if (!trimmed || trimmed.length < 80) return null;
+
+    // Tenta provedores em ORDEM: 1) OpenAI GPT-4o-mini 2) Gemini Flash 3) Anthropic
+    const keys = {
+      openai: ((import.meta as any)?.env?.VITE_OPENAI_API_KEY as string) || ((window as any).__ENV_OPENAI_API_KEY as string) || '',
+      gemini: ((import.meta as any)?.env?.VITE_GEMINI_API_KEY as string) || ((window as any).__ENV_GEMINI_API_KEY as string) || '',
+      anthropic: ((import.meta as any)?.env?.VITE_ANTHROPIC_API_KEY as string) || ((window as any).__ENV_ANTHROPIC_API_KEY as string) || ''
+    };
+
+    let requestInit: RequestInit | undefined;
+    let baseUrl = '';
+    const sliceLimit = 120_000;
+    if (keys.openai) {
+      const apiKey = keys.openai;
+      baseUrl = ((import.meta as any)?.env?.VITE_OPENAI_BASE_URL as string) || 'https://api.openai.com/v1';
+      const modelName = ((import.meta as any)?.env?.VITE_OPENAI_MODEL as string) || 'gpt-4o-mini';
+      requestInit = {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+          max_tokens: 8000,
+          messages: [
+            { role: 'system', content: UNIVERSAL_INVOICE_SYSTEM_PROMPT },
+            { role: 'user', content: `TEXTO DA FATURA PARA EXTRAIR:\n\n${trimmed.slice(0, sliceLimit)}` }
+          ]
+        })
+      };
+    } else if (keys.gemini) {
+      const apiKey = keys.gemini;
+      baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+      requestInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [{ text: `${UNIVERSAL_INVOICE_SYSTEM_PROMPT}\n\nTEXTO DA FATURA PARA EXTRAIR:\n\n${trimmed.slice(0, sliceLimit)}` }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+            maxOutputTokens: 8000
+          }
+        })
+      };
+    } else if (keys.anthropic) {
+      const apiKey = keys.anthropic;
+      baseUrl = 'https://api.anthropic.com/v1/messages';
+      const modelName = ((import.meta as any)?.env?.VITE_ANTHROPIC_MODEL as string) || 'claude-3-haiku-20240307';
+      requestInit = {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          max_tokens: 8000,
+          temperature: 0.1,
+          system: UNIVERSAL_INVOICE_SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: `TEXTO DA FATURA PARA EXTRAIR:\n\n${trimmed.slice(0, sliceLimit)}` }]
+        })
+      };
+    } else {
+      return null;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45_000);
+      const res = await fetch(baseUrl, { ...requestInit, signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        console.warn('[LLM] HTTP status', res.status, 'ao extrair fatura, fallback heuristica...');
+        return null;
+      }
+      const data = await res.json();
+      let contentRaw = '';
+      if (keys.openai) {
+        contentRaw = data?.choices?.[0]?.message?.content ?? '';
+      } else if (keys.gemini) {
+        contentRaw = data?.candidates?.[0]?.content?.parts?.map?.((p: any) => p.text ?? '').join?.('') ?? '';
+      } else if (keys.anthropic) {
+        contentRaw = Array.isArray(data?.content)
+          ? data.content.map((c: any) => c.text ?? '').join('')
+          : '';
+      }
+      if (!contentRaw) return null;
+      // Tira markdown ```json ou ```
+      const clean = contentRaw
+        .replace(/^```(?:json)?\s*/gi, '')
+        .replace(/```\s*$/g, '')
+        .trim();
+      const parsed = JSON.parse(clean);
+      if (!parsed || typeof parsed !== 'object') return null;
+
+      const out: ExtractedInvoiceData = {
+        cartaoSugeridoNome: undefined,
+        vencimento: parsed?.vencimento_fatura && typeof parsed.vencimento_fatura === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.vencimento_fatura) ? String(parsed.vencimento_fatura) : undefined,
+        valorTotalExtraido: typeof parsed?.valor_total_fatura === 'number' ? Number(Number(parsed.valor_total_fatura).toFixed(2)) : undefined,
+        itens: []
+      };
+
+      if (Array.isArray(parsed?.transacoes)) {
+        for (const tx of parsed.transacoes) {
+          if (!tx || typeof tx !== 'object') continue;
+          const descRaw = typeof (tx as any).descricao === 'string' ? String((tx as any).descricao) : '';
+          if (!descRaw) continue;
+          let d: string = typeof (tx as any).data === 'string' ? String((tx as any).data) : '';
+          if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) d = parseDateSmart(d) || '';
+          if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+          let valorNum: number | null = null;
+          const valorRaw = (tx as any).valor;
+          if (typeof valorRaw === 'number' && Number.isFinite(valorRaw)) valorNum = valorRaw;
+          if (valorNum == null) {
+            const candidate = parseCurrencySmart(String(valorRaw ?? ''));
+            if (candidate != null && Number.isFinite(candidate)) valorNum = candidate;
+          }
+          if (valorNum == null || !Number.isFinite(valorNum) || valorNum <= 0) continue;
+          valorNum = Math.abs(Number(Number(valorNum).toFixed(2)));
+          const catRaw = typeof (tx as any).categoria_sugerida === 'string' ? String((tx as any).categoria_sugerida).trim() : '';
+          const cat = catRaw || suggCatFromDesc(descRaw);
+          let parcelaAtual: number | undefined;
+          let totalParcelas: number | undefined;
+          if ((tx as any).parcela && typeof (tx as any).parcela === 'string') {
+            const m = String((tx as any).parcela).match(/^\s*(\d{1,4})\s*[\/\-\:]\s*(\d{1,4})\s*$/);
+            if (m) {
+              parcelaAtual = Number(m[1]);
+              totalParcelas = Number(m[2]);
+              if (!(parcelaAtual >= 1 && totalParcelas >= parcelaAtual && totalParcelas <= 999)) {
+                parcelaAtual = undefined;
+                totalParcelas = undefined;
+              }
+            }
+          }
+          out.itens.push({
+            id: `pdf-llm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${out.itens.length}`,
+            data: d,
+            descricao: descRaw.toUpperCase().trim().slice(0, 120),
+            categoria: cat,
+            valor: valorNum,
+            parcelaAtual,
+            totalParcelas,
+            selected: (tx as any).selecionado !== false
+          });
+        }
+      }
+      if (out.valorTotalExtraido == null && out.itens.length) {
+        out.valorTotalExtraido = Number(out.itens.reduce((s, i) => s + i.valor, 0).toFixed(2));
+      }
+      out.itens.sort((a, b) => a.data.localeCompare(b.data));
+      return out;
+    } catch (err) {
+      console.warn('[LLM parser falhou:', err);
+      return null;
+    }
+  };
+  // Usa LLM primeiro se API key estiver configurada, fallback ao heuristico
+  const parseInvoiceUniversal = async (texto: string, opts?: { preferLLM?: boolean; methodLabelRef?: { label?: string } }): Promise<ExtractedInvoiceData> => {
+    const preferLLM = opts?.preferLLM !== false;
+    let llmResult: ExtractedInvoiceData | null = null;
+    if (preferLLM) llmResult = await parseInvoiceUniversalLLM(texto);
+    if (llmResult && llmResult.itens.length > 0) {
+      if (opts?.methodLabelRef) opts.methodLabelRef.label = 'Inteligência Artificial (LLM)';
+      return llmResult;
+    }
+    const heuristicResult = parseInvoiceTextHeuristic(texto);
+    if (opts?.methodLabelRef) opts.methodLabelRef.label = 'Heurística local (Regex)';
+    return heuristicResult;
+  };
+
   const suggCatFromDesc = (desc: string): string => {
     const d = desc.toLowerCase();
     const rules: [RegExp, string][] = [
@@ -2041,21 +2284,30 @@ function App() {
       }
     }
     setPdfImportDebugText(extractedText.slice(0, 8000)); // para DEBUG na UI
-    // Se ainda assim nao tem nada -> UI vai permitir editar manualmente. Nao bloqueia.
-    return parseInvoiceTextHeuristic(extractedText);
+    const methodRef: { label?: string } = { label: 'Heurística local (Regex)' };
+    const finalResult = await parseInvoiceUniversal(extractedText, { methodLabelRef: methodRef });
+    setPdfImportMethodUsed(methodRef.label ?? '');
+    return finalResult;
   };
 
   // Cola texto colado manualmente -> extrai direto
-  const handlePdfPasteText = (texto: string) => {
+  const handlePdfPasteText = async (texto: string) => {
     setPdfImportDebugText(texto);
-    const parsed = parseInvoiceTextHeuristic(texto);
-    setPdfImportExtracted(parsed);
-    if (parsed.cartaoSugeridoNome && !pdfImportCartaoId) {
-      const suggestion = (creditCards.length ? creditCards : defaultSampleCards).find(
-        c => c.nome.toLowerCase().includes(parsed.cartaoSugeridoNome!.toLowerCase()) ||
-             parsed.cartaoSugeridoNome!.toLowerCase().includes(c.nome.toLowerCase())
-      );
-      if (suggestion) setPdfImportCartaoId(suggestion.id);
+    setPdfImportIsParsing(true);
+    try {
+      const methodLabelRef: { label?: string } = { label: 'Heurística local (Regex)' };
+      const parsed = await parseInvoiceUniversal(texto, { preferLLM: true, methodLabelRef });
+      setPdfImportMethodUsed(methodLabelRef.label ?? '');
+      setPdfImportExtracted(parsed);
+      if (parsed.cartaoSugeridoNome && !pdfImportCartaoId) {
+        const suggestion = (creditCards.length ? creditCards : defaultSampleCards).find(
+          c => c.nome.toLowerCase().includes(parsed.cartaoSugeridoNome!.toLowerCase()) ||
+               parsed.cartaoSugeridoNome!.toLowerCase().includes(c.nome.toLowerCase())
+        );
+        if (suggestion) setPdfImportCartaoId(suggestion.id);
+      }
+    } finally {
+      setPdfImportIsParsing(false);
     }
   };
 
@@ -3498,17 +3750,63 @@ function App() {
                   </div>
 
                   {/* Info */}
-                  <div className="rounded-2xl bg-blue-50 border border-blue-100 p-3 flex items-start gap-2.5">
-                    <Info size={16} className="text-[#0e69b2] shrink-0 mt-0.5" />
-                    <div className="text-left">
-                      <p className="text-[11px] font-extrabold text-[#0e69b2] leading-tight mb-0.5">
-                        Não detectou nenhum lançamento automaticamente?
-                      </p>
-                      <p className="text-[10px] font-bold text-[#0e69b2]/80 leading-relaxed">
-                        Expanda a área abaixo e cole o texto da fatura (extraído do app do banco — Extrato → Compartilhar → Copiar Texto).
-                      </p>
-                    </div>
-                  </div>
+                  {(() => {
+                    const hasAnyKey = (
+                      !!((import.meta as any)?.env?.VITE_OPENAI_API_KEY || (import.meta as any)?.env?.VITE_GEMINI_API_KEY || (import.meta as any)?.env?.VITE_ANTHROPIC_API_KEY)
+                    );
+                    const method = pdfImportMethodUsed;
+                    const isLLM = method?.includes('(LLM)') || method?.includes('Inteligência');
+                    const isHeur = method?.includes('Heurística') || (!isLLM && method.length > 0);
+                    return (
+                      <>
+                        {!hasAnyKey && (
+                          <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 flex items-start gap-2.5">
+                            <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                            <div className="text-left">
+                              <p className="text-[11px] font-extrabold text-amber-700 leading-tight mb-0.5">
+                                Nenhuma API de IA configurada (modo Heurística)
+                              </p>
+                              <p className="text-[10px] font-bold text-amber-700/90 leading-relaxed">
+                                Para leitura inteligente agnóstica a layouts, configure uma variável:
+                                <code className="block font-mono mt-1.5 px-2 py-1 rounded-lg bg-white/80 text-amber-800 border border-amber-200 break-words">
+                                  VITE_OPENAI_API_KEY=sk-...
+                                </code>
+                                <span className="block mt-1 text-amber-700/80">
+                                  Alternativas: <code>VITE_GEMINI_API_KEY</code> ou <code>VITE_ANTHROPIC_API_KEY</code>.
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        {hasAnyKey && (
+                          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3 flex items-start gap-2.5">
+                            <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                            <div className="text-left">
+                              <p className="text-[11px] font-extrabold text-emerald-700 leading-tight mb-0.5">
+                                Extração inteligente com LLM ativada
+                              </p>
+                              <p className="text-[10px] font-bold text-emerald-800/85 leading-relaxed">
+                                O sistema usa IA para interpretar qualquer layout de banco (Nubank, Itaú, C6, Mercado Pago, Bradesco) e ignora automaticamente totais, tarifas e juros.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        {method && (
+                          <div className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-2xl bg-white border border-slate-200">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                              <Info size={11} />
+                              Método de extração
+                            </span>
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-extrabold
+                              ${isLLM ? 'bg-blue-50 text-blue-700 border border-blue-100' : isHeur ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                              {isLLM ? <Sparkles size={10} /> : isHeur ? <RefreshCw size={10} /> : <Info size={10} />}
+                              {method || 'Aguardando...'}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* DEBUG / TEXTAREA de texto colado */}
                   <details className="rounded-2xl bg-white border border-slate-200 overflow-hidden">
