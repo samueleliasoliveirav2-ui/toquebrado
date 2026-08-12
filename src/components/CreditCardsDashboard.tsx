@@ -19,6 +19,7 @@ import type {
   Transaction,
   BankAccount
 } from '../types';
+import { computeInvoiceDerivedStatus as _computeInvoiceStatus } from '../types';
 import { BANK_PRESETS } from './CreditCardModal';
 
 const getCardPreset = (card: CreditCardType) => {
@@ -90,6 +91,10 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
     }).format(val);
   };
 
+  const _hoje = new Date();
+  const resolvedInvoiceStatus = (inv?: CreditCardInvoice) =>
+    inv ? _computeInvoiceStatus(inv, _hoje) : 'ABERTA';
+
   const totalLimiteConsolidado = cards.reduce(
     (sum, card) => sum + Number(card.limiteTotal),
     0
@@ -97,7 +102,8 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
 
   const totalLimiteDisponivel = cards.reduce((sum, card) => {
     const invoiceAberta = invoices.find(
-      (inv) => inv.cartaoId === card.id && inv.status === 'ABERTA'
+      (inv) => inv.cartaoId === card.id && inv.mesAno === selectedMonth &&
+        (resolvedInvoiceStatus(inv) === 'ABERTA' || resolvedInvoiceStatus(inv) === 'FECHADA')
     );
     const usado = invoiceAberta ? Number(invoiceAberta.valorTotal) : 0;
     return sum + (Number(card.limiteTotal) - usado);
@@ -107,7 +113,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
     .filter(
       (inv) =>
         inv.mesAno === selectedMonth &&
-        (inv.status === 'ABERTA' || inv.status === 'FECHADA')
+        ['ABERTA', 'FECHADA', 'ATRASADA'].includes(resolvedInvoiceStatus(inv))
     )
     .reduce((sum, inv) => sum + Number(inv.valorTotal), 0);
 
@@ -144,6 +150,13 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
           text: 'text-rose-700',
           icon: <AlertCircle size={10} />,
           label: 'ATRASADA'
+        };
+      case 'POSTERGADA':
+        return {
+          bg: 'bg-orange-50',
+          text: 'text-orange-700',
+          icon: <Clock size={10} />,
+          label: 'POSTERGADA'
         };
       default:
         return {
@@ -287,8 +300,9 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
                 (valorFatura / Number(card.limiteTotal)) * 100
               );
               const bandeira = getBandeiraDisplay(card.bandeira);
-              const statusBadge = invoice
-                ? getStatusBadge(invoice.status)
+              const invoiceResolvedStatus = invoice ? resolvedInvoiceStatus(invoice) : null;
+              const statusBadge = invoiceResolvedStatus
+                ? getStatusBadge(invoiceResolvedStatus)
                 : null;
               const barColor =
                 limiteUsadoPct > 85
@@ -422,7 +436,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
                             onPayInvoice(card, invoice);
                           }
                         }}
-                        disabled={!invoice || invoice.status === 'PAGA'}
+                        disabled={!invoice || resolvedInvoiceStatus(invoice) === 'PAGA'}
                         className="flex items-center justify-center gap-1 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <DollarSign size={11} />

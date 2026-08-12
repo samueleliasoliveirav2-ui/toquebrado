@@ -20,6 +20,7 @@ import type {
   Transaction,
   BankAccount
 } from '../types';
+import { computeInvoiceDerivedStatus as _compute } from '../types';
 
 interface InvoiceDetailModalProps {
   isOpen: boolean;
@@ -63,6 +64,9 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
   const saldoFatura = invoice.valorTotal - (invoice.valorPago || 0);
   const currentMonthIndex = months.findIndex((m) => m.key === selectedMonth);
   const currentMonthLabel = months.find((m) => m.key === selectedMonth)?.label || '';
+
+  const derivedStatus = _compute(invoice, new Date());
+  const resolvedVisualStatus = derivedStatus;
 
   const getPostponeOptions = () => {
     const [yearStr, monthStr] = selectedMonth.split('-');
@@ -169,7 +173,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
     }
   };
 
-  const statusConfig = getStatusConfig(invoice.status);
+  const statusConfig = getStatusConfig(resolvedVisualStatus);
   const StatusIcon = statusConfig.icon;
 
   const handlePrevMonth = () => {

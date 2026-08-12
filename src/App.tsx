@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles, FileUp, CheckSquare, Square, Upload, FileText as FileTextIcon } from 'lucide-react';
 import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice, ExtractedInvoiceData, ExtractedInvoiceItem } from './types';
-import { CATEGORIES, INITIAL_TRANSACTIONS } from './types';
+import { CATEGORIES, INITIAL_TRANSACTIONS, computeInvoiceDerivedStatus } from './types';
 import { StatsHeader } from './components/StatsHeader';
 import { WeeklyAccordion } from './components/WeeklyAccordion';
 import { TransactionModal } from './components/TransactionModal';
@@ -184,7 +184,8 @@ function App() {
     const fatura = creditCardInvoices.find(
       (i) => i.cartaoId === card.id && i.mesAno === mesAnoAtual
     );
-    const statusPago = fatura?.status === 'PAGA';
+    const faturaResolved = fatura ? computeInvoiceDerivedStatus(fatura, hoje) : 'ABERTA';
+    const statusPago = faturaResolved === 'PAGA';
     const temFatura = totalFaturaAtual > 0.0049;
 
     let title = `Limite Disponível: ${fmt(limiteDisponivel)}`;

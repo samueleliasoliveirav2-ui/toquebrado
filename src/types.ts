@@ -74,6 +74,45 @@ export interface CreditCard {
 // ============================================================
 export type InvoiceStatus = 'ABERTA' | 'FECHADA' | 'PAGA' | 'ATRASADA' | 'POSTERGADA';
 
+export const parseDateOnly = (iso: string | undefined | null): Date | null => {
+  if (!iso) return null;
+  const s = String(iso).trim();
+  if (!s) return null;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+};
+
+export const compareDateOnly = (a: Date, b: Date): number => {
+  const ay = a.getFullYear(), am = a.getMonth(), ad = a.getDate();
+  const by = b.getFullYear(), bm = b.getMonth(), bd = b.getDate();
+  if (ay !== by) return ay - by;
+  if (am !== bm) return am - bm;
+  return ad - bd;
+};
+
+export const computeInvoiceDerivedStatus = (invoice: CreditCardInvoice, hoje?: Date): InvoiceStatus => {
+  const saved = (invoice.status || 'ABERTA') as InvoiceStatus;
+  // Estados salvos manuais: sempre respeita (PAGA = pago, POSTERGADA = usuario adiou explicitamente)
+  if (saved === 'PAGA') return 'PAGA';
+  if (saved === 'POSTERGADA') return 'POSTERGADA';
+
+  const ref = hoje instanceof Date && !Number.isNaN(hoje.getTime()) ? hoje : new Date();
+  const fech = parseDateOnly(invoice.dataFechamento);
+  const venc = parseDateOnly(invoice.dataVencimento);
+
+  // Atrasada = hoje passou do vencimento (e ainda nao foi paga / postergada)
+  if (venc && compareDateOnly(ref, venc) > 0) return 'ATRASADA';
+
+  // Fechada = hoje passou ou igualou a data de fechamento, mas ainda nao venceu
+  if (fech && compareDateOnly(ref, fech) >= 0 && (!venc || compareDateOnly(ref, venc) <= 0)) return 'FECHADA';
+
+  // Default: aberta (dentro do periodo de compras, fechamento ainda nao chegou)
+  return 'ABERTA';
+};
+
 export interface CreditCardInvoice {
   id: string;
   userId: string;
