@@ -1985,13 +1985,17 @@ function App() {
       try {
         if (typeof pdfjs.GlobalWorkerOptions !== 'undefined') {
           const workerUrl = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+          const controller = new AbortController();
+          const tId = setTimeout(() => controller.abort(), 4000); // 4s de timeout para baixar o worker
           try {
-            const resp = await fetch(workerUrl);
+            const resp = await fetch(workerUrl, { signal: controller.signal });
+            clearTimeout(tId);
             const blob = await resp.blob();
             const blobUrl = URL.createObjectURL(blob);
             pdfjs.GlobalWorkerOptions.workerSrc = blobUrl;
           } catch (corsErr) {
-            console.warn('[pdf.js] blob fallback falhou, usando URL direta:', corsErr);
+            clearTimeout(tId);
+            console.warn('[pdf.js] blob fallback falhou ou timeout, usando URL direta:', corsErr);
             pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
           }
         }
@@ -2004,7 +2008,13 @@ function App() {
         fr.onerror = () => reject(fr.error);
         fr.readAsArrayBuffer(file);
       });
-      const pdf = await pdfjs.getDocument({ data: ab, useSystemFonts: true, enableXfa: true }).promise;
+      // Promise race com timeout de 8 segundos para evitar travamento infinito no celular
+      const docPromise = pdfjs.getDocument({ data: ab, useSystemFonts: true, enableXfa: true }).promise;
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Tempo limite excedido ao ler o PDF. O leitor local travou devido a conexão lenta ou restrições do navegador.')), 8000)
+      );
+      const pdf = await Promise.race([docPromise, timeoutPromise]);
+
       const pagesTxt: string[] = [];
       const maxPages = Math.min(pdf.numPages, 40);
       for (let p = 1; p <= maxPages; p++) {
