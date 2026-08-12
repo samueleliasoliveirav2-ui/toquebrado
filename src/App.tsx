@@ -19,27 +19,7 @@ import { supabase } from './lib/supabaseClient';
 
 const CURRENT_VERSION = '1.0.1';
 
-type LLMKeys = { openai: string; gemini: string; anthropic: string };
-const resolveLLMKeys = (): LLMKeys => {
-  const env = (import.meta as any)?.env ?? {};
-  const win: any = typeof window !== 'undefined' ? window : {};
-  const pick = (viteName: string, runtimeName: string): string => {
-    const v1 = String(env?.[viteName] ?? '').trim();
-    if (v1 && v1 !== 'undefined' && v1 !== 'null') return v1;
-    const v2 = String(win?.[runtimeName] ?? '').trim();
-    if (v2 && v2 !== 'undefined' && v2 !== 'null') return v2;
-    return '';
-  };
-  return {
-    openai: pick('VITE_OPENAI_API_KEY', '__ENV_OPENAI_API_KEY'),
-    gemini: pick('VITE_GEMINI_API_KEY', '__ENV_GEMINI_API_KEY'),
-    anthropic: pick('VITE_ANTHROPIC_API_KEY', '__ENV_ANTHROPIC_API_KEY'),
-  };
-};
-const hasAnyLLMKey = (): boolean => {
-  const k = resolveLLMKeys();
-  return !!(k.openai || k.gemini || k.anthropic);
-};
+
 
 function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
@@ -1800,32 +1780,7 @@ function App() {
     return null;
   };
 
-  const parseDateSmart = (raw: string, referenceYear?: number): string | null => {
-    const s = raw.trim();
-    if (!s) return null;
-    let m: RegExpMatchArray | null;
-    m = s.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
-    if (m) {
-      const d = Number(m[1]);
-      const mo = Number(m[2]);
-      let y = Number(m[3]);
-      if (y < 100) y += 2000;
-      if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-      return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    }
-    m = s.match(/(\d{1,2})\s+de\s+([A-Za-zçãõáéíóúâêîôû]+)(?:\s+de\s+(\d{2,4}))?/i);
-    if (m) {
-      const d = Number(m[1]);
-      const mo = normalizePtMonthToNum(m[2]);
-      if (!mo) return null;
-      let y = m[3] ? Number(m[3]) : (referenceYear ?? new Date().getFullYear());
-      if (y < 100) y += 2000;
-      return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    }
-    m = s.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
-    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-    return null;
-  };
+
 
   const parseCurrencySmart = (raw: string): number | null => {
     const s = raw.trim();
@@ -1849,258 +1804,13 @@ function App() {
     return null;
   };
 
-  // ============================================================
-  // PARSER UNIVERSAL FATURA CARTÃO (LLM prompt inteligente + fallback heuristica)
-  // ============================================================
-  const UNIVERSAL_INVOICE_SYSTEM_PROMPT = `Você é um assistente especialista em leitura de faturas e extratos de cartão de crédito de instituições financeiras brasileiras (Nubank, Itaú, C6, Bradesco, Inter, Safra, Mercado Pago, Santander, Sicoob, Sicredi, XP, etc).
-
-INSTRUÇÕES DE EXTRAÇÃO:
-
-1. Analise o TEXTO BRUTO fornecido (texto extraído de PDF ou colado pelo usuário) e extraia APENAS os LANÇAMENTOS / COMPRAS EFETIVAS do cliente.
-
-2. IGNORE COMPLETAMENTE os blocos de:
-   - Resumos financeiros, totais, subtotais, "Total da fatura", "Pagamento mínimo", "Pagamento da fatura anterior", "Juros do rotativo", "IOF", "Multas", "Encargos", "Tarifas" (exceto se for uma tarifa individual "Tarifa Mensal" que apareça na LISTA DE COMPRAS).
-   - Ofertas de crédito, opções de parcelamento DA FATURA, seguros, proteção, saques, avisos legais, "Aviso", "Contrato", "Ouvidoria", SAC, telefones, endereço, CPF, CNPJ, cartão número, titular, "Limite total disponível", "Fatura anterior", "Crédito de desconto", "Estorno" a menos que apareça como linha individual listada como lançamento).
-   - NÃO inclua a linha de "Pagamento efetuado" nem o "Total a pagar" nem nada que não seja uma compra do usuário final.
-
-3. Para cada LINHA / COMPRA encontrada extraia:
-   - data: sempre no formato YYYY-MM-DD (use a data de vencimento da fatura como referência de ANO se a data da compra tiver apenas DIA/MÊS).
-   - descricao: nome do estabelecimento COMPLETO, LIMPO, MAIÚSCULO. Exemplo: "ASSAI ATACADISTA LJ33" ou "NETFLIX *SERVICOS DE STREAMING".
-   - categoria_sugerida: uma destas (ESCOLHA A MELHOR):
-      * Supermercado
-      * Alimentação
-      * Assinaturas
-      * Transporte
-      * Saúde
-      * Lazer
-      * Tecnologia
-      * Moda
-      * Moradia
-      * Educação
-      * Outros.
-   - valor: sempre NÚMERO positivo EM FORMATO DE PONTO FLUTUANTE, usar '.' como separador decimal, 2 casas decimais (ex: 295.41).
-   - parcela: se houver indicação de parcela retorne STRING "X/Y". Se NÃO TIVER PARCELA retorne NULL. Exemplo "Parcela 2 de 15" -> "2/15". "11/12" -> "11/12".
-   - selecionado: sempre true.
-
-4. vencimento_fatura: data de vencimento geral DA FATURA (YYYY-MM-DD).
-5. valor_total_fatura: valor numérico com '.' decimal.
-6. sucesso: true se pelo menos 1 transação extraída, false em caso contrário.
-
-REGRAS DE DATA:
-- Se a compra tiver dia/mes/ano use ela mesma.
-- Se a compra tiver apenas dia e mês, use o ANO do vencimento como REFERENCIA. Se a compra for de DEZEMBRO e o vencimento for JANEIRO do ano seguinte use o ANO ANTERIOR.
-- Nunca deixe data incompleta.
-
-RETORNE APENAS um JSON VÁLIDO, no seguinte modelo. NENHUMA análise, NENHUMA explicação. NÃO use blocos de código crase json, NÃO use crase tripla.
-
-MODELO:
-{
-  "sucesso": true,
-  "vencimento_fatura": "YYYY-MM-DD",
-  "valor_total_fatura": 0.00,
-  "transacoes": [
-    {
-      "data": "YYYY-MM-DD",
-      "descricao": "NOME DO ESTABELECIMENTO",
-      "categoria_sugerida": "Categoria",
-      "valor": 295.41,
-      "parcela": "X/Y OU null",
-      "selecionado": true
-    }
-  ]
-}`.trim();
-
-  let lastLlmErrorStr = '';
-
-  // Chama LLM se disponivel (chave configurada), retorna JSON padrao universal
-  const parseInvoiceUniversalLLM = async (texto: string): Promise<ExtractedInvoiceData | null> => {
-    const trimmed = texto?.trim?.();
-    if (!trimmed || trimmed.length < 80) return null;
-
-    // Tenta provedores em ORDEM: 1) OpenAI GPT-4o-mini 2) Gemini Flash 3) Anthropic
-    const keys = resolveLLMKeys();
-
-    let requestInit: RequestInit | undefined;
-    let baseUrl = '';
-    const sliceLimit = 120_000;
-    if (keys.openai) {
-      const apiKey = keys.openai;
-      baseUrl = ((import.meta as any)?.env?.VITE_OPENAI_BASE_URL as string) || 'https://api.openai.com/v1';
-      const modelName = ((import.meta as any)?.env?.VITE_OPENAI_MODEL as string) || 'gpt-4o-mini';
-      requestInit = {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: modelName,
-          temperature: 0.1,
-          response_format: { type: 'json_object' },
-          max_tokens: 8000,
-          messages: [
-            { role: 'system', content: UNIVERSAL_INVOICE_SYSTEM_PROMPT },
-            { role: 'user', content: `TEXTO DA FATURA PARA EXTRAIR:\n\n${trimmed.slice(0, sliceLimit)}` }
-          ]
-        })
-      };
-    } else if (keys.gemini) {
-      const apiKey = keys.gemini;
-      baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-      requestInit = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            role: 'user',
-            parts: [{ text: `${UNIVERSAL_INVOICE_SYSTEM_PROMPT}\n\nTEXTO DA FATURA PARA EXTRAIR:\n\n${trimmed.slice(0, sliceLimit)}` }]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json',
-            maxOutputTokens: 8000
-          }
-        })
-      };
-    } else if (keys.anthropic) {
-      const apiKey = keys.anthropic;
-      baseUrl = 'https://api.anthropic.com/v1/messages';
-      const modelName = ((import.meta as any)?.env?.VITE_ANTHROPIC_MODEL as string) || 'claude-3-haiku-20240307';
-      requestInit = {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: modelName,
-          max_tokens: 8000,
-          temperature: 0.1,
-          system: UNIVERSAL_INVOICE_SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: `TEXTO DA FATURA PARA EXTRAIR:\n\n${trimmed.slice(0, sliceLimit)}` }]
-        })
-      };
-    } else {
-      return null;
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45_000);
-      lastLlmErrorStr = '';
-      const res = await fetch(baseUrl, { ...requestInit, signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (!res.ok) {
-        let detail = '';
-        try {
-          const detailJson = await res.json();
-          detail = JSON.stringify(detailJson);
-        } catch {
-          detail = await res.text();
-        }
-        lastLlmErrorStr = `HTTP ${res.status}: ${detail.slice(0, 100)}`;
-        console.warn('[LLM] HTTP status', res.status, 'ao extrair fatura, fallback heuristica...');
-        return null;
-      }
-      const data = await res.json();
-      let contentRaw = '';
-      if (keys.openai) {
-        contentRaw = data?.choices?.[0]?.message?.content ?? '';
-      } else if (keys.gemini) {
-        contentRaw = data?.candidates?.[0]?.content?.parts?.map?.((p: any) => p.text ?? '').join?.('') ?? '';
-      } else if (keys.anthropic) {
-        contentRaw = Array.isArray(data?.content)
-          ? data.content.map((c: any) => c.text ?? '').join('')
-          : '';
-      }
-      if (!contentRaw) return null;
-      // Tira markdown ```json ou ```
-      const clean = contentRaw
-        .replace(/^```(?:json)?\s*/gi, '')
-        .replace(/```\s*$/g, '')
-        .trim();
-      const parsed = JSON.parse(clean);
-      if (!parsed || typeof parsed !== 'object') return null;
-
-      const out: ExtractedInvoiceData = {
-        cartaoSugeridoNome: undefined,
-        vencimento: parsed?.vencimento_fatura && typeof parsed.vencimento_fatura === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.vencimento_fatura) ? String(parsed.vencimento_fatura) : undefined,
-        valorTotalExtraido: typeof parsed?.valor_total_fatura === 'number' ? Number(Number(parsed.valor_total_fatura).toFixed(2)) : undefined,
-        itens: []
-      };
-
-      if (Array.isArray(parsed?.transacoes)) {
-        for (const tx of parsed.transacoes) {
-          if (!tx || typeof tx !== 'object') continue;
-          const descRaw = typeof (tx as any).descricao === 'string' ? String((tx as any).descricao) : '';
-          if (!descRaw) continue;
-          let d: string = typeof (tx as any).data === 'string' ? String((tx as any).data) : '';
-          if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) d = parseDateSmart(d) || '';
-          if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
-          let valorNum: number | null = null;
-          const valorRaw = (tx as any).valor;
-          if (typeof valorRaw === 'number' && Number.isFinite(valorRaw)) valorNum = valorRaw;
-          if (valorNum == null) {
-            const candidate = parseCurrencySmart(String(valorRaw ?? ''));
-            if (candidate != null && Number.isFinite(candidate)) valorNum = candidate;
-          }
-          if (valorNum == null || !Number.isFinite(valorNum) || valorNum <= 0) continue;
-          valorNum = Math.abs(Number(Number(valorNum).toFixed(2)));
-          const catRaw = typeof (tx as any).categoria_sugerida === 'string' ? String((tx as any).categoria_sugerida).trim() : '';
-          const cat = catRaw || suggCatFromDesc(descRaw);
-          let parcelaAtual: number | undefined;
-          let totalParcelas: number | undefined;
-          if ((tx as any).parcela && typeof (tx as any).parcela === 'string') {
-            const m = String((tx as any).parcela).match(/^\s*(\d{1,4})\s*[\/\-\:]\s*(\d{1,4})\s*$/);
-            if (m) {
-              parcelaAtual = Number(m[1]);
-              totalParcelas = Number(m[2]);
-              if (!(parcelaAtual >= 1 && totalParcelas >= parcelaAtual && totalParcelas <= 999)) {
-                parcelaAtual = undefined;
-                totalParcelas = undefined;
-              }
-            }
-          }
-          out.itens.push({
-            id: `pdf-llm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${out.itens.length}`,
-            data: d,
-            descricao: descRaw.toUpperCase().trim().slice(0, 120),
-            categoria: cat,
-            valor: valorNum,
-            parcelaAtual,
-            totalParcelas,
-            selected: (tx as any).selecionado !== false
-          });
-        }
-      }
-      if (out.valorTotalExtraido == null && out.itens.length) {
-        out.valorTotalExtraido = Number(out.itens.reduce((s, i) => s + i.valor, 0).toFixed(2));
-      }
-      out.itens.sort((a, b) => a.data.localeCompare(b.data));
-      return out;
-    } catch (err: any) {
-      lastLlmErrorStr = err?.message || String(err);
-      console.warn('[LLM parser falhou:', err);
-      return null;
-    }
-  };
-  // Usa LLM primeiro se API key estiver configurada, fallback ao heuristico
+  // Usa leitor local inteligente (Processador local gratuito)
   const parseInvoiceUniversal = async (texto: string, opts?: { preferLLM?: boolean; methodLabelRef?: { label?: string } }): Promise<ExtractedInvoiceData> => {
-    const preferLLM = opts?.preferLLM !== false;
-    let llmResult: ExtractedInvoiceData | null = null;
-    if (preferLLM) llmResult = await parseInvoiceUniversalLLM(texto);
-    if (llmResult && llmResult.itens.length > 0) {
-      if (opts?.methodLabelRef) opts.methodLabelRef.label = 'Inteligência Artificial (LLM)';
-      return llmResult;
-    }
-    const heuristicResult = parseInvoiceTextHeuristic(texto);
+    const localResult = parseInvoiceTextHeuristic(texto);
     if (opts?.methodLabelRef) {
-      opts.methodLabelRef.label = lastLlmErrorStr 
-        ? `Heurística local (Falha IA: ${lastLlmErrorStr})` 
-        : 'Heurística local (Sem chaves de IA)';
+      opts.methodLabelRef.label = 'Processamento Inteligente Local (100% Gratuito)';
     }
-    return heuristicResult;
+    return localResult;
   };
 
   const suggCatFromDesc = (desc: string): string => {
@@ -2119,101 +1829,121 @@ MODELO:
     return 'Cartão';
   };
 
-  // Heuristic parser for ANY text (fallback se pdf-parse nao estiver disponivel)
+  // Heuristic parser for ANY text
   const parseInvoiceTextHeuristic = (text: string): ExtractedInvoiceData => {
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    const fullText = text;
     const result: ExtractedInvoiceData = { itens: [] };
 
-    // 1) Vencimento
-    const vencRe = /vencimento[^0-9]{0,40}(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i;
-    const mv = fullText.match(vencRe) || fullText.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})\s*(?:venc|vcto|pagar|pagamento|até o dia|ate o dia)/i);
-    if (mv) {
-      const pv = parseDateSmart(mv[1]);
-      if (pv) result.vencimento = pv;
+    // 1) Vencimento geral (Ano de referência)
+    let vencimentoStr: string | null = null;
+    const vencRe = /(?:vencimento|vence em|vcto|venc)[^\d]{0,20}(\d{1,2})[\/\-\.](\d{1,2})(?:[\/\-\.](\d{2,4}))?/i;
+    for (const line of lines) {
+      const m = line.match(vencRe);
+      if (m) {
+        let d = Number(m[1]);
+        let mo = Number(m[2]);
+        let y = m[3] ? Number(m[3]) : new Date().getFullYear();
+        if (y < 100) y += 2000;
+        vencimentoStr = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        break;
+      }
+    }
+    if (!vencimentoStr) {
+      const m2 = text.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+      if (m2) {
+        let d = Number(m2[1]);
+        let mo = Number(m2[2]);
+        let y = Number(m2[3]);
+        if (y < 100) y += 2000;
+        vencimentoStr = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
+    if (vencimentoStr) {
+      result.vencimento = vencimentoStr;
     }
 
-    // 2) Valor total da fatura
-    const totRe = /(?:valor\s*(?:total|da\s*fatura)|total\s*da\s*fatura|total\s+geral|toral\s+da\s+fatura)[^0-9]{0,25}(R?\$?\s*[\d\.,\-\s]+)/i;
-    const mtot = fullText.match(totRe) || fullText.match(/(?:valor\s*a\s*pagar|total\s*a\s*pagar)[^0-9]{0,25}(R?\$?\s*[\d\.,\-\s]+)/i);
-    if (mtot) {
-      const v = parseCurrencySmart(mtot[1]);
-      if (v != null) result.valorTotalExtraido = v;
-    }
-
-    // 3) Nome do cartao sugerido (primeiros 40 chars: ITAU/BRADESCO/C6/NUBANK/REVOLUT/SANTANDER/SAFRA/INTER/BANCO...)
+    // 2) Sugerir banco/cartão com base no cabeçalho
     const head = lines.slice(0, Math.min(15, lines.length)).join(' ');
-    const bancoMatch = head.match(/(itaú|itau|nubank|nu\s*bank|c6\s*bank|c6bank|revolut|santander|safra|inter|bradesco|banco\s*do\s*brasil|bb|caixa|hipercard|sicoob|sicredi)/i);
-    if (bancoMatch) result.cartaoSugeridoNome = bancoMatch[0];
+    const bancoMatch = head.match(/(itaú|itau|nubank|nu\s*bank|c6\s*bank|c6bank|revolut|santander|safra|inter|bradesco|banco\s*do\s*brasil|bb|caixa|hipercard|sicoob|sicredi|mercado\s*pago)/i);
+    if (bancoMatch) {
+      result.cartaoSugeridoNome = bancoMatch[0];
+    }
 
-    // 4) Itens: linha do tipo DATA   DESCRICAO...     VALOR
-    // Exemplos de linha validas em faturas reais brasileiras:
-    //   25/07  CARREFOUR SUPERMERCADO    10X 1/10   R$ 372,46
-    //   25/07/2026 SUPERMERCADO CARREFOUR 2/15 372.46
-    //   Uber Tecnologia 02 Ago 23 42,50
-    //   02/08 Starbucks Café Parcela 2 de 10 R$ 42,50
-    const parcelaRe = /(?:parcela\s*)?(\d{1,3})\s*(?:\/|de\s*)\s*(\d{1,3})/i;
+    const anoRef = vencimentoStr ? new Date(vencimentoStr).getFullYear() : new Date().getFullYear();
 
-    const anoRef = (result.vencimento ? new Date(result.vencimento).getFullYear() : new Date().getFullYear()) || new Date().getFullYear();
-
+    // 3) Processar linhas
     for (const line of lines) {
       if (line.length < 8) continue;
       
-      // Filtro estrito: ignorar linhas contendo palavras de resumo financeiro, limites ou cabeçalhos em qualquer parte da linha
-      if (/\b(limite|vencimento|vence em|total a pagar|pagamento minimo|pagamento mínimo|saque total|resumo da fatura|fatura de|fatura anterior|encargos|tarifas e encargos|juros|multas por atraso|pagamentos e creditos|pagamentos e créditos|compras parceladas|fatura parcelada|demonstração|demonstracao|falar com a gente|ouvidoria|sac)\b/i.test(line)) continue;
+      // Filtro estrito: ignorar informativos, saldos, termos regulatórios e cabeçalhos em qualquer parte da linha
+      const ignoreRe = /\b(limite|vencimento|vence em|total a pagar|pagamento minimo|pagamento mínimo|saque total|resumo da fatura|fatura de|fatura anterior|encargos|tarifas e encargos|juros|multas por atraso|pagamentos e creditos|pagamentos e créditos|compras parceladas|fatura parcelada|demonstração|demonstracao|falar com a gente|ouvidoria|sac|0800|atendimento|contrato|regulamento|teto de juros|teto de juro|opcao de parcelamento|opções de parcelamento|pagamento da fatura|pagamento de fatura|pagamento efetuado|pagamento recebido|pagto|total|subtotal|saldo|fatura|faturas|atraso|atrasos|demonstrativo)\b/i;
+      if (ignoreRe.test(line)) continue;
 
-      const dataMatch = line.match(/(\d{1,2}[\/\.\-]\d{1,2}(?:[\/\.\-]\d{2,4})?)/) || line.match(/(\d{1,2}\s+(?:de\s+)?[A-Za-zçãõáéíóúâêîôû]{3,}(?:\s+(?:de\s+)?\d{2,4})?)/);
-      if (!dataMatch) continue;
-
-      // Remove a data encontrada da linha para evitar que o ano/dia/mês seja confundido com valor/moeda
-      const lineWithoutDate = line.replace(dataMatch[0], ' ');
-
-      const matchPrimarioValor = lineWithoutDate.match(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{2})|\d+(?:,\d{2})|\d+\.\d{2})/);
-      const fallbacks = Array.from(lineWithoutDate.matchAll(/(?:R\$\s*)?([\d\.,]{4,})/g)).map(mm => {
-        const v = parseCurrencySmart(mm[0] ?? mm[1] ?? '');
-        return v != null ? v : null;
-      }).filter((x): x is number => x != null);
-
-      let valorNum: number | null = null;
-      if (matchPrimarioValor) {
-        valorNum = parseCurrencySmart(matchPrimarioValor[1] ?? matchPrimarioValor[0] ?? '');
-      } else if (fallbacks.length) {
-        valorNum = fallbacks[fallbacks.length - 1] ?? null;
+      // Padrão de data DD/MM ou DD/MM/YYYY ou DD MMM (ex: 15 Ago ou 15 de Agosto)
+      const date1Match = line.match(/\b(\d{1,2})[\/\-\.](\d{1,2})(?:[\/\-\.](\d{2,4}))?\b/);
+      const date2Match = line.match(/\b(\d{1,2})\s+(?:de\s+)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*\b/i);
+      
+      let dataStr = '';
+      let dateRawText = '';
+      if (date1Match) {
+        dateRawText = date1Match[0];
+        let d = Number(date1Match[1]);
+        let mo = Number(date1Match[2]);
+        let y = date1Match[3] ? Number(date1Match[3]) : anoRef;
+        if (y < 100) y += 2000;
+        dataStr = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      } else if (date2Match) {
+        dateRawText = date2Match[0];
+        let d = Number(date2Match[1]);
+        let mo = normalizePtMonthToNum(date2Match[2]) || 1;
+        let y = anoRef;
+        dataStr = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      } else {
+        continue;
       }
-      if (valorNum == null || valorNum <= 0 || valorNum > 9999999.99) continue;
 
-      const dataStr = parseDateSmart(dataMatch[0], anoRef);
-      if (!dataStr) continue;
+      // Remove a data encontrada da linha para evitar colisões
+      const lineWithoutDate = line.replace(dateRawText, ' ');
 
-      // Extrai parcela
+      // Procura valores no formato R$ XX,XX ou apenas XX,XX ou com separador de milhar opcional
+      const valMatch = lineWithoutDate.match(/(?:R\$\s*)?(-?\d{1,3}(?:\.\d{3})*(?:,\d{2})|-?\d+(?:,\d{2})|-?\d+\.\d{2})\b/);
+      if (!valMatch) continue;
+      const valorNum = parseCurrencySmart(valMatch[1]);
+      if (valorNum == null || valorNum <= 0 || valorNum > 999999.99) continue;
+
+      const lineWithoutDateAndVal = lineWithoutDate.replace(valMatch[0], ' ');
+
+      // Verifica se há parcelamento (ex: Parcela 2 de 4 ou 11/12 ou 2x)
       let parcelaAtual: number | undefined;
       let totalParcelas: number | undefined;
-      const pm = line.match(parcelaRe);
-      if (pm) {
-        parcelaAtual = Number(pm[1]);
-        totalParcelas = Number(pm[2]);
+      const partMatch = lineWithoutDateAndVal.match(/\b(\d{1,3})\s*(?:\/|de|x)\s*(\d{1,3})\b/i) || lineWithoutDateAndVal.match(/parcela\s*(\d{1,3})\s*de\s*(\d{1,3})/i);
+      if (partMatch) {
+        parcelaAtual = Number(partMatch[1]);
+        totalParcelas = Number(partMatch[2]);
         if (!(parcelaAtual >= 1 && totalParcelas >= parcelaAtual && totalParcelas <= 999)) {
           parcelaAtual = undefined;
           totalParcelas = undefined;
         }
       }
 
-      // Descricao: remove data, valor, parcela, espacos
-      let desc = line
-        .replace(/(?:R?\$?\s*)?\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})|\d+(?:,\d{2})|\d+\.\d{2}/g, ' ')
-        .replace(dataMatch[0], ' ')
-        .replace(/(?:parcela\s*)?\d{1,3}\s*(?:\/|de\s*)\s*\d{1,3}/gi, ' ')
+      let descClean = lineWithoutDateAndVal;
+      if (partMatch) {
+        descClean = descClean.replace(partMatch[0], ' ');
+      }
+
+      // Limpa caracteres especiais, pontuação restante e espaços extras
+      descClean = descClean
+        .replace(/[\-\+\*\:\.\,]/g, ' ')
         .replace(/\s{2,}/g, ' ')
-        .trim()
-        .replace(/^[\s\-\.\,\:]+|[\s\-\.\,\:]+$/g, '');
-      if (!desc) desc = 'Compra Cartão';
-      if (desc.length > 120) desc = desc.slice(0, 117) + '...';
+        .trim();
+
+      if (descClean.length < 2) continue;
 
       result.itens.push({
-        id: `pdf-item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: `pdf-local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${result.itens.length}`,
         data: dataStr,
-        descricao: desc,
-        categoria: suggCatFromDesc(desc),
+        descricao: descClean.toUpperCase(),
+        categoria: suggCatFromDesc(descClean),
         valor: Number(valorNum.toFixed(2)),
         parcelaAtual,
         totalParcelas,
@@ -2221,11 +1951,9 @@ MODELO:
       });
     }
 
-    // Total extraido dos itens, se nao pegamos o total geral
     if (result.valorTotalExtraido == null && result.itens.length > 0) {
       result.valorTotalExtraido = Number(result.itens.reduce((s, i) => s + i.valor, 0).toFixed(2));
     }
-    // Ordena por data
     result.itens.sort((a, b) => a.data.localeCompare(b.data));
     return result;
   };
@@ -3789,62 +3517,29 @@ MODELO:
                     )}
                   </div>
 
-                  {/* Info */}
-                  {(() => {
-                    const hasAnyKey = hasAnyLLMKey();
-                    const method = pdfImportMethodUsed;
-                    const isLLM = method?.includes('(LLM)') || method?.includes('Inteligência');
-                    const isHeur = method?.includes('Heurística') || (!isLLM && method.length > 0);
-                    return (
-                      <>
-                        {!hasAnyKey && (
-                          <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 flex items-start gap-2.5">
-                            <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-                            <div className="text-left">
-                              <p className="text-[11px] font-extrabold text-amber-700 leading-tight mb-0.5">
-                                Nenhuma API de IA configurada (modo Heurística)
-                              </p>
-                              <p className="text-[10px] font-bold text-amber-700/90 leading-relaxed">
-                                Para leitura inteligente agnóstica a layouts, configure uma variável:
-                                <code className="block font-mono mt-1.5 px-2 py-1 rounded-lg bg-white/80 text-amber-800 border border-amber-200 break-words">
-                                  VITE_OPENAI_API_KEY=sk-...
-                                </code>
-                                <span className="block mt-1 text-amber-700/80">
-                                  Alternativas: <code>VITE_GEMINI_API_KEY</code> ou <code>VITE_ANTHROPIC_API_KEY</code>.
-                                </span>
-                              </p>
-                            </div>
+                        <div className="rounded-2xl bg-purple-50 border border-purple-200 p-3 flex items-start gap-2.5">
+                          <Sparkles size={16} className="text-purple-650 shrink-0 mt-0.5 animate-pulse" />
+                          <div className="text-left font-sans">
+                            <p className="text-[11px] font-extrabold text-purple-800 leading-tight mb-0.5">
+                              Leitura Inteligente Local Ativada (100% Gratuito & Seguro)
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                              O sistema analisa o texto da sua fatura e localiza os lançamentos de forma 100% privada e rodando localmente no seu próprio navegador. Nenhuma informação é enviada a servidores externos.
+                            </p>
                           </div>
-                        )}
-                        {hasAnyKey && (
-                          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3 flex items-start gap-2.5">
-                            <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                            <div className="text-left">
-                              <p className="text-[11px] font-extrabold text-emerald-700 leading-tight mb-0.5">
-                                Extração inteligente com LLM ativada
-                              </p>
-                              <p className="text-[10px] font-bold text-emerald-800/85 leading-relaxed">
-                                O sistema usa IA para interpretar qualquer layout de banco (Nubank, Itaú, C6, Mercado Pago, Bradesco) e ignora automaticamente totais, tarifas e juros.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                        {method && (
+                        </div>
+                        {pdfImportMethodUsed && (
                           <div className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-2xl bg-white border border-slate-200">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-sans">
                               <Info size={11} />
                               Método de extração
                             </span>
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-extrabold
-                              ${isLLM ? 'bg-blue-50 text-blue-700 border border-blue-100' : isHeur ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
-                              {isLLM ? <Sparkles size={10} /> : isHeur ? <RefreshCw size={10} /> : <Info size={10} />}
-                              {method || 'Aguardando...'}
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-100 font-sans">
+                              <Sparkles size={10} />
+                              {pdfImportMethodUsed || 'Aguardando...'}
                             </span>
                           </div>
                         )}
-                      </>
-                    );
-                  })()}
 
                   {/* DEBUG / TEXTAREA de texto colado */}
                   <details className="rounded-2xl bg-white border border-slate-200 overflow-hidden">
