@@ -1944,7 +1944,7 @@ MODELO:
       };
     } else if (keys.gemini) {
       const apiKey = keys.gemini;
-      baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+      baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
       requestInit = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2145,13 +2145,24 @@ MODELO:
       // Evita pegar linhas de "total", "saldo", "vencimento" como item
       if (/^(total|valor|vencimento|saldo|fatura|data|lançamento|lancamento|cartao|cartão|nome|cliente|cpf|cnpj|agencia|agência|conta|limite|juros|multa|iof|mora)\b/i.test(line)) continue;
 
+      // Filtros adicionais para ignorar informativos, termos regulatórios, opções de parcelamento e pagamentos da fatura
+      if (/\b(pagamento da fatura|pagamento de fatura|pagamento efetuado|pagamento recebido|pagamento de julho|pagamento de agosto|pagamento de setembro|pagamento de outubro|pagamento de novembro|pagamento de dezembro|pagamentos e creditos|pagamento da fatura de)\b/i.test(line)) continue;
+      if (/\b(teto de juros|teto de juro|encargos|juros do rotativo|juros de mora|parcelar a fatura|parcelamento de fatura|opções de pagamento|opcao de pagamento)\b/i.test(line)) continue;
+      if (/\b(limite utilizado|limite disponível|saques com seu cartão|saque utilizado|saque disponível|melhor dia de compra|fechamento da fatura|próximo fechamento)\b/i.test(line)) continue;
+      if (/\b(compras parceladas|fatura parcelada|tarifa de saque|saque em dinheiro|saque no caixa)\b/i.test(line)) continue;
+
       const dataMatch = line.match(/(\d{1,2}[\/\.\-]\d{1,2}(?:[\/\.\-]\d{2,4})?)/) || line.match(/(\d{1,2}\s+(?:de\s+)?[A-Za-zçãõáéíóúâêîôû]{3,}(?:\s+(?:de\s+)?\d{2,4})?)/);
-      const matchPrimarioValor = line.match(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{2})|\d+(?:,\d{2})|\d+\.\d{2})/);
-      const fallbacks = Array.from(line.matchAll(/(?:R\$\s*)?([\d\.,]{4,})/g)).map(mm => {
+      if (!dataMatch) continue;
+
+      // Remove a data encontrada da linha para evitar que o ano/dia/mês seja confundido com valor/moeda
+      const lineWithoutDate = line.replace(dataMatch[0], ' ');
+
+      const matchPrimarioValor = lineWithoutDate.match(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{2})|\d+(?:,\d{2})|\d+\.\d{2})/);
+      const fallbacks = Array.from(lineWithoutDate.matchAll(/(?:R\$\s*)?([\d\.,]{4,})/g)).map(mm => {
         const v = parseCurrencySmart(mm[0] ?? mm[1] ?? '');
         return v != null ? v : null;
       }).filter((x): x is number => x != null);
-      if (!dataMatch) continue;
+
       let valorNum: number | null = null;
       if (matchPrimarioValor) {
         valorNum = parseCurrencySmart(matchPrimarioValor[1] ?? matchPrimarioValor[0] ?? '');
