@@ -2278,30 +2278,29 @@ function App() {
       setTransactions(prev => [...prev, ...novasTransacoes]);
       try {
         if (userId && supabase) {
-          for (const tx of novasTransacoes) {
-            const payload = {
-              id: tx.id,
-              user_id: userId,
-              data: tx.data,
-              descricao: tx.descricao,
-              categoria: tx.categoria,
-              tipo: tx.tipo,
-              valor: tx.valor,
-              status: tx.status,
-              data_postergar: tx.dataPostergar ?? null,
-              juros: tx.juros ?? null,
-              conta_id: tx.contaId ?? null,
-              frequencia: tx.frequencia ?? 'AVULSO',
-              periodicidade: tx.periodicidade ?? null,
-              parcela_atual: tx.parcelaAtual ?? null,
-              total_parcelas: tx.totalParcelas ?? null,
-              grupo_recorrencia_id: tx.grupoRecorrenciaId ?? null,
-              cartao_id: tx.cartaoId ?? null,
-              fatura_id: tx.faturaId ?? null,
-              data_compra: tx.dataCompra ?? null
-            };
-            await supabase.from('transactions').upsert(payload, { onConflict: 'id', ignoreDuplicates: false });
-          }
+          const payloads = novasTransacoes.map(tx => ({
+            user_id: userId,
+            data: tx.data,
+            descricao: tx.descricao,
+            categoria: tx.categoria,
+            tipo: tx.tipo,
+            valor: tx.valor,
+            status: tx.status,
+            data_postergar: tx.dataPostergar ?? null,
+            juros: tx.juros ?? null,
+            conta_id: tx.contaId ?? null,
+            frequencia: tx.frequencia ?? 'AVULSO',
+            periodicidade: tx.periodicidade ?? null,
+            parcela_atual: tx.parcelaAtual ?? null,
+            total_parcelas: tx.totalParcelas ?? null,
+            grupo_recorrencia_id: tx.grupoRecorrenciaId ?? null,
+            cartao_id: tx.cartaoId ?? null,
+            fatura_id: tx.faturaId ?? null,
+            data_compra: tx.dataCompra ?? null
+          }));
+          const { error: insertErr } = await supabase.from('transactions').insert(payloads);
+          if (insertErr) throw insertErr;
+
           
           // Recalcula totais das faturas diretamente no banco usando valores locais somados
           for (const mesAno of Array.from(mesAnoSet)) {
