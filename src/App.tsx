@@ -16,6 +16,7 @@ import { CreditCardModal, BANK_PRESETS } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
 import type { TemaVisual, UserProfile } from './types';
 import { supabase } from './lib/supabaseClient';
+import PDFWorker from 'pdfjs-dist/build/pdf.worker.mjs?worker&inline';
 
 const CURRENT_VERSION = '1.0.1';
 
@@ -1981,26 +1982,12 @@ function App() {
     try {
       // Import dinamico para nao aumentar o bundle inicial
       const pdfjs = await import('pdfjs-dist');
-      // Carrega o worker padrao via unpkg CDN com fallback de Blob para contornar restrições de CORS
       try {
         if (typeof pdfjs.GlobalWorkerOptions !== 'undefined') {
-          const workerUrl = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
-          const controller = new AbortController();
-          const tId = setTimeout(() => controller.abort(), 4000); // 4s de timeout para baixar o worker
-          try {
-            const resp = await fetch(workerUrl, { signal: controller.signal });
-            clearTimeout(tId);
-            const blob = await resp.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            pdfjs.GlobalWorkerOptions.workerSrc = blobUrl;
-          } catch (corsErr) {
-            clearTimeout(tId);
-            console.warn('[pdf.js] blob fallback falhou ou timeout, usando URL direta:', corsErr);
-            pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-          }
+          pdfjs.GlobalWorkerOptions.workerPort = new PDFWorker();
         }
       } catch (err) {
-        console.warn('[pdf.js] erro ao configurar worker:', err);
+        console.warn('[pdf.js] erro ao configurar worker local inline:', err);
       }
       const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
         const fr = new FileReader();
