@@ -97,6 +97,7 @@ function App() {
   const [pdfImportExtracted, setPdfImportExtracted] = useState<ExtractedInvoiceData | null>(null);
   const [pdfImportCartaoId, setPdfImportCartaoId] = useState<string>('');
   const [pdfImportIsParsing, setPdfImportIsParsing] = useState(false);
+  const [pdfImportDebugText, setPdfImportDebugText] = useState<string>('');
 
   const openModalForType = (tipo: 'ENTRADA' | 'SAIDA') => {
     setEditingTransaction(null);
@@ -1948,60 +1949,116 @@ function App() {
 
   // Entrypoint do parser
   const parsePdfInvoice = async (file: File): Promise<ExtractedInvoiceData> => {
+    // TENTATIVA 1: PDF.JS-DIST (le PDF binario CORRETO, descompacta streams, etc)
     let extractedText = '';
-    // Tenta ler como texto puro (bom quando for PDF exportado digitalmente e arrastado como txt ou for utf-8)
-    // Para arquivos binários PDF na verdade, a API FileReader text vai trazer lixo.
-    // Vamos tentar de toda forma e usar REGEX para extrair o texto quando houver.
-    const tryAsText = async (): Promise<string> => {
-      return await new Promise((resolve) => {
-        const fr = new FileReader();
-        fr.onload = () => { resolve(String(fr.result || '')); };
-        fr.onerror = () => { resolve(''); };
-        fr.readAsText(file, 'utf-8');
-      });
-    };
-    extractedText = await tryAsText();
-    // Heuristic: se a leitura deu muita coisa legivel -> OK. Senao tenta UTF-8 stream + fallback.
-    const printable = extractedText.replace(/[^\x20-\x7EáàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ\s\n\r\t.,:;!?()\-+@#$%&*_=<>/\\'"[\]{}|~^`]/g, '').length;
-    const ratio = extractedText.length ? printable / extractedText.length : 0;
-    if (ratio < 0.6) {
-      // Provavelmente PDF binario. Para nao depender de serverless function (ainda)
-      // vamos tentar extrair TODAS as sequencias legiveis (stream BT..ET / strings PDF)
+    let pdfJsUsedOk = false;
+    try {
+      // Import dinamico para nao aumentar o bundle inicial
+      const pdfjs = await import('pdfjs-dist');
+      // Carrega o worker padrao via unpkg CDN (evita erro de resolve worker no Vite local buildado)
       try {
-        const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
-          const fr = new FileReader();
-          fr.onload = () => resolve(fr.result as ArrayBuffer);
-          fr.onerror = () => reject(fr.error);
-          fr.readAsArrayBuffer(file);
-        });
-        const bytes = new Uint8Array(ab);
-        const decodedChunks: string[] = [];
-        let currentBuf: number[] = [];
-        const pushCurrent = () => {
-          if (currentBuf.length >= 6) {
-            try {
-              const s = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(currentBuf));
-              // filtra impressos + acentuados
-              const clean = s.replace(/[^\x20-\x7EáàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ\s\n\r\t.,:;!?()\-+@#$%&*_=<>/\\'"[\]{}|~^`]/g, ' ').trim();
-              if (clean.length >= 6) decodedChunks.push(clean);
-            } catch { /* noop */ }
-          }
-          currentBuf = [];
-        };
-        for (const b of bytes) {
-          const printableByte = (b >= 0x20 && b <= 0x7e) || (b >= 0x80 && b <= 0xff) || b === 0xa || b === 0xd || b === 0x9;
-          if (printableByte) currentBuf.push(b);
-          else pushCurrent();
+        // @ts-ignore - __VITE__
+        if (typeof pdfjs.GlobalWorkerOptions !== 'undefined') {
+          // @ts-ignore
+          pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
         }
-        pushCurrent();
-        extractedText = decodedChunks.join('\n');
-      } catch {
-        extractedText = '';
+      } catch { /* noop */ }
+      const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result as ArrayBuffer);
+        fr.onerror = () => reject(fr.error);
+        fr.readAsArrayBuffer(file);
+      });
+      const pdf = await pdfjs.getDocument({ data: ab, useSystemFonts: true, enableXfa: true }).promise;
+      const pagesTxt: string[] = [];
+      const maxPages = Math.min(pdf.numPages, 40);
+      for (let p = 1; p <= maxPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        const pageLines: string[] = [];
+        // Usamos transform[5] (y) para agrupar por linha
+        const rows = new Map<number, string[]>();
+        for (const tok of (content.items as any[] || [])) {
+          if (!tok?.str) continue;
+          const y = Math.round((tok.transform?.[5] as number) ?? 0);
+          if (!rows.has(y)) rows.set(y, []);
+          rows.get(y)!.push(tok.str);
+        }
+        const sortedRows = Array.from(rows.entries()).sort((a, b) => b[0] - a[0]);
+        for (const [, toks] of sortedRows) pageLines.push(toks.join(' '));
+        pagesTxt.push(pageLines.join('\n'));
+      }
+      extractedText = pagesTxt.join('\n\n');
+      pdfJsUsedOk = extractedText.length > 50;
+    } catch (err) {
+      console.warn('[pdf.js] falhou ao ler pdf, caindo em fallback:', err);
+    }
+
+    // TENTATIVA 2: fallback antigo (texto puro ou stream bytes)
+    if (!pdfJsUsedOk) {
+      const tryAsText = async (): Promise<string> => {
+        return await new Promise((resolve) => {
+          const fr = new FileReader();
+          fr.onload = () => { resolve(String(fr.result || '')); };
+          fr.onerror = () => { resolve(''); };
+          fr.readAsText(file, 'utf-8');
+        });
+      };
+      extractedText = await tryAsText();
+      const printable = extractedText.replace(/[^\x20-\x7EáàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ\s\n\r\t.,:;!?()\-+@#$%&*_=<>/\\'"[\]{}|~^`]/g, '').length;
+      const ratio = extractedText.length ? printable / extractedText.length : 0;
+      if (ratio < 0.6) {
+        try {
+          const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result as ArrayBuffer);
+            fr.onerror = () => reject(fr.error);
+            fr.readAsArrayBuffer(file);
+          });
+          const bytes = new Uint8Array(ab);
+          const decodedChunks: string[] = [];
+          let currentBuf: number[] = [];
+          const pushCurrent = () => {
+            if (currentBuf.length >= 6) {
+              try {
+                const s = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(currentBuf));
+                const clean = s.replace(/[^\x20-\x7EáàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ\s\n\r\t.,:;!?()\-+@#$%&*_=<>/\\'"[\]{}|~^`]/g, ' ').trim();
+                if (clean.length >= 6) decodedChunks.push(clean);
+              } catch { /* noop */ }
+            }
+            currentBuf = [];
+          };
+          for (const b of bytes) {
+            const printableByte = (b >= 0x20 && b <= 0x7e) || (b >= 0x80 && b <= 0xff) || b === 0xa || b === 0xd || b === 0x9;
+            if (printableByte) currentBuf.push(b);
+            else pushCurrent();
+          }
+          pushCurrent();
+          extractedText = decodedChunks.join('\n');
+        } catch {
+          extractedText = '';
+        }
       }
     }
+    setPdfImportDebugText(extractedText.slice(0, 8000)); // para DEBUG na UI
     // Se ainda assim nao tem nada -> UI vai permitir editar manualmente. Nao bloqueia.
     return parseInvoiceTextHeuristic(extractedText);
   };
+
+  // Cola texto colado manualmente -> extrai direto
+  const handlePdfPasteText = (texto: string) => {
+    setPdfImportDebugText(texto);
+    const parsed = parseInvoiceTextHeuristic(texto);
+    setPdfImportExtracted(parsed);
+    if (parsed.cartaoSugeridoNome && !pdfImportCartaoId) {
+      const suggestion = (creditCards.length ? creditCards : defaultSampleCards).find(
+        c => c.nome.toLowerCase().includes(parsed.cartaoSugeridoNome!.toLowerCase()) ||
+             parsed.cartaoSugeridoNome!.toLowerCase().includes(c.nome.toLowerCase())
+      );
+      if (suggestion) setPdfImportCartaoId(suggestion.id);
+    }
+  };
+
 
   const handlePdfFileSelect = async (file: File) => {
     if (!file) return;
@@ -3445,13 +3502,65 @@ function App() {
                     <Info size={16} className="text-[#0e69b2] shrink-0 mt-0.5" />
                     <div className="text-left">
                       <p className="text-[11px] font-extrabold text-[#0e69b2] leading-tight mb-0.5">
-                        Não tem o arquivo PDF ainda?
+                        Não detectou nenhum lançamento automaticamente?
                       </p>
                       <p className="text-[10px] font-bold text-[#0e69b2]/80 leading-relaxed">
-                        Avance para a etapa de revisão e cadastre os lançamentos manualmente.
+                        Expanda a área abaixo e cole o texto da fatura (extraído do app do banco — Extrato → Compartilhar → Copiar Texto).
                       </p>
                     </div>
                   </div>
+
+                  {/* DEBUG / TEXTAREA de texto colado */}
+                  <details className="rounded-2xl bg-white border border-slate-200 overflow-hidden">
+                    <summary className="cursor-pointer list-none px-3.5 py-3 flex items-center justify-between hover:bg-slate-50 transition">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
+                          <FileTextIcon size={13} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[11px] font-black text-slate-800 leading-tight">
+                            Colar texto da fatura manualmente
+                          </p>
+                          <p className="text-[9px] font-bold text-slate-400 leading-tight">
+                            PDF digitalizado / scaneado pode não ter texto. Cole aqui o conteúdo copiado do extrato do app do banco.
+                          </p>
+                        </div>
+                      </div>
+                      {pdfImportFileName && (
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          {pdfImportDebugText.length} chars extraídos
+                        </span>
+                      )}
+                    </summary>
+                    <div className="px-3.5 pb-3.5 pt-1 space-y-2 border-t border-slate-100">
+                      <textarea
+                        value={pdfImportDebugText}
+                        onChange={(e) => setPdfImportDebugText(e.target.value)}
+                        placeholder={`Exemplo de texto que você pode colar aqui:
+
+Vencimento: 10/08/2026
+Total da fatura: R$ 1.850,00
+
+25/07/2026  SUPERMERCADO CARREFOUR     Parcela 2/15    R$ 372,46
+02/08/2026  STARBUCKS CAFE                            R$ 42,50
+05/08      POSTO SHELL GASOLINA                      R$ 220,00`}
+                        rows={8}
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0e69b2]/30 focus:border-[#0e69b2] transition resize-y"
+                      />
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 max-w-[65%] leading-relaxed">
+                          {pdfImportDebugText.length > 100 ? `${pdfImportDebugText.length.toLocaleString('pt-BR')} caracteres prontos para análise.` : 'Cole o texto da fatura acima.'}
+                        </span>
+                        <button
+                          onClick={() => handlePdfPasteText(pdfImportDebugText)}
+                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-extrabold transition cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                        >
+                          <RefreshCw size={12} />
+                          Re-analisar texto
+                        </button>
+                      </div>
+                    </div>
+                  </details>
                 </>
               )}
 
