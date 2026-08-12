@@ -2221,7 +2221,7 @@ MODELO:
         // @ts-ignore - __VITE__
         if (typeof pdfjs.GlobalWorkerOptions !== 'undefined') {
           // @ts-ignore
-          pdfjs.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
+          pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
         }
       } catch { /* noop */ }
       const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
