@@ -2211,12 +2211,16 @@ function App() {
         const prox = new Date(y, m, 1);
         return `${prox.getFullYear()}-${String(prox.getMonth() + 1).padStart(2, '0')}`;
       };
-
       // Cria / recupera fatura para cada mesAno distinto
       const mesAnoSet = new Set<string>();
       selectedItems.forEach(it => mesAnoSet.add(alocarParaMesAno(it.data)));
+      
+      const invoicesMap: Record<string, CreditCardInvoice> = {};
       for (const mesAno of Array.from(mesAnoSet)) {
-        await getOrCreateInvoiceFor(card, mesAno);
+        const inv = await getOrCreateInvoiceFor(card, mesAno);
+        if (inv) {
+          invoicesMap[mesAno] = inv;
+        }
       }
 
       const allowedSet = new Set<string>(CATEGORIES.SAIDA);
@@ -2245,7 +2249,7 @@ function App() {
 
       const novasTransacoes: Transaction[] = selectedItems.map((it, idx) => {
         const mesAno = alocarParaMesAno(it.data);
-        const fatura = getInvoiceForCardMonth(card.id, mesAno);
+        const fatura = invoicesMap[mesAno] || getInvoiceForCardMonth(card.id, mesAno);
         const valorCorrigido = Number(it.valor) > 0 ? Number(it.valor) : 0;
         const categoriaFinal = normalizarCategoria(it.categoria);
         return {
@@ -2293,12 +2297,25 @@ function App() {
             };
             await supabase.from('transactions').upsert(payload, { onConflict: 'id', ignoreDuplicates: false });
           }
+          
+          // Recalcula totais das faturas diretamente no banco usando valores locais somados
+          for (const mesAno of Array.from(mesAnoSet)) {
+            const inv = invoicesMap[mesAno] || getInvoiceForCardMonth(card.id, mesAno);
+            if (inv) {
+              const existingTxs = transactions.filter(t => t.cartaoId === card.id && t.data.startsWith(mesAno) && t.tipo === 'SAIDA');
+              const incomingTxs = novasTransacoes.filter(t => t.cartaoId === card.id && t.data.startsWith(mesAno) && t.tipo === 'SAIDA');
+              const allTxs = [...existingTxs, ...incomingTxs];
+              const total = allTxs.reduce((s, t) => s + Number(t.valor), 0);
+              
+              const { error } = await supabase
+                .from('faturas_cartao')
+                .update({ valor_total: Number(total.toFixed(2)) })
+                .eq('id', inv.id);
+              if (error) throw error;
+            }
+          }
           await fetchTransactions();
           await fetchCreditCardInvoices();
-          // Recalcula totais das faturas
-          for (const mesAno of Array.from(mesAnoSet)) {
-            await recalcInvoiceTotals(card.id, mesAno);
-          }
         }
       } catch (e) {
         console.error('Erro persistindo importacao PDF no Supabase:', e);
