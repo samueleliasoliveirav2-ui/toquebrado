@@ -13,6 +13,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        try {
+          if (!window.__ENV_OPENAI_API_KEY) window.__ENV_OPENAI_API_KEY = "";
+          if (!window.__ENV_GEMINI_API_KEY) window.__ENV_GEMINI_API_KEY = "";
+          if (!window.__ENV_ANTHROPIC_API_KEY) window.__ENV_ANTHROPIC_API_KEY = "";
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

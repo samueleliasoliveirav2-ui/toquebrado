@@ -19,6 +19,28 @@ import { supabase } from './lib/supabaseClient';
 
 const CURRENT_VERSION = '1.0.1';
 
+type LLMKeys = { openai: string; gemini: string; anthropic: string };
+const resolveLLMKeys = (): LLMKeys => {
+  const env = (import.meta as any)?.env ?? {};
+  const win: any = typeof window !== 'undefined' ? window : {};
+  const pick = (viteName: string, runtimeName: string): string => {
+    const v1 = String(env?.[viteName] ?? '').trim();
+    if (v1 && v1 !== 'undefined' && v1 !== 'null') return v1;
+    const v2 = String(win?.[runtimeName] ?? '').trim();
+    if (v2 && v2 !== 'undefined' && v2 !== 'null') return v2;
+    return '';
+  };
+  return {
+    openai: pick('VITE_OPENAI_API_KEY', '__ENV_OPENAI_API_KEY'),
+    gemini: pick('VITE_GEMINI_API_KEY', '__ENV_GEMINI_API_KEY'),
+    anthropic: pick('VITE_ANTHROPIC_API_KEY', '__ENV_ANTHROPIC_API_KEY'),
+  };
+};
+const hasAnyLLMKey = (): boolean => {
+  const k = resolveLLMKeys();
+  return !!(k.openai || k.gemini || k.anthropic);
+};
+
 function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
@@ -1894,11 +1916,7 @@ MODELO:
     if (!trimmed || trimmed.length < 80) return null;
 
     // Tenta provedores em ORDEM: 1) OpenAI GPT-4o-mini 2) Gemini Flash 3) Anthropic
-    const keys = {
-      openai: ((import.meta as any)?.env?.VITE_OPENAI_API_KEY as string) || ((window as any).__ENV_OPENAI_API_KEY as string) || '',
-      gemini: ((import.meta as any)?.env?.VITE_GEMINI_API_KEY as string) || ((window as any).__ENV_GEMINI_API_KEY as string) || '',
-      anthropic: ((import.meta as any)?.env?.VITE_ANTHROPIC_API_KEY as string) || ((window as any).__ENV_ANTHROPIC_API_KEY as string) || ''
-    };
+    const keys = resolveLLMKeys();
 
     let requestInit: RequestInit | undefined;
     let baseUrl = '';
@@ -3751,9 +3769,7 @@ MODELO:
 
                   {/* Info */}
                   {(() => {
-                    const hasAnyKey = (
-                      !!((import.meta as any)?.env?.VITE_OPENAI_API_KEY || (import.meta as any)?.env?.VITE_GEMINI_API_KEY || (import.meta as any)?.env?.VITE_ANTHROPIC_API_KEY)
-                    );
+                    const hasAnyKey = hasAnyLLMKey();
                     const method = pdfImportMethodUsed;
                     const isLLM = method?.includes('(LLM)') || method?.includes('Inteligência');
                     const isHeur = method?.includes('Heurística') || (!isLLM && method.length > 0);
