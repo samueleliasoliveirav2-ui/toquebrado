@@ -16,7 +16,7 @@ import { CreditCardModal, BANK_PRESETS } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
 import type { TemaVisual, UserProfile } from './types';
 import { supabase } from './lib/supabaseClient';
-import PDFWorker from 'pdfjs-dist/build/pdf.worker.mjs?worker&inline';
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 const CURRENT_VERSION = '1.0.1';
 
@@ -1984,10 +1984,10 @@ function App() {
       const pdfjs = await import('pdfjs-dist');
       try {
         if (typeof pdfjs.GlobalWorkerOptions !== 'undefined') {
-          pdfjs.GlobalWorkerOptions.workerPort = new PDFWorker();
+          pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
         }
       } catch (err) {
-        console.warn('[pdf.js] erro ao configurar worker local inline:', err);
+        console.warn('[pdf.js] erro ao configurar workerSrc local:', err);
       }
       const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
         const fr = new FileReader();
