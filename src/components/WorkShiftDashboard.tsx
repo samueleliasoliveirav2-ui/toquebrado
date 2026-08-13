@@ -1,26 +1,19 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ArrowDownRight, Briefcase, Car, Calendar, Send, Edit3, CheckCircle, Clock, ChevronDown, ChevronUp, Link, Tag, Sparkles } from 'lucide-react';
 import type { WorkShiftEntry } from '../types';
-import { PillMonthPicker } from './PillMonthPicker';
 
 interface WorkShiftDashboardProps {
   entries: WorkShiftEntry[];
   onEditEntry: (entry: WorkShiftEntry) => void;
   onSendToWallet: (date: string, activity: string, amount: number) => void;
   onMarkAsPaid: (id: string) => void;
-  months: Array<{ key: string; label: string }>;
-  selectedMonth: string;
-  onMonthChange: (m: string) => void;
 }
 
 export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   entries,
   onEditEntry,
   onSendToWallet,
-  onMarkAsPaid,
-  months,
-  selectedMonth,
-  onMonthChange
+  onMarkAsPaid
 }) => {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 
@@ -83,18 +76,8 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   return (
     <div className="w-full flex-1 flex flex-col bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
 
-      {/* Header com pill do seletor de mês centralizado */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-center">
-        <PillMonthPicker
-          months={months}
-          selectedMonth={selectedMonth}
-          onChange={onMonthChange}
-          labelIcone={<Calendar size={15} className="stroke-[2.2]" />}
-        />
-      </div>
-
       {/* Cards KPI Dark Glass */}
-      <div className="px-4 pt-2 pb-1 space-y-3">
+      <div className="px-4 pt-4 pb-1 space-y-3">
         {/* Ganho Bruto e A Receber (linha 1 - 2 cols) */}
         <div className="grid grid-cols-2 gap-2.5">
           {/* Ganho Bruto */}

@@ -21,7 +21,6 @@ import type {
 } from '../types';
 import { computeInvoiceDerivedStatus as _computeInvoiceStatus } from '../types';
 import { BANK_PRESETS } from './CreditCardModal';
-import { PillMonthPicker } from './PillMonthPicker';
 
 const getCardPreset = (card: CreditCardType) => {
   if (card.banco && BANK_PRESETS[card.banco]) {
@@ -47,8 +46,6 @@ interface CreditCardsDashboardProps {
   _transactions: Transaction[];
   _accounts: BankAccount[];
   selectedMonth: string;
-  onMonthChange: (m: string) => void;
-  months: { key: string; label: string }[];
   onAddCard: () => void;
   onEditCard: (card: CreditCardType) => void;
   onViewInvoice: (card: CreditCardType) => void;
@@ -63,8 +60,6 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
   cards,
   invoices,
   selectedMonth,
-  onMonthChange,
-  months,
   onAddCard,
   onEditCard,
   onViewInvoice,
@@ -175,26 +170,10 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
-
-      {/* Header com Pill do mês centralizado */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between gap-2">
-        <div className="p-2 rounded-2xl bg-[#0e69b2]/10 text-[#0e69b2] border border-[#0e69b2]/10 shrink-0" aria-hidden>
-          <CreditCard size={18} className="stroke-[2.3]" />
-        </div>
-
-        <PillMonthPicker
-          months={months}
-          selectedMonth={selectedMonth}
-          onChange={onMonthChange}
-          labelIcone={<Calendar size={15} className="stroke-[2.2]" />}
-        />
-
-        <div className="w-[42px] shrink-0" aria-hidden />
-      </div>
+    <div className="w-full flex-1 flex flex-col bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans space-y-5">
 
       {/* KPIs Dark Glass */}
-      <div className="px-4 pt-2 space-y-3">
+      <div className="space-y-3">
         {/* Linha 1 — Limite Consolidado (card destaque full width) */}
         <div className="relative overflow-hidden rounded-3xl p-5
                         bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950
@@ -313,7 +292,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
       </div>
 
       {/* Botões de ação */}
-      <div className="px-4 pt-4">
+      <div>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={onAddCard}
@@ -332,7 +311,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
         </div>
       </div>
 
-      <div className="px-4 pt-4 space-y-3">
+      <div className="space-y-3">
         <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider text-left pl-1">
           Meus Cartões
         </h3>

@@ -14,6 +14,7 @@ import { AccountsDashboard } from './components/AccountsDashboard';
 import { CreditCardsDashboard } from './components/CreditCardsDashboard';
 import { CreditCardModal, BANK_PRESETS } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
+import { PillMonthPicker } from './components/PillMonthPicker';
 import type { TemaVisual, UserProfile } from './types';
 import { supabase } from './lib/supabaseClient';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -3184,34 +3185,43 @@ function App() {
               </>
             ) : activeTab === 'DIARIAS' ? (
               <>
-                {/* Barra flutuante superior (menu + atalho Relatórios) — o seletor de mês AGORA está DENTRO do WorkShiftDashboard (pill centralizado) */}
-                <div className="px-4 pt-3 flex items-center justify-between shrink-0">
-                  <button
-                    onClick={() => setIsDrawerOpen(true)}
-                    className="p-2 rounded-2xl bg-white border border-slate-200 shadow-xs hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer"
-                    title="Menu"
-                  >
-                    <Menu size={18} className="stroke-[2.5]" />
-                  </button>
-
-                  <div className="flex items-center gap-1.5">
-                    {isSyncing && (
-                      <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
-                    )}
+                <header className="sticky top-0 z-30 px-4 pt-4 pb-3 bg-gradient-to-b from-slate-50 via-slate-50/95 to-transparent backdrop-blur-md shrink-0">
+                  <div className="flex items-center justify-between gap-2">
                     <button
-                      onClick={() => {
-                        setReportsInitialReport('DIARIAS_TRABALHO');
-                        setReportsRemountKey(prev => prev + 1);
-                        setActiveTab('RELATORIOS');
-                      }}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0e69b2]/10 text-[#0e69b2] hover:bg-[#0e69b2]/20 transition-all cursor-pointer group"
-                      title="Abrir Relatórios de Diárias & Trabalho"
+                      onClick={() => setIsDrawerOpen(true)}
+                      className="p-2 rounded-2xl bg-white border border-slate-200 shadow-xs hover:bg-slate-50 text-slate-700 transition-all cursor-pointer shrink-0 w-[42px] h-[42px] flex items-center justify-center"
+                      title="Menu"
                     >
-                      <BarChart2 size={13} className="stroke-[2.5]" />
-                      <span className="text-[10px] font-black uppercase tracking-wider hidden xs:inline">Relatórios</span>
+                      <Menu size={18} className="stroke-[2.5]" />
                     </button>
+
+                    <div className="flex-1 max-w-[75%] mx-auto">
+                      <PillMonthPicker
+                        months={months}
+                        selectedMonth={selectedMonth}
+                        onChange={setSelectedMonth}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 min-w-[42px] justify-end">
+                      {isSyncing && (
+                        <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
+                      )}
+                      <button
+                        onClick={() => {
+                          setReportsInitialReport('DIARIAS_TRABALHO');
+                          setReportsRemountKey(prev => prev + 1);
+                          setActiveTab('RELATORIOS');
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0e69b2]/10 text-[#0e69b2] hover:bg-[#0e69b2]/20 transition-all cursor-pointer group"
+                        title="Abrir Relatórios de Diárias & Trabalho"
+                      >
+                        <BarChart2 size={13} className="stroke-[2.5]" />
+                        <span className="text-[10px] font-black uppercase tracking-wider hidden xs:inline">Relatórios</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </header>
 
                 <WorkShiftDashboard
                   entries={monthWorkShifts}
@@ -3221,9 +3231,6 @@ function App() {
                   }}
                   onSendToWallet={handleSendToWallet}
                   onMarkAsPaid={handleMarkShiftAsPaid}
-                  months={months}
-                  selectedMonth={selectedMonth}
-                  onMonthChange={setSelectedMonth}
                 />
               </>
             ) : activeTab === 'RELATORIOS' ? (
@@ -3249,23 +3256,39 @@ function App() {
               />
             ) : activeTab === 'CARTOES' ? (
               <>
-                <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setIsDrawerOpen(true)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-655 hover:text-slate-800 transition-colors cursor-pointer"
-                        title="Menu"
-                      >
-                        <Menu size={20} />
-                      </button>
-                      <span className="text-sm font-extrabold text-slate-800 font-sans">
-                        Cartões de Crédito
-                      </span>
+                <header className="sticky top-0 z-30 px-4 pt-4 pb-3 bg-gradient-to-b from-slate-50 via-slate-50/95 to-transparent backdrop-blur-md shrink-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => setIsDrawerOpen(true)}
+                      className="p-2 rounded-2xl bg-white border border-slate-200 shadow-xs hover:bg-slate-50 text-slate-700 transition-all cursor-pointer shrink-0 w-[42px] h-[42px] flex items-center justify-center"
+                      title="Menu"
+                    >
+                      <Menu size={18} className="stroke-[2.5]" />
+                    </button>
+
+                    <div className="flex-1 max-w-[75%] mx-auto">
+                      <PillMonthPicker
+                        months={months}
+                        selectedMonth={selectedMonth}
+                        onChange={setSelectedMonth}
+                      />
                     </div>
-                    {isSyncing && (
-                      <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
-                    )}
+
+                    <div className="flex items-center gap-1.5 shrink-0 min-w-[42px] justify-end">
+                      {isSyncing && (
+                        <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
+                      )}
+                      <button
+                        onClick={() => {
+                          setEditingCreditCard(null);
+                          setIsCreditCardModalOpen(true);
+                        }}
+                        className="p-2 rounded-2xl bg-[#0e69b2]/10 hover:bg-[#0e69b2]/20 text-[#0e69b2] transition-all cursor-pointer"
+                        title="Adicionar Cartão"
+                      >
+                        <Plus size={16} className="stroke-[2.5]" />
+                      </button>
+                    </div>
                   </div>
                 </header>
 
@@ -3276,8 +3299,6 @@ function App() {
                     _transactions={transactions}
                     _accounts={accounts}
                     selectedMonth={selectedMonth}
-                    onMonthChange={setSelectedMonth}
-                    months={months}
                     onAddCard={() => {
                       setEditingCreditCard(null);
                       setIsCreditCardModalOpen(true);
