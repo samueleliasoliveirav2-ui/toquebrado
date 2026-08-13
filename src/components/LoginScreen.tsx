@@ -126,12 +126,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   return (
     <div className="w-full flex-1 flex flex-col justify-between p-6 bg-gradient-to-b from-slate-50 via-white to-slate-100 animate-fade-in">
       {/* Top Section: Title branding */}
-      <div className="flex flex-col items-center justify-center pt-6 pb-2 text-center">
-        <div className="w-20 h-20 rounded-3xl bg-brand-gradient-knot flex items-center justify-center shadow-xl shadow-blue-900/10 mb-4">
-          <KnotfinLogo size="lg" variant="icon" theme="light" />
-        </div>
-        <KnotfinLogo size="xl" variant="full" theme="color" />
-        <p className="text-slate-500 text-[11px] font-semibold tracking-wide mt-3 max-w-[260px] leading-relaxed">
+      <div className="flex flex-col items-center justify-center pt-10 pb-4 text-center">
+        <KnotfinLogo size="2xl" theme="dark" />
+        <p className="text-slate-500 text-[11px] font-semibold tracking-wide mt-4 max-w-[260px] leading-relaxed">
           Decisões inteligentes para quem constrói o próprio futuro.
         </p>
       </div>
@@ -266,7 +263,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-3.5 px-4 rounded-2xl bg-[#0e69b2] hover:bg-[#0c5996] text-white font-extrabold text-sm transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-75"
+            className="w-full mt-2 py-3.5 px-4 rounded-2xl bg-gradient-to-br from-[#050a14] via-[#0b1220] to-[#0f172a] hover:from-[#0a1426] hover:via-[#0f1d33] hover:to-[#142542] text-white font-extrabold text-sm transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-75 border border-white/5"
           >
             {loading ? (
               <span>Processando...</span>

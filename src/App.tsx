@@ -2590,17 +2590,9 @@ function App() {
             <div className="relative w-64 max-w-[80vw] h-full bg-brand-gradient-drawer text-white flex flex-col p-5 shadow-2xl border-r border-white/10 z-10 animate-slide-right">
               {/* Header section with close and branding */}
               <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                <div className="flex items-center gap-3 text-left">
-                  <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center shadow-lg shadow-black/20 backdrop-blur">
-                    <KnotfinLogo size="sm" variant="icon" theme="light" />
-                  </div>
-                  <div>
-                    <h2 className="font-extrabold text-[15px] leading-tight text-white font-brand tracking-tight">
-                      <span className="text-white">knot</span>
-                      <span style={{ color: '#f59e0b' }}>fin</span>
-                    </h2>
-                    <span className="text-[10px] text-white/70 font-bold font-sans">Workspace</span>
-                  </div>
+                <div className="flex flex-col text-left">
+                  <KnotfinLogo size="md" theme="light" />
+                  <span className="text-[10px] text-white/60 font-bold font-sans mt-1">Workspace</span>
                 </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}
