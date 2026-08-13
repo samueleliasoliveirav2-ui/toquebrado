@@ -1199,8 +1199,7 @@ function App() {
             periodicidade_parcelas: period,
             parcela_atual: idxParcela,
             total_parcelas: nParcelas,
-            grupo_id: grupo,
-            grupo: grupo
+            grupo_id: grupo
           });
         }
 
@@ -1271,9 +1270,7 @@ function App() {
             dbPayload.total_parcelas = total;
             dbPayload.periodicidade_parcelas = payload.periodicidadeParcelas || 'MENSAL';
             dbPayload.parcela_atual = 1;
-            const grupo = `grp-rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            dbPayload.grupo_id = grupo;
-            dbPayload.grupo = grupo;
+            dbPayload.grupo_id = `grp-rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
           }
         }
         if (payload.id && payload.tipoRecebimento) {
