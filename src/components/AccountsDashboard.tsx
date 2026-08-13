@@ -278,33 +278,34 @@ export const AccountsDashboard: React.FC<AccountsDashboardProps> = ({
         </button>
       </header>
 
-      {/* Patrimônio Resumo Card */}
-      <div className="bg-white border border-slate-200 text-slate-800 p-5 rounded-3xl shadow-lg text-left relative overflow-hidden">
+      {/* Patrimônio Resumo Card — Dark Slim */}
+      <div className="bg-gradient-to-br from-[#050a14] via-[#0b1220] to-[#0f1f35] border border-white/10 text-white p-5 rounded-[28px] shadow-xl shadow-slate-900/25 text-left relative overflow-hidden">
         {/* Glow Effects */}
-        <div className="absolute top-0 right-0 w-24 h-24 bg-[#0e69b2]/5 rounded-full filter blur-xl" />
-        
-        <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-500 block">Patrimônio Consolidado</span>
-        <h2 className="text-2xl font-black mt-1 leading-none">
+        <div className="absolute top-[-30px] right-[-20px] w-40 h-40 bg-[#0e69b2]/30 rounded-full filter blur-3xl" />
+        <div className="absolute bottom-[-30px] left-[-20px] w-40 h-40 bg-[#f59e0b]/20 rounded-full filter blur-3xl" />
+
+        <span className="text-[10px] uppercase tracking-[0.18em] font-extrabold text-white/55 block relative">Patrimônio Consolidado</span>
+        <h2 className="text-[34px] font-black mt-1.5 leading-none tracking-tight relative">
           {formatCurrency(saldoConsolidado)}
         </h2>
 
         {/* Sub-balances PF/PJ grid */}
-        <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t border-slate-200">
-          <div>
-            <span className="text-[9px] uppercase font-bold text-slate-500 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+        <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t border-white/10 relative">
+          <div className="rounded-2xl bg-white/5 border border-white/5 p-3">
+            <span className="text-[9px] uppercase font-black tracking-[0.14em] text-white/60 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#3b82f6] ring-2 ring-blue-500/20" />
               Pessoa Física (PF)
             </span>
-            <span className="text-sm font-extrabold text-slate-800 block mt-0.5">
+            <span className="text-lg font-extrabold text-white block mt-1 tracking-tight">
               {formatCurrency(saldoPF)}
             </span>
           </div>
-          <div>
-            <span className="text-[9px] uppercase font-bold text-slate-500 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+          <div className="rounded-2xl bg-white/5 border border-white/5 p-3">
+            <span className="text-[9px] uppercase font-black tracking-[0.14em] text-white/60 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#f59e0b] ring-2 ring-orange-500/20" />
               Pessoa Jurídica (PJ)
             </span>
-            <span className="text-sm font-extrabold text-slate-800 block mt-0.5">
+            <span className="text-lg font-extrabold text-white block mt-1 tracking-tight">
               {formatCurrency(saldoPJ)}
             </span>
           </div>
