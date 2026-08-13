@@ -3040,7 +3040,7 @@ function App() {
                   </div>
 
                   {/* Summary filter toggle view inside INICIO (small top-left) */}
-                  <div className="flex items-center justify-between -mb-1">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="inline-flex bg-white border border-slate-200 rounded-xl p-0.5 shadow-3xs gap-0.5">
                       <button
                         onClick={() => setInicioViewMode('LIST')}
