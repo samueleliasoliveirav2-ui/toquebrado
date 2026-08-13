@@ -1,18 +1,15 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Menu,
   Sliders,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
-  ChevronRight,
   TrendingDown,
   BarChart3,
   CheckCircle2,
   Clock,
   AlertTriangle,
   Calendar,
-  Wallet,
   Briefcase,
   Car,
   Building2,
@@ -24,7 +21,9 @@ import {
   Download,
   Trash2,
   FileSpreadsheet,
-  Search
+  Search,
+  Check,
+  CreditCard
 } from 'lucide-react';
 import type { Transaction, WorkShiftEntry } from '../types';
 
@@ -48,15 +47,55 @@ interface ReportsDashboardProps {
   initialReport?: TipoRelatorio;
 }
 
-const RELATORIOS_ABAS: Array<{
-  id: TipoRelatorio; rotulo: string; icone: React.ReactNode; breve?: boolean }> = [
-    { id: 'VISAO_GERAL', rotulo: 'Visão Geral', icone: <BarChart3 size={14} /> },
-    { id: 'STATUS_LANCAMENTOS', rotulo: 'Status de Lançamentos', icone: <CheckCircle2 size={14} /> },
-    { id: 'DIARIAS_TRABALHO', rotulo: 'Diárias & Trabalho', icone: <Briefcase size={14} /> },
-    { id: 'DRE_PESSOAL', rotulo: 'DRE Pessoal', icone: <TrendingDown size={14} />, breve: true },
-    { id: 'FATURAS_CARTAO', rotulo: 'Faturas Cartão', icone: <Wallet size={14} />, breve: true },
-    { id: 'GASTO_MEDIO_DIARIO', rotulo: 'Gasto Médio Diário', icone: <Calendar size={14} />, breve: true }
-  ];
+const RELATORIOS_LISTA: Array<{
+  id: TipoRelatorio;
+  rotulo: string;
+  descricao: string;
+  icone: React.ReactNode;
+  breve?: boolean;
+  destaque?: boolean;
+}> = [
+  {
+    id: 'VISAO_GERAL',
+    rotulo: 'Visão Geral',
+    descricao: 'Resumo financeiro consolidado',
+    icone: <BarChart3 size={18} />
+  },
+  {
+    id: 'STATUS_LANCAMENTOS',
+    rotulo: 'Status de Lançamentos',
+    descricao: 'Pagos, Pendentes e Postergados',
+    icone: <CheckCircle2 size={18} />
+  },
+  {
+    id: 'DIARIAS_TRABALHO',
+    rotulo: 'Diárias & Trabalho',
+    descricao: 'Receitas a receber, custos de rua e eventos',
+    icone: <Briefcase size={18} />,
+    destaque: true
+  },
+  {
+    id: 'FATURAS_CARTAO',
+    rotulo: 'Cartões & Faturas',
+    descricao: 'Projeção de faturas e comprometimento',
+    icone: <CreditCard size={18} />,
+    breve: true
+  },
+  {
+    id: 'DRE_PESSOAL',
+    rotulo: 'DRE Pessoal',
+    descricao: 'Entradas vs Saídas mês a mês',
+    icone: <TrendingDown size={18} />,
+    breve: true
+  },
+  {
+    id: 'GASTO_MEDIO_DIARIO',
+    rotulo: 'Gasto Médio Diário',
+    descricao: 'Custo médio por dia trabalhado',
+    icone: <Calendar size={18} />,
+    breve: true
+  }
+];
 
 export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   transactions,
@@ -67,27 +106,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   initialReport = 'VISAO_GERAL'
 }) => {
   const [activeReport, setActiveReport] = useState<TipoRelatorio>(initialReport);
-  const abasScrollRef = useRef<HTMLDivElement>(null);
-  const [showScrollLeft, setShowScrollLeft] = useState(false);
-  const [showScrollRight, setShowScrollRight] = useState(true);
-
-  const atualizarBotoesScroll = () => {
-    if (!abasScrollRef.current) return;
-    const el = abasScrollRef.current;
-    setShowScrollLeft(el.scrollLeft > 4);
-    setShowScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-  };
-
-  useEffect(() => {
-    atualizarBotoesScroll();
-    const t = setTimeout(atualizarBotoesScroll, 250);
-    const handleResize = () => atualizarBotoesScroll();
-    window.addEventListener('resize', handleResize);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [initialReport]);
+  const [pickerAberto, setPickerAberto] = useState(false);
 
   // Shared filters
   const [periodFilter, setPeriodFilter] = useState<'ESTE_MES' | 'MES_ANTERIOR' | 'ULTIMOS_3_MESES' | 'ANO' | 'PERSONALIZADO' | 'MES_ANO'>('ESTE_MES');
@@ -538,107 +557,49 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   const strokeWidth = 12;
   const circ = 2 * Math.PI * radius;
 
-  return (
-    <div className="w-full flex-1 flex flex-col p-4 space-y-5 bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
+  const relatorioAtual = RELATORIOS_LISTA.find(r => r.id === activeReport) ?? RELATORIOS_LISTA[0];
 
-      {/* Header bar */}
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+  return (
+    <div className="w-full flex-1 flex flex-col bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans relative">
+
+      {/* Header compacto — menu hamb + picker centralizado estilo pill/glass */}
+      <header className="sticky top-0 z-30 px-4 pt-4 pb-3 bg-gradient-to-b from-slate-50 via-slate-50/95 to-transparent backdrop-blur-md">
+        <div className="flex items-center justify-between gap-2">
           <button
             onClick={onOpenDrawer}
-            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+            className="p-2 rounded-2xl bg-white border border-slate-200 shadow-xs hover:bg-slate-50 text-slate-700 transition-all cursor-pointer"
+            title="Menu"
           >
-            <Menu size={20} />
+            <Menu size={18} className="stroke-[2.5]" />
           </button>
-          <span className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">
-            Relatórios
-          </span>
+
+          <button
+            onClick={() => setPickerAberto(true)}
+            className="flex-1 max-w-[75%] mx-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-full glass bg-white/85 border border-slate-200/70 shadow-[0_6px_20px_-10px_rgba(14,105,178,0.25)] hover:shadow-[0_10px_30px_-12px_rgba(14,105,178,0.35)] hover:bg-white transition-all cursor-pointer group"
+            title="Trocar relatório"
+          >
+            <span className="shrink-0 w-7 h-7 rounded-xl bg-gradient-to-br from-[#0e69b2]/15 to-[#0e69b2]/5 text-[#0e69b2] flex items-center justify-center border border-[#0e69b2]/10">
+              {relatorioAtual.icone}
+            </span>
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[12px] font-black text-slate-800 truncate tracking-wide">
+                {relatorioAtual.rotulo}
+              </span>
+              {relatorioAtual.destaque && (
+                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[8px] font-black leading-none border border-amber-600 shadow-xs animate-pulse">
+                  NOVO
+                </span>
+              )}
+            </span>
+            <ChevronDown size={16} className={`shrink-0 text-slate-500 group-hover:text-[#0e69b2] transition-colors ${pickerAberto ? 'rotate-180' : ''}`} />
+          </button>
+
+          <div className="w-10 shrink-0" aria-hidden />
         </div>
       </header>
 
-      {/* Abas de Relatórios — 100% visíveis com setas de rolagem */}
-      <div className="relative mx-0 -ml-4 -mr-4">
-        <div className="bg-white border-b border-slate-200 shadow-[0_4px_10px_-6px_rgba(15,23,42,0.08)] px-3 py-2.5 flex items-center gap-1.5">
-          <button
-            onClick={() => {
-              abasScrollRef.current?.scrollBy({ left: -220, behavior: 'smooth' });
-              setTimeout(atualizarBotoesScroll, 320);
-            }}
-            disabled={!showScrollLeft}
-            className={`shrink-0 w-8 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-              showScrollLeft
-                ? 'bg-[#0e69b2]/10 text-[#0e69b2] hover:bg-[#0e69b2]/20 shadow-xs border border-[#0e69b2]/15'
-                : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed opacity-60'
-            }`}
-            title="Anterior"
-          >
-            <ChevronLeft size={16} className="stroke-[3]" />
-          </button>
-
-          <div
-            ref={abasScrollRef}
-            onScroll={atualizarBotoesScroll}
-            className="flex-1 flex gap-2 overflow-x-auto px-1 py-1 snap-x snap-mandatory no-scrollbar"
-          >
-            {RELATORIOS_ABAS.map(aba => {
-              const ativo = activeReport === aba.id;
-              const destaqueDiarias = aba.id === 'DIARIAS_TRABALHO' && !ativo && !aba.breve;
-              return (
-                <button
-                  key={aba.id}
-                  onClick={() => {
-                    if (aba.breve) return;
-                    setActiveReport(aba.id);
-                    setTimeout(atualizarBotoesScroll, 100);
-                  }}
-                  disabled={aba.breve}
-                  className={[
-                    'snap-start shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-extrabold uppercase tracking-wider transition-all duration-200',
-                    ativo
-                      ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-md shadow-blue-500/20 scale-[1.02]'
-                      : destaqueDiarias
-                      ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200 hover:from-amber-100 hover:to-orange-100 cursor-pointer ring-2 ring-amber-200/60'
-                      : aba.breve
-                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-70'
-                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] cursor-pointer'
-                  ].join(' ')}
-                >
-                  <span className={ativo ? 'text-white' : aba.breve ? 'text-slate-400' : destaqueDiarias ? 'text-amber-700' : 'text-[#0e69b2]'}>
-                    {aba.breve ? <Lock size={12} /> : aba.icone}
-                  </span>
-                  <span>{aba.rotulo}</span>
-                  {aba.breve && (
-                    <span className="ml-1 px-1.5 text-[8px] font-black px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-500 border border-slate-300">
-                      BREVE
-                    </span>
-                  )}
-                  {destaqueDiarias && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[8px] font-black leading-none border border-amber-600 shadow-xs animate-pulse">
-                      NOVO
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={() => {
-              abasScrollRef.current?.scrollBy({ left: 220, behavior: 'smooth' });
-              setTimeout(atualizarBotoesScroll, 320);
-            }}
-            disabled={!showScrollRight}
-            className={`shrink-0 w-8 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-              showScrollRight
-                ? 'bg-[#0e69b2]/10 text-[#0e69b2] hover:bg-[#0e69b2]/20 shadow-xs border border-[#0e69b2]/15'
-                : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed opacity-60'
-            }`}
-            title="Próximo"
-          >
-            <ChevronRight size={16} className="stroke-[3]" />
-          </button>
-        </div>
-      </div>
+      {/* Conteudo do relatorio com padding horizontal */}
+      <div className="flex-1 flex flex-col p-4 space-y-5">
 
       {/* Placeholder para relatórios EM BREVE */}
       {(activeReport === 'DRE_PESSOAL' || activeReport === 'FATURAS_CARTAO' || activeReport === 'GASTO_MEDIO_DIARIO') && (
@@ -1669,6 +1630,130 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                 })}
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      </div>
+
+      {/* Bottom Sheet / Gaveta dos Relatórios */}
+      {pickerAberto && (
+        <>
+          {/* Backdrop (clica fora fecha) */}
+          <div
+            className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-fade-in cursor-pointer"
+            onClick={() => setPickerAberto(false)}
+            aria-hidden
+          />
+
+          {/* Gaveta flutuante universal — mobile = sobe de baixo; desktop = centralizada */}
+          <div
+            className="fixed z-50 inset-x-0 sm:inset-x-auto sm:max-w-md sm:w-[92%] sm:left-1/2 sm:-translate-x-1/2
+                       bottom-0 sm:bottom-auto sm:top-[16%]
+                       bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_-20px_60px_-15px_rgba(15,23,42,0.25)] sm:shadow-2xl
+                       border-t border-slate-200/60 sm:border border-slate-200/70
+                       animate-[slideUp_0.28s_ease-out]
+                       max-h-[82vh] flex flex-col overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Handle top + titulo */}
+            <div className="px-4 pt-3 pb-2 border-b border-slate-100 flex flex-col items-center shrink-0">
+              <div className="w-12 h-1.5 rounded-full bg-slate-200 mb-2.5" aria-hidden />
+              <div className="w-full flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 tracking-tight">Escolher Relatório</h3>
+                  <p className="text-[10px] font-semibold text-slate-500 mt-0.5">Alternar entre as análises disponíveis</p>
+                </div>
+                <button
+                  onClick={() => setPickerAberto(false)}
+                  className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                  aria-label="Fechar"
+                >
+                  <ChevronDown size={18} className="stroke-[3]" />
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de relatorios */}
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
+              {RELATORIOS_LISTA.map(rel => {
+                const ativo = activeReport === rel.id;
+                const indiponivel = !!rel.breve;
+                return (
+                  <button
+                    key={rel.id}
+                    onClick={() => {
+                      if (indiponivel) return;
+                      setActiveReport(rel.id);
+                      setPickerAberto(false);
+                    }}
+                    disabled={indiponivel}
+                    className={[
+                      'w-full flex items-center gap-3 p-3 rounded-2xl text-left transition-all',
+                      ativo
+                        ? 'bg-gradient-to-r from-[#0e69b2]/10 via-[#0e69b2]/5 to-transparent border border-[#0e69b2]/20 shadow-[0_6px_16px_-10px_rgba(14,105,178,0.35)]'
+                        : indiponivel
+                        ? 'bg-slate-50 border border-slate-200/70 opacity-70 cursor-not-allowed'
+                        : 'bg-white border border-slate-200/60 hover:bg-slate-50 hover:border-slate-200 active:scale-[0.995] cursor-pointer'
+                    ].join(' ')}
+                  >
+                    <span className={[
+                      'shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center border transition-colors',
+                      ativo
+                        ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-md shadow-blue-500/25'
+                        : indiponivel
+                        ? 'bg-slate-100 text-slate-400 border-slate-200'
+                        : rel.destaque
+                        ? 'bg-gradient-to-br from-amber-50 to-orange-50 text-amber-700 border-amber-200'
+                        : 'bg-[#0e69b2]/10 text-[#0e69b2] border-[#0e69b2]/10'
+                    ].join(' ')}>
+                      {indiponivel ? <Lock size={18} /> : rel.icone}
+                    </span>
+
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={[
+                          'text-[12.5px] font-black truncate tracking-wide',
+                          ativo ? 'text-[#0e69b2]' : indiponivel ? 'text-slate-400' : 'text-slate-800'
+                        ].join(' ')}>
+                          {rel.rotulo}
+                        </span>
+                        {rel.destaque && !indiponivel && !ativo && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[8px] font-black leading-none border border-amber-600 shadow-xs">
+                            NOVO
+                          </span>
+                        )}
+                        {indiponivel && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-500 text-[8px] font-black leading-none border border-slate-300">
+                            BREVE
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-[10.5px] font-semibold truncate leading-snug ${
+                        ativo ? 'text-[#0e69b2]/80' : indiponivel ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
+                        {rel.descricao}
+                      </span>
+                    </div>
+
+                    <span className={[
+                      'shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all',
+                      ativo
+                        ? 'bg-[#0e69b2] text-white shadow-md shadow-blue-500/30'
+                        : 'bg-slate-100 text-transparent'
+                    ].join(' ')} aria-hidden>
+                      <Check size={13} className="stroke-[3]" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Rodape seguro */}
+            <div className="px-4 pt-2 pb-4 shrink-0" aria-hidden>
+              <div className="h-1 w-32 mx-auto rounded-full bg-slate-100" />
+            </div>
           </div>
         </>
       )}
