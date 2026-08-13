@@ -14,6 +14,7 @@ import { AccountsDashboard } from './components/AccountsDashboard';
 import { CreditCardsDashboard } from './components/CreditCardsDashboard';
 import { CreditCardModal, BANK_PRESETS } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
+import { KnotfinLogo } from './components/KnotfinLogo';
 import type { TemaVisual, UserProfile } from './types';
 import { supabase } from './lib/supabaseClient';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -2586,31 +2587,34 @@ function App() {
             />
 
             {/* Drawer container (slides from left) */}
-            <div className="relative w-64 max-w-[80vw] h-full bg-white text-slate-800 flex flex-col p-5 shadow-2xl border-r border-slate-200 z-10 animate-slide-right">
+            <div className="relative w-64 max-w-[80vw] h-full bg-brand-gradient-drawer text-white flex flex-col p-5 shadow-2xl border-r border-white/10 z-10 animate-slide-right">
               {/* Header section with close and branding */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div className="flex items-center justify-between pb-4 border-b border-white/10">
                 <div className="flex items-center gap-3 text-left">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-rose-400 flex items-center justify-center text-white font-black text-base shadow-revolut-glow">
-                    R
+                  <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center shadow-lg shadow-black/20 backdrop-blur">
+                    <KnotfinLogo size="sm" variant="icon" theme="light" />
                   </div>
                   <div>
-                    <h2 className="font-extrabold text-sm leading-tight text-slate-800 font-sans">Samuel Finanças</h2>
-                    <span className="text-[10px] text-blue-500 font-bold font-sans">Conta Ultra</span>
+                    <h2 className="font-extrabold text-[15px] leading-tight text-white font-brand tracking-tight">
+                      <span className="text-white">knot</span>
+                      <span style={{ color: '#f59e0b' }}>fin</span>
+                    </h2>
+                    <span className="text-[10px] text-white/70 font-bold font-sans">Workspace</span>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl hover:bg-white/10 text-white/75 hover:text-white transition-colors cursor-pointer"
                 >
                   <X size={16} />
                 </button>
               </div>
 
               {/* User Identity info inside drawer */}
-              <div className="py-4 border-b border-slate-200 mb-4 text-left font-sans">
-                <p className="text-[9px] uppercase font-bold text-slate-500">Logado como</p>
-                <p className="text-xs font-bold text-slate-600 truncate mt-0.5">{currentUser}</p>
-                <p className="text-[10px] text-slate-500 font-semibold truncate">{userEmail}</p>
+              <div className="py-4 border-b border-white/10 mb-4 text-left font-sans">
+                <p className="text-[9px] uppercase font-extrabold text-white/50">Logado como</p>
+                <p className="text-xs font-bold text-white truncate mt-0.5">{currentUser}</p>
+                <p className="text-[10px] text-white/55 font-semibold truncate">{userEmail}</p>
               </div>
 
               {/* Navigation list items */}
@@ -2623,8 +2627,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'INICIO'
-                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                      ? 'bg-white/12 text-white border border-white/20 shadow-inner'
+                      : 'text-white/75 hover:bg-white/8 hover:text-white'
                   }`}
                 >
                   <Home size={16} />
@@ -2639,8 +2643,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'DIARIAS'
-                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                      ? 'bg-white/12 text-white border border-white/20 shadow-inner'
+                      : 'text-white/75 hover:bg-white/8 hover:text-white'
                   }`}
                 >
                   <Briefcase size={16} />
@@ -2655,8 +2659,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'RELATORIOS'
-                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                      ? 'bg-white/12 text-white border border-white/20 shadow-inner'
+                      : 'text-white/75 hover:bg-white/8 hover:text-white'
                   }`}
                 >
                   <BarChart2 size={16} />
@@ -2671,8 +2675,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'CONTAS'
-                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                      ? 'bg-white/12 text-white border border-white/20 shadow-inner'
+                      : 'text-white/75 hover:bg-white/8 hover:text-white'
                   }`}
                 >
                   <Wallet size={16} />
@@ -2687,8 +2691,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'CARTOES'
-                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                      ? 'bg-white/12 text-white border border-white/20 shadow-inner'
+                      : 'text-white/75 hover:bg-white/8 hover:text-white'
                   }`}
                 >
                   <CreditCardIcon size={16} />
@@ -2703,8 +2707,8 @@ function App() {
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'PERFIL'
-                      ? 'bg-blue-50 text-[#0e69b2] border border-blue-100 shadow-inner'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                      ? 'bg-white/12 text-white border border-white/20 shadow-inner'
+                      : 'text-white/75 hover:bg-white/8 hover:text-white'
                   }`}
                 >
                   <Settings size={16} />
@@ -2713,7 +2717,7 @@ function App() {
               </nav>
 
               {/* Bottom Drawer actions */}
-              <div className="border-t border-slate-200 pt-4 space-y-2 font-sans">
+              <div className="border-t border-white/10 pt-4 space-y-2 font-sans">
                 {/* Refresh/Sync button */}
                 <button
                   onClick={() => {
@@ -2721,9 +2725,9 @@ function App() {
                     setIsDrawerOpen(false);
                   }}
                   disabled={isSyncing}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-all disabled:opacity-60 cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-white/75 hover:bg-white/10 hover:text-white transition-all disabled:opacity-60 cursor-pointer"
                 >
-                  <RefreshCw size={14} className={isSyncing ? "animate-spin text-blue-500" : ""} />
+                  <RefreshCw size={14} className={isSyncing ? "animate-spin text-[#f59e0b]" : ""} />
                   <span>Atualizar Dados</span>
                 </button>
 
@@ -2733,7 +2737,7 @@ function App() {
                     setIsDrawerOpen(false);
                     handleLogout();
                   }}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-950/30 transition-all cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-300 hover:bg-rose-500/10 transition-all cursor-pointer"
                 >
                   <LogOut size={14} />
                   <span>Sair do Sistema</span>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Lock, User, Check, ArrowRight, Info } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { KnotfinLogo } from './KnotfinLogo';
 
 interface LoginScreenProps {
   onLoginSuccess: (userName: string) => void;
@@ -123,14 +124,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   }, [mode]);
 
   return (
-    <div className="w-full flex-1 flex flex-col justify-between p-6 bg-white animate-fade-in">
+    <div className="w-full flex-1 flex flex-col justify-between p-6 bg-gradient-to-b from-slate-50 via-white to-slate-100 animate-fade-in">
       {/* Top Section: Title branding */}
-      <div className="flex flex-col items-center justify-center pt-8 pb-4 text-center">
-        <h1 className="text-4xl font-extrabold text-[#0e69b2] tracking-tighter lowercase mb-2 hover:scale-102 transition-transform select-none">
-          tô quebrado
-        </h1>
-        <p className="text-slate-500 text-xs font-semibold tracking-wider uppercase">
-          Controle sua semana, salve seu dinheiro
+      <div className="flex flex-col items-center justify-center pt-6 pb-2 text-center">
+        <div className="w-20 h-20 rounded-3xl bg-brand-gradient-knot flex items-center justify-center shadow-xl shadow-blue-900/10 mb-4">
+          <KnotfinLogo size="lg" variant="icon" theme="light" />
+        </div>
+        <KnotfinLogo size="xl" variant="full" theme="color" />
+        <p className="text-slate-500 text-[11px] font-semibold tracking-wide mt-3 max-w-[260px] leading-relaxed">
+          Decisões inteligentes para quem constrói o próprio futuro.
         </p>
       </div>
 

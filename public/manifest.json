@@ -1,11 +1,18 @@
 {
-  "name": "Tôquebrado - Controle Pessoal",
-  "short_name": "Tôquebrado",
+  "name": "knotfin · Decisões inteligentes",
+  "short_name": "knotfin",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0ea5e9",
+  "background_color": "#050a14",
+  "theme_color": "#094d80",
+  "description": "knotfin - Controle pessoal inteligente: receitas, despesas, diárias, cartões e relatórios em um só lugar.",
   "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
