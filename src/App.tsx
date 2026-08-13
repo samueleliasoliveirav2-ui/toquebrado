@@ -2925,17 +2925,15 @@ function App() {
                     }
                     mainInicioScrollRef.current = y;
                   }}
-                  className={`flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28 transition-all duration-500 ease-out ${isHeaderCollapsed ? 'pt-2' : ''}`}
+                  className={`flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28 transition-all duration-500 ease-out`}
                 >
                   
-                  {/* Stats Header Summary Cards (Inputs vs Expenses) - HIDE on collapse */}
-                  <div className={`overflow-hidden transition-all duration-500 ease-out ${isHeaderCollapsed ? 'max-h-0 opacity-0 mb-0 pointer-events-none scale-95 origin-top' : 'max-h-[280px] opacity-100'}`}>
-                    <StatsHeader 
-                      saldoAcumulado={saldoAcumulado}
-                      totalEntradas={totalEntradasMes}
-                      totalSaidas={totalSaidasMes}
-                    />
-                  </div>
+                  {/* Stats Header Summary Cards (Inputs vs Expenses) — AGORA SEMPRE VISÍVEL (fora da área colapsada) */}
+                  <StatsHeader 
+                    saldoAcumulado={saldoAcumulado}
+                    totalEntradas={totalEntradasMes}
+                    totalSaidas={totalSaidasMes}
+                  />
 
                   {/* Warning/Cleanup Banner for Mock Data */}
                   {mockTransactionsCount > 0 && (
