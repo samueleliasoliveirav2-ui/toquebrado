@@ -43,6 +43,7 @@ interface ReportsDashboardProps {
   onOpenDrawer: () => void;
   onMarkShiftAsPaid?: (id: string) => void;
   onDeleteWorkShift?: (id: string) => void;
+  initialReport?: TipoRelatorio;
 }
 
 const RELATORIOS_ABAS: Array<{
@@ -60,9 +61,10 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   workShifts,
   onOpenDrawer,
   onMarkShiftAsPaid,
-  onDeleteWorkShift
+  onDeleteWorkShift,
+  initialReport = 'VISAO_GERAL'
 }) => {
-  const [activeReport, setActiveReport] = useState<TipoRelatorio>('VISAO_GERAL');
+  const [activeReport, setActiveReport] = useState<TipoRelatorio>(initialReport);
 
   // Shared filters
   const [periodFilter, setPeriodFilter] = useState<'ESTE_MES' | 'MES_ANTERIOR' | 'ULTIMOS_3_MESES' | 'ANO' | 'PERSONALIZADO' | 'MES_ANO'>('ESTE_MES');

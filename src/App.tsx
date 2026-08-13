@@ -38,6 +38,8 @@ function App() {
 
   // Active view state
   const [activeTab, setActiveTab] = useState<'INICIO' | 'PERFIL' | 'DIARIAS' | 'RELATORIOS' | 'CONTAS' | 'CARTOES'>('INICIO');
+  const [reportsInitialReport, setReportsInitialReport] = useState<'VISAO_GERAL' | 'STATUS_LANCAMENTOS' | 'DIARIAS_TRABALHO' | 'DRE_PESSOAL' | 'FATURAS_CARTAO' | 'GASTO_MEDIO_DIARIO'>('VISAO_GERAL');
+  const [reportsRemountKey, setReportsRemountKey] = useState<number>(0);
 
   // Sidebar Drawer menu state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -3200,9 +3202,23 @@ function App() {
                       </span>
                     </div>
 
-                    {isSyncing && (
-                      <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          setReportsInitialReport('DIARIAS_TRABALHO');
+                          setReportsRemountKey(prev => prev + 1);
+                          setActiveTab('RELATORIOS');
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0e69b2]/10 text-[#0e69b2] hover:bg-[#0e69b2]/20 transition-all cursor-pointer group"
+                        title="Abrir Relatórios de Diárias & Trabalho"
+                      >
+                        <BarChart2 size={13} className="stroke-[2.5]" />
+                        <span className="text-[10px] font-black uppercase tracking-wider hidden xs:inline">Relatórios</span>
+                      </button>
+                      {isSyncing && (
+                        <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
+                      )}
+                    </div>
                   </div>
 
                   {/* Month Selector Slider */}
@@ -3243,11 +3259,13 @@ function App() {
               </>
             ) : activeTab === 'RELATORIOS' ? (
               <ReportsDashboard
+                key={reportsRemountKey}
                 transactions={transactions}
                 workShifts={workShifts}
                 onOpenDrawer={() => setIsDrawerOpen(true)}
                 onMarkShiftAsPaid={handleMarkShiftAsPaid}
                 onDeleteWorkShift={handleDeleteWorkShift}
+                initialReport={reportsInitialReport}
               />
             ) : activeTab === 'CONTAS' ? (
               <AccountsDashboard
