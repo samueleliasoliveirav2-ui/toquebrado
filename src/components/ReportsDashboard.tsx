@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   Menu,
   Sliders,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   TrendingDown,
   BarChart3,
   CheckCircle2,
@@ -65,6 +67,27 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   initialReport = 'VISAO_GERAL'
 }) => {
   const [activeReport, setActiveReport] = useState<TipoRelatorio>(initialReport);
+  const abasScrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollLeft, setShowScrollLeft] = useState(false);
+  const [showScrollRight, setShowScrollRight] = useState(true);
+
+  const atualizarBotoesScroll = () => {
+    if (!abasScrollRef.current) return;
+    const el = abasScrollRef.current;
+    setShowScrollLeft(el.scrollLeft > 4);
+    setShowScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    atualizarBotoesScroll();
+    const t = setTimeout(atualizarBotoesScroll, 250);
+    const handleResize = () => atualizarBotoesScroll();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [initialReport]);
 
   // Shared filters
   const [periodFilter, setPeriodFilter] = useState<'ESTE_MES' | 'MES_ANTERIOR' | 'ULTIMOS_3_MESES' | 'ANO' | 'PERSONALIZADO' | 'MES_ANO'>('ESTE_MES');
@@ -533,36 +556,88 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
         </div>
       </header>
 
-      {/* Abas de Relatórios (scroll horizontal) */}
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-thin">
-        {RELATORIOS_ABAS.map(aba => {
-          const ativo = activeReport === aba.id;
-          return (
-            <button
-              key={aba.id}
-              onClick={() => !aba.breve && setActiveReport(aba.id)}
-              disabled={aba.breve}
-              className={[
-                'shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-extrabold uppercase tracking-wider transition-all duration-200',
-                ativo
-                  ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-md shadow-blue-500/20 scale-[1.02]'
-                  : aba.breve
-                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-70'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] cursor-pointer'
-              ].join(' ')}
-            >
-              <span className={ativo ? 'text-white' : aba.breve ? 'text-slate-400' : 'text-[#0e69b2]'}>
-                {aba.breve ? <Lock size={12} /> : aba.icone}
-              </span>
-              <span>{aba.rotulo}</span>
-              {aba.breve && (
-                <span className="ml-1 px-1.5 text-[8px] font-black px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-500 border border-slate-300">
-                  BREVE
-                </span>
-              )}
-            </button>
-          );
-        })}
+      {/* Abas de Relatórios — 100% visíveis com setas de rolagem */}
+      <div className="relative mx-0 -ml-4 -mr-4">
+        <div className="bg-white border-b border-slate-200 shadow-[0_4px_10px_-6px_rgba(15,23,42,0.08)] px-3 py-2.5 flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              abasScrollRef.current?.scrollBy({ left: -220, behavior: 'smooth' });
+              setTimeout(atualizarBotoesScroll, 320);
+            }}
+            disabled={!showScrollLeft}
+            className={`shrink-0 w-8 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              showScrollLeft
+                ? 'bg-[#0e69b2]/10 text-[#0e69b2] hover:bg-[#0e69b2]/20 shadow-xs border border-[#0e69b2]/15'
+                : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed opacity-60'
+            }`}
+            title="Anterior"
+          >
+            <ChevronLeft size={16} className="stroke-[3]" />
+          </button>
+
+          <div
+            ref={abasScrollRef}
+            onScroll={atualizarBotoesScroll}
+            className="flex-1 flex gap-2 overflow-x-auto px-1 py-1 snap-x snap-mandatory no-scrollbar"
+          >
+            {RELATORIOS_ABAS.map(aba => {
+              const ativo = activeReport === aba.id;
+              const destaqueDiarias = aba.id === 'DIARIAS_TRABALHO' && !ativo && !aba.breve;
+              return (
+                <button
+                  key={aba.id}
+                  onClick={() => {
+                    if (aba.breve) return;
+                    setActiveReport(aba.id);
+                    setTimeout(atualizarBotoesScroll, 100);
+                  }}
+                  disabled={aba.breve}
+                  className={[
+                    'snap-start shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-extrabold uppercase tracking-wider transition-all duration-200',
+                    ativo
+                      ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-md shadow-blue-500/20 scale-[1.02]'
+                      : destaqueDiarias
+                      ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200 hover:from-amber-100 hover:to-orange-100 cursor-pointer ring-2 ring-amber-200/60'
+                      : aba.breve
+                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-70'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] cursor-pointer'
+                  ].join(' ')}
+                >
+                  <span className={ativo ? 'text-white' : aba.breve ? 'text-slate-400' : destaqueDiarias ? 'text-amber-700' : 'text-[#0e69b2]'}>
+                    {aba.breve ? <Lock size={12} /> : aba.icone}
+                  </span>
+                  <span>{aba.rotulo}</span>
+                  {aba.breve && (
+                    <span className="ml-1 px-1.5 text-[8px] font-black px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-500 border border-slate-300">
+                      BREVE
+                    </span>
+                  )}
+                  {destaqueDiarias && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[8px] font-black leading-none border border-amber-600 shadow-xs animate-pulse">
+                      NOVO
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => {
+              abasScrollRef.current?.scrollBy({ left: 220, behavior: 'smooth' });
+              setTimeout(atualizarBotoesScroll, 320);
+            }}
+            disabled={!showScrollRight}
+            className={`shrink-0 w-8 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              showScrollRight
+                ? 'bg-[#0e69b2]/10 text-[#0e69b2] hover:bg-[#0e69b2]/20 shadow-xs border border-[#0e69b2]/15'
+                : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed opacity-60'
+            }`}
+            title="Próximo"
+          >
+            <ChevronRight size={16} className="stroke-[3]" />
+          </button>
+        </div>
       </div>
 
       {/* Placeholder para relatórios EM BREVE */}
