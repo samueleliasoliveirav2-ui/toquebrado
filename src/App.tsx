@@ -2918,9 +2918,9 @@ function App() {
                     const y = el.scrollTop;
                     const lastY = mainInicioScrollRef.current;
                     const dy = y - lastY;
-                    if (y < 20) {
-                      if (isHeaderCollapsed) setIsHeaderCollapsed(false);
-                    } else if (dy > 14) {
+                    if (dy > 14) {
+                      // Apenas auto-colapsa ao rolar PARA BAIXO (e só se ainda não estiver colapsado)
+                      // NUNCA MAIS auto-expande — abrir só é possível com clique MANUAL na setinha
                       if (!isHeaderCollapsed) setIsHeaderCollapsed(true);
                     }
                     mainInicioScrollRef.current = y;
