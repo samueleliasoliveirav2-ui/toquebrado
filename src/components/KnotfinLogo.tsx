@@ -46,13 +46,13 @@ export const KnotfinLogo: React.FC<KnotfinLogoProps> = ({
   return (
     <div
       className={[
-        'inline-flex items-center justify-center font-brand font-extrabold tracking-tight leading-none select-none whitespace-nowrap',
+        'inline-flex items-center justify-center font-brand font-semibold tracking-tight leading-none select-none whitespace-nowrap',
         dims.textClass,
         className,
       ].filter(Boolean).join(' ')}
     >
-      <span style={{ color: text.knot, letterSpacing: '-0.015em' }}>knot</span>
-      <span style={{ color: text.suffix, letterSpacing: '-0.015em' }}>fin</span>
+      <span style={{ color: text.knot, letterSpacing: '-0.01em' }}>knot</span>
+      <span style={{ color: text.suffix, letterSpacing: '-0.01em' }}>fin</span>
     </div>
   );
 };
