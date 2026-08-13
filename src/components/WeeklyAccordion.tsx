@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   ChevronDown, 
@@ -46,8 +46,6 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
 }) => {
   const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({});
   const [popoverTxId, setPopoverTxId] = useState<string | null>(null);
-  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
-  const iconRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -197,49 +195,32 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
 
   const openTxPopover = (tx: Transaction, e: React.MouseEvent) => {
     e.stopPropagation();
-    const btnEl = (e.currentTarget as HTMLButtonElement);
-    iconRefs.current[tx.id] = btnEl;
-
-    const rect = btnEl.getBoundingClientRect();
-    // Posicionamento responsivo: mobile centralizado, desktop perto do ícone
-    const isMobile = window.innerWidth < 640;
-    let left: number;
-    let top: number;
-
-    if (isMobile) {
-      const vw = window.innerWidth;
-      left = Math.max(16, Math.min(rect.left - 10, vw - 360)); // nunca passa da borda
-      top = Math.max(16, rect.bottom + 10);
-      // Se transbordar a viewport na parte de baixo, abre ACIMA
-      if (top + 380 > window.innerHeight) {
-        top = Math.max(16, rect.top - 400);
-      }
-    } else {
-      left = Math.max(16, Math.min(rect.right + 12, window.innerWidth - 380));
-      top = Math.max(16, Math.min(rect.top - 10, window.innerHeight - 410));
-    }
-
-    setPopoverPos({ top, left });
     setPopoverTxId(tx.id);
   };
 
   const closeTxPopover = () => {
     setPopoverTxId(null);
-    setPopoverPos(null);
   };
 
-  // Click-outside fecha o popover
+  // Click-outside fecha o popover + FECHA COM TECLA ESC
   useEffect(() => {
     if (!popoverTxId) return;
     const onDocClick = (ev: MouseEvent) => {
-      const btn = popoverTxId ? iconRefs.current[popoverTxId] : null;
-      if (btn && btn.contains(ev.target as Node)) return; // clicou novamente no ícone: handler do botao vai alternar
       const popEl = document.getElementById('tx-details-popover');
       if (popEl && popEl.contains(ev.target as Node)) return;
       closeTxPopover();
     };
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape' || ev.key === 'Esc') closeTxPopover();
+    };
     document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = '';
+    };
   }, [popoverTxId]);
 
   const getTxPopoverData = (tx: Transaction) => {
@@ -457,14 +438,20 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
           </div>
         );
       })}
-      {/* ====== POPOVER DETALHES DA TRANSAÇÃO (React Portal) ====== */}
-      {popoverTx && popoverPos && typeof document !== 'undefined' &&
+      {/* ====== MODAL DETALHES DA TRANSAÇÃO (React Portal — CENTRALIZADA, NUNCA MAIS VAZA) ====== */}
+      {popoverTx && typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[120] animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) closeTxPopover(); }}>
+          <div
+            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm animate-fade-in flex items-center justify-center p-4 cursor-pointer"
+            onClick={closeTxPopover}
+            onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Esc') closeTxPopover(); }}
+            role="dialog"
+            aria-modal="true"
+          >
             <div
               id="tx-details-popover"
-              className="fixed w-[340px] max-w-[92vw] rounded-3xl shadow-2xl shadow-slate-900/30 overflow-hidden animate-pop-in origin-top-left backdrop-blur-2xl bg-white/85 border border-white/70 ring-1 ring-slate-900/5"
-              style={{ top: `${popoverPos.top}px`, left: `${popoverPos.left}px` }}
+              className="relative w-full max-w-sm mx-auto bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-pop-in cursor-auto"
+              onClick={(e) => e.stopPropagation()}
             >
               {(() => {
                 const data = getTxPopoverData(popoverTx);
@@ -473,113 +460,124 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                 const CIcon = catDt.icon;
                 return (
                   <>
-                    {/* =========== HEADER CATEGORIA =========== */}
-                    <div className={`px-4 py-3.5 flex items-center justify-between relative overflow-hidden ${catDt.bg}`}>
-                      {/* Glow acento */}
-                      <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-white/50 filter blur-2xl" />
-                      <div className="flex items-center gap-3 relative">
-                        <div className={`w-11 h-11 rounded-2xl bg-white/90 border border-white shadow-md flex items-center justify-center ${catDt.iconColor}`}>
-                          <CIcon size={20} className="stroke-[2.5]" />
+                    {/* =========== HEADER: TÍTULO + STATUS + X FECHAR =========== */}
+                    <div className="px-4.5 py-3.5 flex items-center justify-between border-b border-slate-200/80 bg-gradient-to-b from-white to-slate-50">
+                      <div className="flex items-center gap-3 min-w-0 pr-2 flex-1">
+                        <div className={`w-10 h-10 rounded-2xl ${catDt.bg} border border-white shadow-sm flex items-center justify-center shrink-0 ${catDt.iconColor}`}>
+                          <CIcon size={18} className="stroke-[2.5]" />
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Categoria</span>
-                          <span className={`text-[13px] font-extrabold ${data.isEntrada ? 'text-emerald-800' : 'text-slate-800'}`}>
-                            {popoverTx.categoria}
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <p className="text-[13.5px] font-extrabold text-slate-800 truncate leading-tight">
+                            {popoverTx.descricao}
+                          </p>
+                          <span className="text-[10px] font-bold text-slate-500 mt-0.5 truncate">
+                            {data.isEntrada ? 'Entrada' : 'Despesa'} • Valor{' '}
+                            <span className={`font-black ${data.isEntrada ? 'text-emerald-700' : 'text-rose-600'}`}>
+                              {(data.isEntrada ? '+ ' : '- ')} {formatCurrency(popoverTx.valor)}
+                            </span>
                           </span>
                         </div>
                       </div>
-                      {/* Status Pill + X fecha */}
-                      <div className="flex items-center gap-1.5 relative">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-black tracking-wide border ${statusInfo.color} ${statusInfo.bg} ${statusInfo.border}`}>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`px-2.5 py-1 rounded-full text-[10.5px] font-black tracking-wide border whitespace-nowrap ${statusInfo.color} ${statusInfo.bg} ${statusInfo.border}`}>
                           {statusInfo.label}
                         </span>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); closeTxPopover(); }}
-                          className="w-7 h-7 rounded-xl bg-white/80 hover:bg-white border border-slate-200/70 text-slate-500 hover:text-slate-800 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-sm"
+                          className="w-8 h-8 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-sm"
                           aria-label="Fechar detalhes"
+                          title="Fechar (Esc)"
                         >
                           <X size={14} className="stroke-[3]" />
                         </button>
                       </div>
                     </div>
 
-                    {/* =========== CORPO INFORMAÇÕES =========== */}
-                    <div className="px-4 py-4 space-y-3.5">
-                      {/* Descrição Completa */}
-                      <div className="space-y-1.5">
-                        <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-1">
-                          <FileText size={11} /> Descrição Completa
-                        </label>
-                        <p className="text-[14px] leading-snug font-bold text-slate-800 break-words w-full">
-                          {popoverTx.descricao}
-                        </p>
-                        {(popoverTx.frequencia && (popoverTx.frequencia !== 'AVULSO')) && (
-                          <span className="inline-flex items-center gap-1 mt-1.5 text-[9.5px] font-black px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
-                            {popoverTx.frequencia === 'PARCELADO'
-                              ? `📅 Parcelado · ${popoverTx.parcelaAtual || 1}ª de ${popoverTx.totalParcelas || popoverTx.parcelaAtual}x`
-                              : `🔁 Recorrente · ${popoverTx.periodicidade ? popoverTx.periodicidade[0].toUpperCase() + popoverTx.periodicidade.slice(1).toLowerCase() : 'Mensal'}`}
-                          </span>
-                        )}
-                      </div>
+                    {/* =========== CORPO: LISTA LIMPA COM ÍCONES =========== */}
+                    <div className="px-4 py-4 space-y-3.5 bg-white">
+                      {popoverTx.frequencia && popoverTx.frequencia !== 'AVULSO' && (
+                        <div className="inline-flex items-center gap-1.5 w-full justify-center text-[9.5px] font-black px-3 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
+                          {popoverTx.frequencia === 'PARCELADO'
+                            ? `📅 Parcelado · ${popoverTx.parcelaAtual || 1}ª de ${popoverTx.totalParcelas || popoverTx.parcelaAtual || 1} parcelas`
+                            : `🔁 Recorrente · ${popoverTx.periodicidade ? popoverTx.periodicidade[0].toUpperCase() + popoverTx.periodicidade.slice(1).toLowerCase() : 'Mensal'}`}
+                        </div>
+                      )}
 
-                      <div className="h-px bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
-
-                      {/* Conta / Forma de Pagamento */}
-                      <div className="space-y-1.5">
-                        <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-1">
-                          {popoverTx.cartaoId ? <CardIcon size={11} /> : <Wallet size={11} />} Conta / Forma de Pagamento
-                        </label>
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200 text-slate-600 flex items-center justify-center shadow-sm">
-                            {popoverTx.cartaoId ? <CardIcon size={14} /> : <Wallet size={14} />}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-[12.5px] font-extrabold text-slate-800">{data.accountName}</span>
-                            <span className="text-[10px] text-slate-500 font-medium">{data.formaPagLabel}</span>
-                          </div>
+                      {/* 📁 Categoria */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center shrink-0 mt-0.5">
+                          <CIcon size={14} className="stroke-[2.5]" />
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400">Categoria</label>
+                          <span className="text-[13px] font-extrabold text-slate-800 leading-tight mt-0.5">{popoverTx.categoria}</span>
                         </div>
                       </div>
 
-                      {/* Data Pagamento / Vencimento */}
-                      <div className="space-y-1.5">
-                        <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-1">
-                          <Calendar size={11} /> {popoverTx.status === 'PAGO' || popoverTx.status === 'RECEBIDO' ? 'Data de Pagamento' : popoverTx.status === 'POSTERGAR' ? 'Data Pós-adiada' : 'Data de Vencimento'}
-                        </label>
-                        <div className={`flex items-start gap-2 px-3 py-2 rounded-2xl border ${statusInfo.border} ${statusInfo.bg}`}>
-                          <span className={`text-[13px] font-black leading-tight ${statusInfo.color}`}>
+                      <div className="h-px bg-slate-100 mx-0.5" />
+
+                      {/* 💳 Conta / Forma */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center shrink-0 mt-0.5">
+                          {popoverTx.cartaoId ? <CardIcon size={14} className="stroke-[2.5]" /> : <Wallet size={14} className="stroke-[2.5]" />}
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400">Conta / Forma de Pagamento</label>
+                          <span className="text-[13px] font-extrabold text-slate-800 leading-tight mt-0.5">{data.accountName}</span>
+                          <span className="text-[10.5px] text-slate-500 font-medium mt-0.5">{data.formaPagLabel}</span>
+                        </div>
+                      </div>
+
+                      <div className="h-px bg-slate-100 mx-0.5" />
+
+                      {/* 📅 Data */}
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 mt-0.5 ${statusInfo.border} ${statusInfo.bg}`}>
+                          <Calendar size={14} className={`stroke-[2.5] ${statusInfo.color}`} />
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400">
+                            {popoverTx.status === 'PAGO' || popoverTx.status === 'RECEBIDO' ? 'Data de Efetivação' : popoverTx.status === 'POSTERGAR' ? 'Data Pós-Adiada' : 'Data de Vencimento'}
+                          </label>
+                          <span className={`text-[13px] font-extrabold leading-tight mt-0.5 ${statusInfo.color}`}>
                             {data.dataLabel}
                           </span>
                         </div>
                       </div>
 
-                      {/* Observações / Anotações */}
-                      <div className="space-y-1.5">
-                        <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-1">
-                          <AlertCircle size={11} /> Observações
-                        </label>
-                        <div className={`px-3 py-2 rounded-2xl border border-slate-200 bg-slate-50/70 ${data.observacoes === 'Sem observações cadastradas.' ? 'italic opacity-75' : ''}`}>
-                          <span className="text-[11.5px] leading-relaxed text-slate-600 font-medium whitespace-pre-wrap break-words">
-                            {data.observacoes}
-                          </span>
+                      <div className="h-px bg-slate-100 mx-0.5" />
+
+                      {/* 📝 Observações */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center shrink-0 mt-0.5">
+                          <FileText size={14} className="stroke-[2.5]" />
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400">Observações</label>
+                          <div className={`px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 mt-1 ${data.observacoes === 'Sem observações cadastradas.' ? 'italic opacity-75' : ''}`}>
+                            <span className="text-[11.5px] leading-relaxed text-slate-600 font-medium whitespace-pre-wrap break-words">
+                              {data.observacoes}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* =========== RODAPÉ: AÇÃO EDITAR =========== */}
-                    <div className="px-4 py-3 border-t border-slate-200/60 bg-gradient-to-b from-white/40 to-white/90">
+                    <div className="px-4 py-3.5 border-t border-slate-200/80 bg-gradient-to-b from-slate-50/60 to-white">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           closeTxPopover();
-                          setTimeout(() => onEditTransaction(popoverTx), 120);
+                          setTimeout(() => onEditTransaction(popoverTx), 140);
                         }}
-                        className="w-full py-2.5 rounded-2xl font-extrabold text-[11.5px] tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer
+                        className="w-full py-3 rounded-2xl font-extrabold text-[12px] tracking-wide flex items-center justify-center gap-2 transition-all cursor-pointer
                                    bg-gradient-to-r from-[#0e69b2] to-[#094d80] hover:from-[#0c5b99] hover:to-[#073e67] text-white
-                                   shadow-lg shadow-blue-700/25 hover:shadow-blue-700/35 active:scale-[0.98] ring-1 ring-blue-900/10"
+                                   shadow-lg shadow-blue-700/25 hover:shadow-blue-700/40 active:scale-[0.99] ring-1 ring-blue-900/10"
                       >
-                        <Pencil size={14} className="stroke-[2.5]" /> Editar Lançamento
+                        <Pencil size={15} className="stroke-[2.5]" /> Editar Lançamento
                       </button>
                     </div>
                   </>
