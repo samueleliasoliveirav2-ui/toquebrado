@@ -6,12 +6,12 @@ import {
   DollarSign,
   Edit2,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   AlertCircle,
   CheckCircle2,
   Clock,
-  FileUp
+  FileUp,
+  Wallet as WalletIcon,
+  Sparkles
 } from 'lucide-react';
 import type {
   CreditCard as CreditCardType,
@@ -21,6 +21,7 @@ import type {
 } from '../types';
 import { computeInvoiceDerivedStatus as _computeInvoiceStatus } from '../types';
 import { BANK_PRESETS } from './CreditCardModal';
+import { PillMonthPicker } from './PillMonthPicker';
 
 const getCardPreset = (card: CreditCardType) => {
   if (card.banco && BANK_PRESETS[card.banco]) {
@@ -70,20 +71,6 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
   onPayInvoice,
   onImportPdfInvoice
 }) => {
-  const currentIndex = months.findIndex((m) => m.key === selectedMonth);
-
-  const handlePrevMonth = () => {
-    if (currentIndex > 0) {
-      onMonthChange(months[currentIndex - 1].key);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (currentIndex < months.length - 1) {
-      onMonthChange(months[currentIndex + 1].key);
-    }
-  };
-
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -188,94 +175,164 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col p-4 space-y-5 bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-[#0e69b2]/10 text-[#0e69b2]">
-            <CreditCard size={20} />
-          </div>
-          <span className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">
-            Cartões de Crédito
-          </span>
-        </div>
-      </header>
+    <div className="w-full flex-1 flex flex-col bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
 
-      <div className="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
-        <button
-          onClick={handlePrevMonth}
-          disabled={currentIndex === 0}
-          className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <span className="text-xs font-black text-[#0e69b2] uppercase tracking-wider select-none font-sans">
-          {months[currentIndex]?.label}
-        </span>
-        <button
-          onClick={handleNextMonth}
-          disabled={currentIndex === months.length - 1}
-          className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-        >
-          <ChevronRight size={16} />
-        </button>
+      {/* Header com Pill do mês centralizado */}
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between gap-2">
+        <div className="p-2 rounded-2xl bg-[#0e69b2]/10 text-[#0e69b2] border border-[#0e69b2]/10 shrink-0" aria-hidden>
+          <CreditCard size={18} className="stroke-[2.3]" />
+        </div>
+
+        <PillMonthPicker
+          months={months}
+          selectedMonth={selectedMonth}
+          onChange={onMonthChange}
+          labelIcone={<Calendar size={15} className="stroke-[2.2]" />}
+        />
+
+        <div className="w-[42px] shrink-0" aria-hidden />
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-3xs flex flex-col text-left">
-          <div className="flex items-center gap-1.5 text-[#0e69b2] mb-1">
-            <CreditCard size={12} />
+      {/* KPIs Dark Glass */}
+      <div className="px-4 pt-2 space-y-3">
+        {/* Linha 1 — Limite Consolidado (card destaque full width) */}
+        <div className="relative overflow-hidden rounded-3xl p-5
+                        bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950
+                        border border-slate-800 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.7)]">
+          <div className="absolute -right-14 -top-14 w-44 h-44 rounded-full bg-[#0e69b2]/20 blur-3xl" aria-hidden />
+          <div className="absolute -left-14 bottom-0 w-40 h-40 rounded-full bg-purple-500/10 blur-3xl" aria-hidden />
+
+          <div className="relative z-10 flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <span className="text-[10px] uppercase tracking-[0.16em] font-extrabold text-slate-400 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-lg bg-[#0e69b2]/20 border border-[#0e69b2]/25 flex items-center justify-center">
+                  <CreditCard size={12} className="stroke-[2.3] text-[#57a1d9]" />
+                </span>
+                Limite Total Consolidado
+              </span>
+              <span className="text-[26px] sm:text-[28px] font-black text-white tabular-nums tracking-tight truncate mt-1.5 leading-none">
+                {formatCurrency(totalLimiteConsolidado)}
+              </span>
+              <span className="text-[10.5px] font-bold text-slate-400 mt-1">
+                Soma dos limites de todos os cartões cadastrados
+              </span>
+            </div>
+            <div className="shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0e69b2]/25 to-purple-500/20 border border-[#0e69b2]/30 flex items-center justify-center shadow-inner">
+              <WalletIcon size={22} className="stroke-[2.2] text-sky-300" />
+            </div>
           </div>
-          <span className="text-[8px] uppercase font-bold text-slate-500 leading-tight">
-            Limite Total
-          </span>
-          <span className="text-[11px] font-black text-slate-800 mt-1 leading-tight">
-            {formatCurrency(totalLimiteConsolidado)}
-          </span>
+
+          {/* Barra de utilização visual */}
+          {totalLimiteConsolidado > 0 && (
+            <div className="relative z-10 mt-4 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-bold">
+                <span className="text-slate-400 uppercase tracking-wider">Utilização</span>
+                <span className="text-slate-200 tabular-nums">
+                  {Math.round(Math.min(100, (totalFaturaAtual / totalLimiteConsolidado) * 100))}% usados
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-800/80 rounded-full overflow-hidden border border-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#0e69b2] via-sky-500 to-emerald-400 transition-all duration-500"
+                  style={{ width: `${Math.max(2, Math.min(100, (totalFaturaAtual / totalLimiteConsolidado) * 100))}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-3xs flex flex-col text-left">
-          <div className="flex items-center gap-1.5 text-emerald-600 mb-1">
-            <CheckCircle2 size={12} />
+        {/* Linha 2 — 2 colunas: Disponível e Fatura do Mês */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Disponível Total */}
+          <div className="relative overflow-hidden rounded-2xl p-3.5 h-[112px] flex flex-col justify-between
+                          bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950
+                          border border-slate-800 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.55)]">
+            <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-emerald-500/12 blur-2xl" aria-hidden />
+            <div className="flex items-center justify-between relative z-10">
+              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 flex items-center gap-1">
+                Disponível Total
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-[7px] font-black leading-none">
+                  OK
+                </span>
+              </span>
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-400/20 flex items-center justify-center">
+                <CheckCircle2 size={12} className="stroke-[2.5] text-emerald-400" />
+              </div>
+            </div>
+            <div className="relative z-10 space-y-1">
+              <span className="text-[16px] font-black truncate tabular-nums tracking-tight text-emerald-400">
+                {formatCurrency(totalLimiteDisponivel)}
+              </span>
+              <p className="text-[9.5px] font-semibold text-slate-400 leading-snug">
+                Limite liberado após faturas
+              </p>
+            </div>
           </div>
-          <span className="text-[8px] uppercase font-bold text-slate-500 leading-tight">
-            Disponível
-          </span>
-          <span className="text-[11px] font-black text-emerald-700 mt-1 leading-tight">
-            {formatCurrency(totalLimiteDisponivel)}
-          </span>
-        </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-3xs flex flex-col text-left">
-          <div className="flex items-center gap-1.5 text-amber-600 mb-1">
-            <DollarSign size={12} />
+          {/* Fatura do Mês */}
+          <div className="relative overflow-hidden rounded-2xl p-3.5 h-[112px] flex flex-col justify-between
+                          bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950
+                          border border-slate-800 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.55)]">
+            <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-amber-500/12 blur-2xl" aria-hidden />
+            <div className="flex items-center justify-between relative z-10">
+              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 flex items-center gap-1.5">
+                Fatura do Mês
+                {(() => {
+                  // status da fatura consolidada do mes
+                  const ativas = invoices.filter(
+                    inv => inv.mesAno === selectedMonth &&
+                      ['ABERTA', 'FECHADA', 'ATRASADA'].includes(resolvedInvoiceStatus(inv))
+                  );
+                  const todosPagos = ativas.length > 0 && ativas.every(inv => resolvedInvoiceStatus(inv) === 'PAGA');
+                  const temAtraso = ativas.some(inv => resolvedInvoiceStatus(inv) === 'ATRASADA');
+                  let s: { label: string; cls: string } = { label: 'ABERTA', cls: 'bg-amber-500/20 text-amber-400 border-amber-500/25' };
+                  if (todosPagos) s = { label: 'PAGA', cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/25' };
+                  else if (temAtraso) s = { label: 'ATRASO', cls: 'bg-rose-500/20 text-rose-400 border-rose-500/25' };
+                  else if (ativas.some(inv => resolvedInvoiceStatus(inv) === 'FECHADA')) s = { label: 'FECHADA', cls: 'bg-sky-500/20 text-sky-400 border-sky-500/25' };
+                  return (
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md border text-[7px] font-black leading-none ${s.cls}`}>
+                      {s.label}
+                    </span>
+                  );
+                })()}
+              </span>
+              <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-400/20 flex items-center justify-center">
+                <Sparkles size={12} className="stroke-[2.5] text-amber-400" />
+              </div>
+            </div>
+            <div className="relative z-10 space-y-1">
+              <span className="text-[16px] font-black truncate tabular-nums tracking-tight text-amber-400">
+                {formatCurrency(totalFaturaAtual)}
+              </span>
+              <p className="text-[9.5px] font-semibold text-slate-400 leading-snug">
+                Soma das faturas do período
+              </p>
+            </div>
           </div>
-          <span className="text-[8px] uppercase font-bold text-slate-500 leading-tight">
-            Fatura Mês
-          </span>
-          <span className="text-[11px] font-black text-amber-700 mt-1 leading-tight">
-            {formatCurrency(totalFaturaAtual)}
-          </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          onClick={onAddCard}
-          className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#0e69b2] hover:bg-[#0b5a9a] text-white text-[11px] font-bold transition-all shadow-sm cursor-pointer"
-        >
-          <Plus size={14} />
-          Adicionar Cartão
-        </button>
-        <button
-          onClick={onImportPdfInvoice}
-          className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold transition-all shadow-sm cursor-pointer"
-        >
-          <FileUp size={14} />
-          Importar Fatura (PDF)
-        </button>
+      {/* Botões de ação */}
+      <div className="px-4 pt-4">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={onAddCard}
+            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#0e69b2] hover:bg-[#0b5a9a] text-white text-[11px] font-bold transition-all shadow-sm cursor-pointer"
+          >
+            <Plus size={14} />
+            Adicionar Cartão
+          </button>
+          <button
+            onClick={onImportPdfInvoice}
+            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold transition-all shadow-sm cursor-pointer"
+          >
+            <FileUp size={14} />
+            Importar Fatura (PDF)
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="px-4 pt-4 space-y-3">
         <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider text-left pl-1">
           Meus Cartões
         </h3>

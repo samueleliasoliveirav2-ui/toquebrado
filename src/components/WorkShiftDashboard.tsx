@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
-import { ArrowUpRight, ArrowDownRight, Briefcase, Car, Calendar, DollarSign, Send, Edit3, CheckCircle, Clock, ChevronDown, ChevronUp, Link, Tag } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Briefcase, Car, Calendar, Send, Edit3, CheckCircle, Clock, ChevronDown, ChevronUp, Link, Tag, Sparkles } from 'lucide-react';
 import type { WorkShiftEntry } from '../types';
+import { PillMonthPicker } from './PillMonthPicker';
 
 interface WorkShiftDashboardProps {
   entries: WorkShiftEntry[];
   onEditEntry: (entry: WorkShiftEntry) => void;
   onSendToWallet: (date: string, activity: string, amount: number) => void;
   onMarkAsPaid: (id: string) => void;
+  months: Array<{ key: string; label: string }>;
+  selectedMonth: string;
+  onMonthChange: (m: string) => void;
 }
 
 export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   entries,
   onEditEntry,
   onSendToWallet,
-  onMarkAsPaid
+  onMarkAsPaid,
+  months,
+  selectedMonth,
+  onMonthChange
 }) => {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 
@@ -74,96 +81,120 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col p-4 space-y-5 bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
-      
-      {/* 2x2 Grid of KPIs */}
-      <div className="grid grid-cols-2 gap-2.5">
-        {/* Ganho Bruto do Mês */}
-        <div className="glass bg-white/95 border border-slate-200/60 p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500">Ganho Bruto</span>
-            <div className="w-5 h-5 rounded-lg bg-slate-55 text-slate-500 flex items-center justify-center">
-              <ArrowUpRight size={12} className="stroke-[3]" />
+    <div className="w-full flex-1 flex flex-col bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
+
+      {/* Header com pill do seletor de mês centralizado */}
+      <div className="px-4 pt-4 pb-2 flex items-center justify-center">
+        <PillMonthPicker
+          months={months}
+          selectedMonth={selectedMonth}
+          onChange={onMonthChange}
+          labelIcone={<Calendar size={15} className="stroke-[2.2]" />}
+        />
+      </div>
+
+      {/* Cards KPI Dark Glass */}
+      <div className="px-4 pt-2 pb-1 space-y-3">
+        {/* Ganho Bruto e A Receber (linha 1 - 2 cols) */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Ganho Bruto */}
+          <div className="relative overflow-hidden rounded-2xl p-3.5 h-[96px] flex flex-col justify-between
+                          bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950
+                          border border-slate-800 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.55)]">
+            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-emerald-500/10 blur-2xl" aria-hidden />
+            <div className="flex items-center justify-between relative z-10">
+              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">Ganho Bruto</span>
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-400/20 flex items-center justify-center">
+                <ArrowUpRight size={12} className="stroke-[2.5] text-emerald-400" />
+              </div>
+            </div>
+            <div className="relative z-10 flex items-end justify-between">
+              <span className="text-[15px] font-black text-white truncate tabular-nums tracking-tight">
+                {formatCurrency(totalGanhos)}
+              </span>
             </div>
           </div>
-          <span className="text-sm font-black text-slate-800 truncate mt-1">
-            {formatCurrency(totalGanhos)}
-          </span>
+
+          {/* A Receber */}
+          <div className="relative overflow-hidden rounded-2xl p-3.5 h-[96px] flex flex-col justify-between
+                          bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950
+                          border border-slate-800 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.55)]">
+            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-amber-500/10 blur-2xl" aria-hidden />
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">A Receber</span>
+                {pendingCount > 0 && (
+                  <span className="bg-amber-500 text-slate-950 text-[7px] font-black px-1.5 py-0.5 rounded-md leading-none shadow-xs">
+                    {pendingCount}
+                  </span>
+                )}
+              </div>
+              <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-400/25 flex items-center justify-center">
+                <Clock size={12} className="stroke-[2.5] text-amber-400" />
+              </div>
+            </div>
+            <div className="relative z-10">
+              <span className={`text-[15px] font-black truncate tabular-nums tracking-tight ${
+                totalAReceber > 0 ? 'text-amber-400' : 'text-slate-300'
+              }`}>
+                {formatCurrency(totalAReceber)}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* A Receber (Eventos) */}
-        <div className={`glass border p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left transition-colors ${
-          totalAReceber > 0 
-            ? 'bg-amber-50/20 border-amber-200/50' 
-            : 'bg-white/95 border-slate-200/60'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500">A Receber</span>
-              {pendingCount > 0 && (
-                <span className="bg-amber-500 text-white text-[7px] font-black px-1 py-0.5 rounded-md leading-none">
-                  {pendingCount}
-                </span>
-              )}
+        {/* Lucro Realizado e Projetado (linha 2 - 2 cols) */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Lucro Líq. Realizado */}
+          <div className={`relative overflow-hidden rounded-2xl p-3.5 h-[96px] flex flex-col justify-between
+                          bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950
+                          border border-slate-800 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.55)]`}>
+            <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full ${
+              lucroRealizado >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10'
+            } blur-2xl`} aria-hidden />
+            <div className="flex items-center justify-between relative z-10">
+              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">Lucro Líq. Realizado</span>
+              <div className={`w-6 h-6 rounded-lg border flex items-center justify-center ${
+                lucroRealizado >= 0
+                  ? 'bg-emerald-500/15 border-emerald-400/25'
+                  : 'bg-rose-500/15 border-rose-400/25'
+              }`}>
+                <CheckCircle size={12} className={`stroke-[2.5] ${lucroRealizado >= 0 ? 'text-emerald-400' : 'text-rose-400'}`} />
+              </div>
             </div>
-            <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
-              totalAReceber > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-400'
-            }`}>
-              <Clock size={11} className="stroke-[3]" />
+            <div className="relative z-10">
+              <span className={`text-[15px] font-black truncate tabular-nums tracking-tight ${
+                lucroRealizado >= 0 ? 'text-emerald-400' : 'text-rose-400'
+              }`}>
+                {lucroRealizado >= 0 && totalGanhos + custosRua + lucroRealizado > 0 ? '+' : ''}{formatCurrency(lucroRealizado)}
+              </span>
             </div>
           </div>
-          <span className={`text-sm font-black truncate mt-1 ${
-            totalAReceber > 0 ? 'text-amber-700' : 'text-slate-800'
-          }`}>
-            {formatCurrency(totalAReceber)}
-          </span>
-        </div>
 
-        {/* Lucro Líquido Realizado */}
-        <div className={`glass border p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left transition-colors ${
-          lucroRealizado >= 0 
-            ? 'bg-emerald-50/20 border-emerald-150/70' 
-            : 'bg-rose-55/10 border-rose-150/70'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500">Lucro Líq. Realizado</span>
-            <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
-              lucroRealizado >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-            }`}>
-              <CheckCircle size={11} className="stroke-[3]" />
+          {/* Lucro Líq. Projetado */}
+          <div className="relative overflow-hidden rounded-2xl p-3.5 h-[96px] flex flex-col justify-between
+                          bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950
+                          border border-slate-800 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.55)]">
+            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-indigo-500/10 blur-2xl" aria-hidden />
+            <div className="flex items-center justify-between relative z-10">
+              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">Lucro Líq. Projetado</span>
+              <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-400/25 flex items-center justify-center">
+                <Sparkles size={12} className="stroke-[2.5] text-indigo-400" />
+              </div>
+            </div>
+            <div className="relative z-10">
+              <span className={`text-[15px] font-black truncate tabular-nums tracking-tight ${
+                lucroProjetado >= 0 ? 'text-indigo-400' : 'text-rose-400'
+              }`}>
+                {lucroProjetado >= 0 && totalGanhos > 0 ? '+' : ''}{formatCurrency(lucroProjetado)}
+              </span>
             </div>
           </div>
-          <span className={`text-sm font-black truncate mt-1 ${
-            lucroRealizado >= 0 ? 'text-emerald-600' : 'text-rose-600'
-          }`}>
-            {formatCurrency(lucroRealizado)}
-          </span>
-        </div>
-
-        {/* Lucro Líquido Projetado */}
-        <div className={`glass border p-3.5 rounded-2xl shadow-3xs flex flex-col justify-between h-20 text-left transition-colors ${
-          lucroProjetado >= 0 
-            ? 'bg-blue-50/20 border-blue-150/70' 
-            : 'bg-rose-55/10 border-rose-150/70'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500">Lucro Líq. Projetado</span>
-            <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${
-              lucroProjetado >= 0 ? 'bg-blue-500/10 text-blue-600' : 'bg-rose-500/10 text-rose-600'
-            }`}>
-              <DollarSign size={11} className="stroke-[3]" />
-            </div>
-          </div>
-          <span className={`text-sm font-black truncate mt-1 ${
-            lucroProjetado >= 0 ? 'text-blue-600' : 'text-rose-600'
-          }`}>
-            {formatCurrency(lucroProjetado)}
-          </span>
         </div>
       </div>
 
       {/* Main List Section */}
-      <div className="space-y-4">
+      <div className="px-4 pt-4 space-y-4">
         <div className="flex items-center justify-between pl-1 pr-1">
           <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Histórico de Turnos</h3>
           <span className="text-[10px] text-slate-500 font-semibold uppercase">
