@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Menu,
   Sliders,
@@ -1637,126 +1638,129 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
       </div>
 
       {/* Bottom Sheet / Gaveta dos Relatórios */}
-      {pickerAberto && (
-        <>
-          {/* Backdrop (clica fora fecha) */}
-          <div
-            className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-fade-in cursor-pointer"
-            onClick={() => setPickerAberto(false)}
-            aria-hidden
-          />
+      {pickerAberto &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            {/* Backdrop (clica fora fecha) */}
+            <div
+              className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-fade-in cursor-pointer"
+              onClick={() => setPickerAberto(false)}
+              aria-hidden
+            />
 
-          {/* Gaveta flutuante universal — mobile = sobe de baixo; desktop = centralizada */}
-          <div
-            className="fixed z-50 inset-x-0 sm:inset-x-auto sm:max-w-md sm:w-[92%] sm:left-1/2 sm:-translate-x-1/2
-                       bottom-0 sm:bottom-auto sm:top-[16%]
-                       bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_-20px_60px_-15px_rgba(15,23,42,0.25)] sm:shadow-2xl
-                       border-t border-slate-200/60 sm:border border-slate-200/70
-                       animate-[slideUp_0.28s_ease-out]
-                       max-h-[82vh] flex flex-col overflow-hidden"
-            role="dialog"
-            aria-modal="true"
-          >
-            {/* Handle top + titulo */}
-            <div className="px-4 pt-3 pb-2 border-b border-slate-100 flex flex-col items-center shrink-0">
-              <div className="w-12 h-1.5 rounded-full bg-slate-200 mb-2.5" aria-hidden />
-              <div className="w-full flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 tracking-tight">Escolher Relatório</h3>
-                  <p className="text-[10px] font-semibold text-slate-500 mt-0.5">Alternar entre as análises disponíveis</p>
+            {/* Gaveta flutuante universal — mobile = sobe de baixo; desktop = centralizada */}
+            <div
+              className="fixed z-[100] inset-x-0 sm:inset-x-auto sm:max-w-md sm:w-[92%] sm:left-1/2 sm:-translate-x-1/2
+                         bottom-0 sm:bottom-auto sm:top-[16%]
+                         bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_-20px_60px_-15px_rgba(15,23,42,0.25)] sm:shadow-2xl
+                         border-t border-slate-200/60 sm:border border-slate-200/70
+                         animate-[slideUp_0.28s_ease-out]
+                         max-h-[82vh] flex flex-col overflow-hidden"
+              role="dialog"
+              aria-modal="true"
+            >
+              {/* Handle top + titulo */}
+              <div className="px-4 pt-3 pb-2 border-b border-slate-100 flex flex-col items-center shrink-0">
+                <div className="w-12 h-1.5 rounded-full bg-slate-200 mb-2.5" aria-hidden />
+                <div className="w-full flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 tracking-tight">Escolher Relatório</h3>
+                    <p className="text-[10px] font-semibold text-slate-500 mt-0.5">Alternar entre as análises disponíveis</p>
+                  </div>
+                  <button
+                    onClick={() => setPickerAberto(false)}
+                    className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                    aria-label="Fechar"
+                  >
+                    <ChevronDown size={18} className="stroke-[3]" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setPickerAberto(false)}
-                  className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
-                  aria-label="Fechar"
-                >
-                  <ChevronDown size={18} className="stroke-[3]" />
-                </button>
+              </div>
+
+              {/* Lista de relatorios */}
+              <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
+                {RELATORIOS_LISTA.map(rel => {
+                  const ativo = activeReport === rel.id;
+                  const indiponivel = !!rel.breve;
+                  return (
+                    <button
+                      key={rel.id}
+                      onClick={() => {
+                        if (indiponivel) return;
+                        setActiveReport(rel.id);
+                        setPickerAberto(false);
+                      }}
+                      disabled={indiponivel}
+                      className={[
+                        'w-full flex items-center gap-3 p-3 rounded-2xl text-left transition-all',
+                        ativo
+                          ? 'bg-gradient-to-r from-[#0e69b2]/10 via-[#0e69b2]/5 to-transparent border border-[#0e69b2]/20 shadow-[0_6px_16px_-10px_rgba(14,105,178,0.35)]'
+                          : indiponivel
+                          ? 'bg-slate-50 border border-slate-200/70 opacity-70 cursor-not-allowed'
+                          : 'bg-white border border-slate-200/60 hover:bg-slate-50 hover:border-slate-200 active:scale-[0.995] cursor-pointer'
+                      ].join(' ')}
+                    >
+                      <span className={[
+                        'shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center border transition-colors',
+                        ativo
+                          ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-md shadow-blue-500/25'
+                          : indiponivel
+                          ? 'bg-slate-100 text-slate-400 border-slate-200'
+                          : rel.destaque
+                          ? 'bg-gradient-to-br from-amber-50 to-orange-50 text-amber-700 border-amber-200'
+                          : 'bg-[#0e69b2]/10 text-[#0e69b2] border-[#0e69b2]/10'
+                      ].join(' ')}>
+                        {indiponivel ? <Lock size={18} /> : rel.icone}
+                      </span>
+
+                      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={[
+                            'text-[12.5px] font-black truncate tracking-wide',
+                            ativo ? 'text-[#0e69b2]' : indiponivel ? 'text-slate-400' : 'text-slate-800'
+                          ].join(' ')}>
+                            {rel.rotulo}
+                          </span>
+                          {rel.destaque && !indiponivel && !ativo && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[8px] font-black leading-none border border-amber-600 shadow-xs">
+                              NOVO
+                            </span>
+                          )}
+                          {indiponivel && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-500 text-[8px] font-black leading-none border border-slate-300">
+                              BREVE
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[10.5px] font-semibold truncate leading-snug ${
+                          ativo ? 'text-[#0e69b2]/80' : indiponivel ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
+                          {rel.descricao}
+                        </span>
+                      </div>
+
+                      <span className={[
+                        'shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all',
+                        ativo
+                          ? 'bg-[#0e69b2] text-white shadow-md shadow-blue-500/30'
+                          : 'bg-slate-100 text-transparent'
+                      ].join(' ')} aria-hidden>
+                        <Check size={13} className="stroke-[3]" />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Rodape seguro */}
+              <div className="px-4 pt-2 pb-4 shrink-0" aria-hidden>
+                <div className="h-1 w-32 mx-auto rounded-full bg-slate-100" />
               </div>
             </div>
-
-            {/* Lista de relatorios */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
-              {RELATORIOS_LISTA.map(rel => {
-                const ativo = activeReport === rel.id;
-                const indiponivel = !!rel.breve;
-                return (
-                  <button
-                    key={rel.id}
-                    onClick={() => {
-                      if (indiponivel) return;
-                      setActiveReport(rel.id);
-                      setPickerAberto(false);
-                    }}
-                    disabled={indiponivel}
-                    className={[
-                      'w-full flex items-center gap-3 p-3 rounded-2xl text-left transition-all',
-                      ativo
-                        ? 'bg-gradient-to-r from-[#0e69b2]/10 via-[#0e69b2]/5 to-transparent border border-[#0e69b2]/20 shadow-[0_6px_16px_-10px_rgba(14,105,178,0.35)]'
-                        : indiponivel
-                        ? 'bg-slate-50 border border-slate-200/70 opacity-70 cursor-not-allowed'
-                        : 'bg-white border border-slate-200/60 hover:bg-slate-50 hover:border-slate-200 active:scale-[0.995] cursor-pointer'
-                    ].join(' ')}
-                  >
-                    <span className={[
-                      'shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center border transition-colors',
-                      ativo
-                        ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-md shadow-blue-500/25'
-                        : indiponivel
-                        ? 'bg-slate-100 text-slate-400 border-slate-200'
-                        : rel.destaque
-                        ? 'bg-gradient-to-br from-amber-50 to-orange-50 text-amber-700 border-amber-200'
-                        : 'bg-[#0e69b2]/10 text-[#0e69b2] border-[#0e69b2]/10'
-                    ].join(' ')}>
-                      {indiponivel ? <Lock size={18} /> : rel.icone}
-                    </span>
-
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={[
-                          'text-[12.5px] font-black truncate tracking-wide',
-                          ativo ? 'text-[#0e69b2]' : indiponivel ? 'text-slate-400' : 'text-slate-800'
-                        ].join(' ')}>
-                          {rel.rotulo}
-                        </span>
-                        {rel.destaque && !indiponivel && !ativo && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[8px] font-black leading-none border border-amber-600 shadow-xs">
-                            NOVO
-                          </span>
-                        )}
-                        {indiponivel && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-500 text-[8px] font-black leading-none border border-slate-300">
-                            BREVE
-                          </span>
-                        )}
-                      </div>
-                      <span className={`text-[10.5px] font-semibold truncate leading-snug ${
-                        ativo ? 'text-[#0e69b2]/80' : indiponivel ? 'text-slate-400' : 'text-slate-500'
-                      }`}>
-                        {rel.descricao}
-                      </span>
-                    </div>
-
-                    <span className={[
-                      'shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all',
-                      ativo
-                        ? 'bg-[#0e69b2] text-white shadow-md shadow-blue-500/30'
-                        : 'bg-slate-100 text-transparent'
-                    ].join(' ')} aria-hidden>
-                      <Check size={13} className="stroke-[3]" />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Rodape seguro */}
-            <div className="px-4 pt-2 pb-4 shrink-0" aria-hidden>
-              <div className="h-1 w-32 mx-auto rounded-full bg-slate-100" />
-            </div>
-          </div>
-        </>
-      )}
+          </>,
+          document.body
+        )}
 
     </div>
   );
