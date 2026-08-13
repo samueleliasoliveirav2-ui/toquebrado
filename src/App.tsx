@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles, FileUp, CheckSquare, Square, Upload, FileText as FileTextIcon } from 'lucide-react';
+import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles, FileUp, CheckSquare, Square, Upload, FileText as FileTextIcon, BarChart3, LayoutList } from 'lucide-react';
 import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice, ExtractedInvoiceData, ExtractedInvoiceItem } from './types';
 import { CATEGORIES, INITIAL_TRANSACTIONS, computeInvoiceDerivedStatus } from './types';
 import { StatsHeader } from './components/StatsHeader';
@@ -2987,10 +2987,11 @@ function App() {
                     </div>
                   )}
 
-                  {/* Filters Bar: Search & Tabs */}
-                  <div className="space-y-3 font-sans">
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
+                  {/* Filters Bar: Compact 2-Line Layout */}
+                  <div className="space-y-2 font-sans">
+                    {/* Line 1 — Search + View Toggle (icon) merged */}
+                    <div className="relative group">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">
                         <Search size={14} />
                       </span>
                       <input
@@ -2998,143 +2999,125 @@ function App() {
                         placeholder="Buscar por descrição ou categoria..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all font-semibold shadow-inner"
+                        className="w-full bg-white border border-slate-200 rounded-2xl pl-9 pr-12 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0e69b2] focus:bg-white transition-all font-semibold shadow-inner focus:shadow-sm focus:shadow-blue-500/10"
                       />
-                    </div>
-
-                    <div className="flex items-center justify-between gap-1 bg-white border border-slate-200 p-1 rounded-2xl text-xs font-bold shadow-inner">
                       <button
-                        onClick={() => { setFilterType('TODOS'); setStatusFilter('TODOS'); }}
-                        className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all cursor-pointer ${
-                          filterType === 'TODOS'
-                            ? 'bg-slate-200 text-slate-800 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-600'
-                        }`}
+                        onClick={() => setInicioViewMode(inicioViewMode === 'LIST' ? 'CHART' : 'LIST')}
+                        title={inicioViewMode === 'LIST' ? 'Ver Gráficos' : 'Ver Lista'}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-[#0e69b2]/10 border border-slate-200 hover:border-[#0e69b2]/30 text-slate-600 hover:text-[#0e69b2] transition-all cursor-pointer shadow-sm active:scale-95"
                       >
-                        Todos
-                      </button>
-                      <button
-                        onClick={() => { setFilterType('ENTRADA'); setStatusFilter('TODOS'); }}
-                        className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                          filterType === 'ENTRADA'
-                            ? 'bg-slate-200 text-emerald-400 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-600'
-                        }`}
-                      >
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Receitas
-                      </button>
-                      <button
-                        onClick={() => { setFilterType('SAIDA'); setStatusFilter('TODOS'); }}
-                        className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                          filterType === 'SAIDA'
-                            ? 'bg-slate-200 text-rose-455 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-600'
-                        }`}
-                      >
-                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                        Despesas
+                        {inicioViewMode === 'LIST' ? <BarChart3 size={15} strokeWidth={2.2} /> : <LayoutList size={15} strokeWidth={2.2} />}
                       </button>
                     </div>
 
-                    {/* Status Filter — AGORA APARECE SEMPRE (inclusive no modo TODOS) */}
-                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                      {filterType === 'ENTRADA' ? (
-                        <>
-                          {[
-                            { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
-                            { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
-                            { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
-                          ].map(opt => (
-                            <button
-                              key={opt.key}
-                              onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
-                              className={[
-                                'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
-                                statusFilter === opt.key
-                                  ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
-                                  : `bg-white ${opt.color} hover:bg-slate-50`
-                              ].join(' ')}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </>
-                      ) : filterType === 'SAIDA' ? (
-                        <>
-                          {[
-                            { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
-                            { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
-                            { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
-                            { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
-                          ].map(opt => (
-                            <button
-                              key={opt.key}
-                              onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
-                              className={[
-                                'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
-                                statusFilter === opt.key
-                                  ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
-                                  : `bg-white ${opt.color} hover:bg-slate-50`
-                              ].join(' ')}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </>
-                      ) : (
-                        // Modo Todos (filterType === TODOS) → Mostra TODOS os status disponíveis
-                        <>
-                          {[
-                            { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
-                            { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
-                            { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
-                            { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
-                            { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
-                          ].map(opt => (
-                            <button
-                              key={opt.key}
-                              onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
-                              className={[
-                                'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
-                                statusFilter === opt.key
-                                  ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
-                                  : `bg-white ${opt.color} hover:bg-slate-50`
-                              ].join(' ')}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  </div>
+                    {/* Line 2 — Segmented Control (Todos/Receitas/Despesas) + Status Chips (scroll horizontal single line) */}
+                    <div className="flex items-center gap-2">
+                      {/* Segmented Control Type Filter (fixed size, no shrink) */}
+                      <div className="flex-shrink-0 flex items-center gap-0.5 bg-white border border-slate-200 p-0.5 rounded-2xl text-xs font-bold shadow-inner">
+                        <button
+                          onClick={() => { setFilterType('TODOS'); setStatusFilter('TODOS'); }}
+                          className={`py-1.5 px-3 rounded-xl text-[10px] font-extrabold text-center transition-all cursor-pointer whitespace-nowrap ${
+                            filterType === 'TODOS'
+                              ? 'bg-slate-200 text-slate-800 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-600'
+                          }`}
+                        >
+                          Todos
+                        </button>
+                        <button
+                          onClick={() => { setFilterType('ENTRADA'); setStatusFilter('TODOS'); }}
+                          className={`py-1.5 px-3 rounded-xl text-[10px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+                            filterType === 'ENTRADA'
+                              ? 'bg-slate-200 text-emerald-600 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-600'
+                          }`}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Receitas
+                        </button>
+                        <button
+                          onClick={() => { setFilterType('SAIDA'); setStatusFilter('TODOS'); }}
+                          className={`py-1.5 px-3 rounded-xl text-[10px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+                            filterType === 'SAIDA'
+                              ? 'bg-slate-200 text-rose-500 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-600'
+                          }`}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          Despesas
+                        </button>
+                      </div>
 
-                  {/* Summary filter toggle view inside INICIO (small top-left) */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="inline-flex bg-white border border-slate-200 rounded-xl p-0.5 shadow-3xs gap-0.5">
-                      <button
-                        onClick={() => setInicioViewMode('LIST')}
-                        className={[
-                          'px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer',
-                          inicioViewMode === 'LIST'
-                            ? 'bg-[#0e69b2] text-white shadow-sm shadow-blue-500/20'
-                            : 'text-slate-500 hover:text-slate-700'
-                        ].join(' ')}
-                      >
-                        Lista
-                      </button>
-                      <button
-                        onClick={() => setInicioViewMode('CHART')}
-                        className={[
-                          'px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer',
-                          inicioViewMode === 'CHART'
-                            ? 'bg-[#0e69b2] text-white shadow-sm shadow-blue-500/20'
-                            : 'text-slate-500 hover:text-slate-700'
-                        ].join(' ')}
-                      >
-                        Gráficos
-                      </button>
+                      {/* Status Chips — Single Line Horizontal Scroll */}
+                      <div className="flex-1 min-w-0 flex flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                        {filterType === 'ENTRADA' ? (
+                          <>
+                            {[
+                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
+                              { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
+                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
+                            ].map(opt => (
+                              <button
+                                key={opt.key}
+                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
+                                className={[
+                                  'flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all border border-slate-200 cursor-pointer',
+                                  statusFilter === opt.key
+                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
+                                    : `bg-white ${opt.color} hover:bg-slate-50`
+                                ].join(' ')}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </>
+                        ) : filterType === 'SAIDA' ? (
+                          <>
+                            {[
+                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
+                              { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
+                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
+                              { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
+                            ].map(opt => (
+                              <button
+                                key={opt.key}
+                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
+                                className={[
+                                  'flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all border border-slate-200 cursor-pointer',
+                                  statusFilter === opt.key
+                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
+                                    : `bg-white ${opt.color} hover:bg-slate-50`
+                                ].join(' ')}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            {[
+                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
+                              { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
+                              { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
+                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
+                              { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
+                            ].map(opt => (
+                              <button
+                                key={opt.key}
+                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
+                                className={[
+                                  'flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all border border-slate-200 cursor-pointer',
+                                  statusFilter === opt.key
+                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
+                                    : `bg-white ${opt.color} hover:bg-slate-50`
+                                ].join(' ')}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
 
