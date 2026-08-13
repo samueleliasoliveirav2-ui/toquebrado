@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
 import { 
   ChevronDown, 
   ChevronUp, 
   Calendar, 
-  AlertCircle, 
+  AlertCircle,
   Check, 
   Clock, 
   DollarSign, 
@@ -14,11 +13,10 @@ import {
   Heart, 
   HelpCircle, 
   CreditCard,
-  X,
   Pencil,
-  FileText,
   CreditCard as CardIcon,
-  Wallet
+  Wallet,
+  Tag
 } from 'lucide-react';
 import type { Transaction, BankAccount } from '../types';
 
@@ -45,13 +43,26 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
   accounts: _accounts = []
 }) => {
   const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({});
-  const [popoverTxId, setPopoverTxId] = useState<string | null>(null);
+  const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
+
+  const toggleTxExpand = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExpandedTxId(prev => (prev === id ? null : id));
+  };
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(val);
+  };
+
+  const getTxExtraData = (tx: Transaction) => {
+    const accountName = tx.contaId
+      ? (_accounts.find(a => a.id === tx.contaId)?.nome || 'Conta / Carteira')
+      : (tx.cartaoId ? 'Cartão de Crédito' : 'Não informada');
+    const observacao = (tx as any).observacao || '';
+    return { accountName, observacao };
   };
 
   const getWeekMonday = (dateStr: string): string => {
@@ -174,86 +185,6 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
     }));
   };
 
-  const formatDateLong = (dateStr: string) => {
-    const parts = dateStr.split('-');
-    if (parts.length !== 3) return dateStr;
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  };
-
-  const getStatusLabel = (tx: Transaction): { label: string; color: string; bg: string; border: string } => {
-    switch (tx.status) {
-      case 'RECEBIDO':
-        return { label: 'Recebido', color: 'text-emerald-700', bg: 'bg-emerald-500/12', border: 'border-emerald-500/20' };
-      case 'PAGO':
-        return { label: 'Pago', color: 'text-emerald-700', bg: 'bg-emerald-500/12', border: 'border-emerald-500/20' };
-      case 'POSTERGAR':
-        return { label: 'Postergado', color: 'text-orange-700', bg: 'bg-orange-500/12', border: 'border-orange-500/20' };
-      default:
-        return { label: 'Pendente', color: 'text-amber-700', bg: 'bg-amber-500/12', border: 'border-amber-500/20' };
-    }
-  };
-
-  const openTxPopover = (tx: Transaction, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPopoverTxId(tx.id);
-  };
-
-  const closeTxPopover = () => {
-    setPopoverTxId(null);
-  };
-
-  // Click-outside fecha o popover + FECHA COM TECLA ESC
-  useEffect(() => {
-    if (!popoverTxId) return;
-    const onDocClick = (ev: MouseEvent) => {
-      const popEl = document.getElementById('tx-details-popover');
-      if (popEl && popEl.contains(ev.target as Node)) return;
-      closeTxPopover();
-    };
-    const onKeyDown = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape' || ev.key === 'Esc') closeTxPopover();
-    };
-    document.addEventListener('mousedown', onDocClick);
-    document.addEventListener('keydown', onKeyDown);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = '';
-    };
-  }, [popoverTxId]);
-
-  const getTxPopoverData = (tx: Transaction) => {
-    const isEntrada = tx.tipo === 'ENTRADA';
-    const accountName = tx.contaId
-      ? (_accounts.find(a => a.id === tx.contaId)?.nome || 'Conta / Carteira')
-      : (tx.cartaoId
-        ? `Cartão de Crédito`
-        : 'Não informado');
-    const formaPagLabel = tx.cartaoId ? 'Cartão de Crédito' : (tx.contaId ? 'Conta / PIX / Dinheiro' : '—');
-    const dataLabel = (() => {
-      const st = getStatusLabel(tx);
-      if (tx.status === 'PAGO' || tx.status === 'RECEBIDO') return `💰 ${st.label} em ${formatDateLong(tx.data)}`;
-      if (tx.status === 'POSTERGAR' && tx.dataPostergar) return `⏳ Pago em ${formatDateLong(tx.dataPostergar)} (postergado)`;
-      return `📅 Vence em ${formatDateLong(tx.data)}`;
-    })();
-    const observacoes = (tx as any).observacao || 'Sem observações cadastradas.';
-
-    return {
-      isEntrada,
-      accountName,
-      formaPagLabel,
-      dataLabel,
-      observacoes,
-      statusInfo: getStatusLabel(tx),
-      totalParcelas: tx.totalParcelas,
-      parcelaAtual: tx.parcelaAtual,
-      frequencia: tx.frequencia
-    };
-  };
-
-  const popoverTx = popoverTxId ? transactions.find(t => t.id === popoverTxId) || null : null;
-
   const getStatusBadge = (tx: Transaction) => {
     switch (tx.status) {
       case 'RECEBIDO':
@@ -359,76 +290,157 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                   const catDetails = getCategoryDetails(tx.categoria, tx.tipo);
                   const CatIcon = catDetails.icon;
 
+                  const isExpandedTx = expandedTxId === tx.id;
+                  const extraData = getTxExtraData(tx);
+
                   return (
                     <div 
                       key={tx.id}
-                      onClick={() => onEditTransaction(tx)}
-                      className="flex items-center justify-between p-3.5 rounded-[20px] bg-white border border-slate-200 hover:bg-slate-50 active:scale-98 transition-all cursor-pointer group"
+                      className={`rounded-[20px] bg-white border border-slate-200 transition-all ${isExpandedTx ? 'ring-2 ring-blue-500/20 shadow-lg shadow-slate-900/10' : 'hover:bg-slate-50 active:scale-[0.995]'}`}
                     >
-                      {/* Left: Icon and info */}
-                      <div className="flex items-center gap-3">
-                        {/* 🔘 ÍCONE DA CATEGORIA → AGORA É BOTÃO INTERATIVO (POPOVER DETALHES) */}
-                        <button
-                          type="button"
-                          onClick={(e) => openTxPopover(tx, e)}
-                          className={`relative w-10 h-10 rounded-2xl ${catDetails.bg} flex items-center justify-center text-sm shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer ring-0 hover:ring-2 hover:ring-slate-900/10 ring-offset-2 z-[1]`}
-                          aria-label="Ver detalhes da transação"
-                          title="Ver detalhes da transação"
-                        >
-                          <CatIcon size={18} className="stroke-[2.5]" />
-                          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-slate-800 border border-white animate-pulse" aria-hidden />
-                        </button>
-
-                        {/* Mid: Description, Category and Date */}
-                        <div className="flex flex-col text-left">
-                          <span className="text-sm font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1 max-w-[150px]">
-                            {tx.descricao}
-                          </span>
-                          
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="text-[10px] text-slate-500 font-medium">
-                              {activeDate.split('-')[2]} Ago • {tx.categoria}
+                      {/* Top row / header do card transação */}
+                      <div
+                        onClick={() => onEditTransaction(tx)}
+                        className="flex items-center justify-between p-3.5 cursor-pointer group"
+                      >
+                        {/* Left: Icon and info */}
+                        <div className="flex items-center gap-3">
+                          {/* 🔘 ÍCONE DA CATEGORIA → BOTÃO TOGGLE ACCORDION INLINE (clica expande/colapsa) */}
+                          <button
+                            type="button"
+                            onClick={(e) => toggleTxExpand(tx.id, e)}
+                            className={`relative w-10 h-10 rounded-2xl ${catDetails.bg} flex items-center justify-center text-sm shadow-sm transition-all cursor-pointer z-[1]
+                                       ${isExpandedTx ? 'ring-2 ring-slate-900/15 ring-offset-1 scale-105' : 'hover:scale-105 active:scale-95 hover:ring-2 hover:ring-slate-900/10 ring-offset-2'}`}
+                            aria-label={isExpandedTx ? 'Ocultar detalhes da transação' : 'Ver detalhes da transação'}
+                            title={isExpandedTx ? 'Recolher detalhes' : 'Expandir detalhes'}
+                          >
+                            <CatIcon size={18} className="stroke-[2.5]" />
+                            {/* Chevron indicador de expandido */}
+                            <span className={`absolute -bottom-1.5 -right-1 w-4 h-4 rounded-full bg-white border border-slate-200 text-slate-500 flex items-center justify-center shadow-sm transition-all duration-300 ${isExpandedTx ? 'rotate-180 bg-blue-50 border-blue-200 text-blue-700' : ''}`}>
+                              <ChevronDown size={9} className="stroke-[3]" />
                             </span>
-                            {isPostponed && (
-                              <span className="text-[8px] text-slate-600 font-bold line-through">
-                                ({tx.data.split('-')[2]} Ago)
+                          </button>
+
+                          {/* Mid: Description, Category and Date */}
+                          <div className="flex flex-col text-left">
+                            <span className="text-sm font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1 max-w-[150px]">
+                              {tx.descricao}
+                            </span>
+                            
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                {activeDate.split('-')[2]} Ago • {tx.categoria}
+                              </span>
+                              {isPostponed && (
+                                <span className="text-[8px] text-slate-600 font-bold line-through">
+                                  ({tx.data.split('-')[2]} Ago)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Value and Badge status */}
+                        <div className="flex items-center gap-2.5">
+                          <div className="text-right flex flex-col items-end">
+                            <span className={`text-sm font-black font-mono tracking-tight ${isEntrada ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {isEntrada ? '+' : '-'} {formatCurrency(tx.valor)}
+                            </span>
+                            {!!tx.juros && tx.juros > 0 && (
+                              <span className="block text-[8px] text-rose-600 font-bold">
+                                +{formatCurrency(tx.juros)} juros
                               </span>
                             )}
                           </div>
+
+                          {/* Status Badge (with 1-click status change behavior) */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleStatus(tx.id);
+                            }}
+                            className="hover:scale-105 active:scale-95 transition-transform relative group/badge flex items-center justify-center cursor-pointer"
+                          >
+                            {getStatusBadge(tx)}
+                            <div className="absolute inset-0 bg-white opacity-0 group-hover/badge:opacity-100 flex items-center justify-center rounded-full transition-opacity border border-slate-200">
+                              {isPaid ? (
+                                <Clock size={11} className="text-slate-500" />
+                              ) : (
+                                <Check size={11} className="text-emerald-600 font-bold" />
+                              )}
+                            </div>
+                          </button>
                         </div>
                       </div>
 
-                      {/* Right: Value and Badge status */}
-                      <div className="flex items-center gap-2.5">
-                        <div className="text-right flex flex-col items-end">
-                          <span className={`text-sm font-black font-mono tracking-tight ${isEntrada ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {isEntrada ? '+' : '-'} {formatCurrency(tx.valor)}
-                          </span>
-                          {!!tx.juros && tx.juros > 0 && (
-                            <span className="block text-[8px] text-rose-600 font-bold">
-                              +{formatCurrency(tx.juros)} juros
-                            </span>
-                          )}
-                        </div>
+                      {/* ÁREA EXPANDÍVEL INLINE: detalhes rápidos (Accordion) */}
+                      <div
+                        className={`overflow-hidden transition-all duration-350 ease-out ${isExpandedTx ? 'max-h-[420px] opacity-100' : 'max-h-0 opacity-0'}`}
+                      >
+                        <div className="px-3.5 pb-3.5">
+                          <div className="pt-3 border-t border-slate-100 text-[11.5px] space-y-2.5">
+                            {/* Linha 1: Conta + Categoria */}
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                <Wallet size={12} className="text-slate-400 shrink-0" />
+                                <span className="text-slate-500 font-bold shrink-0">Conta:</span>
+                                <span className="text-slate-800 font-extrabold truncate">{extraData.accountName}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Tag size={12} className="text-slate-400 shrink-0" />
+                                <span className="text-slate-500 font-bold shrink-0">Categoria:</span>
+                                <span className="text-slate-800 font-extrabold">{tx.categoria}</span>
+                              </div>
+                            </div>
 
-                        {/* Status Badge (with 1-click status change behavior) */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleStatus(tx.id);
-                          }}
-                          className="hover:scale-105 active:scale-95 transition-transform relative group/badge flex items-center justify-center cursor-pointer"
-                        >
-                          {getStatusBadge(tx)}
-                          <div className="absolute inset-0 bg-white opacity-0 group-hover/badge:opacity-100 flex items-center justify-center rounded-full transition-opacity border border-slate-200">
-                            {isPaid ? (
-                              <Clock size={11} className="text-slate-500" />
-                            ) : (
-                              <Check size={11} className="text-emerald-600 font-bold" />
+                            {/* Linha 2: Forma + Data */}
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                <CardIcon size={12} className="text-slate-400 shrink-0" />
+                                <span className="text-slate-500 font-bold shrink-0">Forma:</span>
+                                <span className="text-slate-800 font-extrabold truncate">
+                                  {tx.cartaoId ? 'Cartão de Crédito' : tx.contaId ? 'Conta / PIX / Dinheiro' : 'Não informado'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Calendar size={12} className="text-slate-400 shrink-0" />
+                                <span className="text-slate-500 font-bold shrink-0">Data:</span>
+                                <span className="text-slate-800 font-extrabold">
+                                  {(() => {
+                                    const d = (isPostponed && tx.dataPostergar) ? tx.dataPostergar : tx.data;
+                                    const p = d.split('-');
+                                    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+                                  })()}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Observações (se existir) */}
+                            {!!extraData.observacao && (
+                              <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 italic">
+                                <p className="text-[11px] text-slate-600 opacity-90 leading-relaxed whitespace-pre-wrap break-words">
+                                  "{extraData.observacao}"
+                                </p>
+                              </div>
                             )}
+
+                            {/* Botão Editar alinhado à direita */}
+                            <div className="pt-1 flex items-center justify-end">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleTxExpand(tx.id, e);
+                                  setTimeout(() => onEditTransaction(tx), 120);
+                                }}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0e69b2] to-[#094d80] hover:from-[#0c5b99] hover:to-[#073e67] text-white text-[11px] font-black tracking-wide shadow-md shadow-blue-700/20 active:scale-95 transition-all cursor-pointer"
+                              >
+                                <Pencil size={12} className="stroke-[3]" /> Editar lançamento
+                              </button>
+                            </div>
                           </div>
-                        </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -438,155 +450,6 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
           </div>
         );
       })}
-      {/* ====== MODAL DETALHES DA TRANSAÇÃO (React Portal — CENTRALIZADA, NUNCA MAIS VAZA) ====== */}
-      {popoverTx && typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm animate-fade-in flex items-center justify-center p-4 cursor-pointer"
-            onClick={closeTxPopover}
-            onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Esc') closeTxPopover(); }}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div
-              id="tx-details-popover"
-              className="relative w-full max-w-sm mx-auto bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-pop-in cursor-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {(() => {
-                const data = getTxPopoverData(popoverTx);
-                const statusInfo = getStatusLabel(popoverTx);
-                const catDt = getCategoryDetails(popoverTx.categoria, popoverTx.tipo);
-                const CIcon = catDt.icon;
-                return (
-                  <>
-                    {/* =========== HEADER: TÍTULO + STATUS + X FECHAR =========== */}
-                    <div className="px-4.5 py-3.5 flex items-center justify-between border-b border-slate-200/80 bg-gradient-to-b from-white to-slate-50">
-                      <div className="flex items-center gap-3 min-w-0 pr-2 flex-1">
-                        <div className={`w-10 h-10 rounded-2xl ${catDt.bg} border border-white shadow-sm flex items-center justify-center shrink-0 ${catDt.iconColor}`}>
-                          <CIcon size={18} className="stroke-[2.5]" />
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <p className="text-[13.5px] font-extrabold text-slate-800 truncate leading-tight">
-                            {popoverTx.descricao}
-                          </p>
-                          <span className="text-[10px] font-bold text-slate-500 mt-0.5 truncate">
-                            {data.isEntrada ? 'Entrada' : 'Despesa'} • Valor{' '}
-                            <span className={`font-black ${data.isEntrada ? 'text-emerald-700' : 'text-rose-600'}`}>
-                              {(data.isEntrada ? '+ ' : '- ')} {formatCurrency(popoverTx.valor)}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`px-2.5 py-1 rounded-full text-[10.5px] font-black tracking-wide border whitespace-nowrap ${statusInfo.color} ${statusInfo.bg} ${statusInfo.border}`}>
-                          {statusInfo.label}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); closeTxPopover(); }}
-                          className="w-8 h-8 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-sm"
-                          aria-label="Fechar detalhes"
-                          title="Fechar (Esc)"
-                        >
-                          <X size={14} className="stroke-[3]" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* =========== CORPO: LISTA LIMPA COM ÍCONES =========== */}
-                    <div className="px-4 py-4 space-y-3.5 bg-white">
-                      {popoverTx.frequencia && popoverTx.frequencia !== 'AVULSO' && (
-                        <div className="inline-flex items-center gap-1.5 w-full justify-center text-[9.5px] font-black px-3 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
-                          {popoverTx.frequencia === 'PARCELADO'
-                            ? `📅 Parcelado · ${popoverTx.parcelaAtual || 1}ª de ${popoverTx.totalParcelas || popoverTx.parcelaAtual || 1} parcelas`
-                            : `🔁 Recorrente · ${popoverTx.periodicidade ? popoverTx.periodicidade[0].toUpperCase() + popoverTx.periodicidade.slice(1).toLowerCase() : 'Mensal'}`}
-                        </div>
-                      )}
-
-                      {/* 📁 Categoria */}
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center shrink-0 mt-0.5">
-                          <CIcon size={14} className="stroke-[2.5]" />
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400">Categoria</label>
-                          <span className="text-[13px] font-extrabold text-slate-800 leading-tight mt-0.5">{popoverTx.categoria}</span>
-                        </div>
-                      </div>
-
-                      <div className="h-px bg-slate-100 mx-0.5" />
-
-                      {/* 💳 Conta / Forma */}
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center shrink-0 mt-0.5">
-                          {popoverTx.cartaoId ? <CardIcon size={14} className="stroke-[2.5]" /> : <Wallet size={14} className="stroke-[2.5]" />}
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400">Conta / Forma de Pagamento</label>
-                          <span className="text-[13px] font-extrabold text-slate-800 leading-tight mt-0.5">{data.accountName}</span>
-                          <span className="text-[10.5px] text-slate-500 font-medium mt-0.5">{data.formaPagLabel}</span>
-                        </div>
-                      </div>
-
-                      <div className="h-px bg-slate-100 mx-0.5" />
-
-                      {/* 📅 Data */}
-                      <div className="flex items-start gap-3">
-                        <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 mt-0.5 ${statusInfo.border} ${statusInfo.bg}`}>
-                          <Calendar size={14} className={`stroke-[2.5] ${statusInfo.color}`} />
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400">
-                            {popoverTx.status === 'PAGO' || popoverTx.status === 'RECEBIDO' ? 'Data de Efetivação' : popoverTx.status === 'POSTERGAR' ? 'Data Pós-Adiada' : 'Data de Vencimento'}
-                          </label>
-                          <span className={`text-[13px] font-extrabold leading-tight mt-0.5 ${statusInfo.color}`}>
-                            {data.dataLabel}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="h-px bg-slate-100 mx-0.5" />
-
-                      {/* 📝 Observações */}
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center shrink-0 mt-0.5">
-                          <FileText size={14} className="stroke-[2.5]" />
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <label className="text-[9.5px] font-black uppercase tracking-[0.2em] text-slate-400">Observações</label>
-                          <div className={`px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 mt-1 ${data.observacoes === 'Sem observações cadastradas.' ? 'italic opacity-75' : ''}`}>
-                            <span className="text-[11.5px] leading-relaxed text-slate-600 font-medium whitespace-pre-wrap break-words">
-                              {data.observacoes}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* =========== RODAPÉ: AÇÃO EDITAR =========== */}
-                    <div className="px-4 py-3.5 border-t border-slate-200/80 bg-gradient-to-b from-slate-50/60 to-white">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeTxPopover();
-                          setTimeout(() => onEditTransaction(popoverTx), 140);
-                        }}
-                        className="w-full py-3 rounded-2xl font-extrabold text-[12px] tracking-wide flex items-center justify-center gap-2 transition-all cursor-pointer
-                                   bg-gradient-to-r from-[#0e69b2] to-[#094d80] hover:from-[#0c5b99] hover:to-[#073e67] text-white
-                                   shadow-lg shadow-blue-700/25 hover:shadow-blue-700/40 active:scale-[0.99] ring-1 ring-blue-900/10"
-                      >
-                        <Pencil size={15} className="stroke-[2.5]" /> Editar Lançamento
-                      </button>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          </div>,
-          document.body
-        )}
     </div>
   );
 };
