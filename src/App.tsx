@@ -91,6 +91,7 @@ function App() {
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [selectedWalletCard, setSelectedWalletCard] = useState<CreditCard | null>(null);
   const [inicioViewMode, setInicioViewMode] = useState<'LIST' | 'CHART'>('LIST');
+  const [statusFilter, setStatusFilter] = useState<'TODOS' | TransactionStatus>('TODOS');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('SAIDA');
@@ -686,7 +687,9 @@ function App() {
       tx.descricao.toLowerCase().includes(searchQuery.toLowerCase()) ||
       tx.categoria.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = filterType === 'TODOS' || tx.tipo === filterType;
-    return matchesSearch && matchesType;
+    const matchesStatus =
+      statusFilter === 'TODOS' || tx.status === statusFilter;
+    return matchesSearch && matchesType && matchesStatus;
   });
 
   // Count mock transactions present in account
@@ -3005,7 +3008,7 @@ function App() {
 
                     <div className="flex items-center justify-between gap-1 bg-white border border-slate-200 p-1 rounded-2xl text-xs font-bold shadow-inner">
                       <button
-                        onClick={() => setFilterType('TODOS')}
+                        onClick={() => { setFilterType('TODOS'); setStatusFilter('TODOS'); }}
                         className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all cursor-pointer ${
                           filterType === 'TODOS'
                             ? 'bg-slate-200 text-slate-800 shadow-sm'
@@ -3015,7 +3018,7 @@ function App() {
                         Todos
                       </button>
                       <button
-                        onClick={() => setFilterType('ENTRADA')}
+                        onClick={() => { setFilterType('ENTRADA'); setStatusFilter('TODOS'); }}
                         className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
                           filterType === 'ENTRADA'
                             ? 'bg-slate-200 text-emerald-400 shadow-sm'
@@ -3026,7 +3029,7 @@ function App() {
                         Receitas
                       </button>
                       <button
-                        onClick={() => setFilterType('SAIDA')}
+                        onClick={() => { setFilterType('SAIDA'); setStatusFilter('TODOS'); }}
                         className={`flex-1 py-2 rounded-xl text-[10.5px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
                           filterType === 'SAIDA'
                             ? 'bg-slate-200 text-rose-455 shadow-sm'
@@ -3037,6 +3040,56 @@ function App() {
                         Despesas
                       </button>
                     </div>
+
+                    {/* Status Filter: conditional by filterType */}
+                    {(filterType === 'ENTRADA' || filterType === 'SAIDA') && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {filterType === 'ENTRADA' ? (
+                          <>
+                            {[
+                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
+                              { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
+                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
+                            ].map(opt => (
+                              <button
+                                key={opt.key}
+                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
+                                className={[
+                                  'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
+                                  statusFilter === opt.key
+                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
+                                    : `bg-white ${opt.color} hover:bg-slate-50`
+                                ].join(' ')}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            {[
+                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
+                              { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
+                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
+                              { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
+                            ].map(opt => (
+                              <button
+                                key={opt.key}
+                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
+                                className={[
+                                  'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
+                                  statusFilter === opt.key
+                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
+                                    : `bg-white ${opt.color} hover:bg-slate-50`
+                                ].join(' ')}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Summary filter toggle view inside INICIO (small top-left) */}
