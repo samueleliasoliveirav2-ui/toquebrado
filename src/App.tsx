@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles, FileUp, CheckSquare, Square, Upload, FileText as FileTextIcon, BarChart3, LayoutList, Tag, Check } from 'lucide-react';
 import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice, ExtractedInvoiceData, ExtractedInvoiceItem } from './types';
@@ -58,7 +58,10 @@ function App() {
   const [editingCreditCard, setEditingCreditCard] = useState<CreditCard | null>(null);
   const [isInvoiceDetailOpen, setIsInvoiceDetailOpen] = useState(false);
   const [selectedInvoiceCard, setSelectedInvoiceCard] = useState<CreditCard | null>(null);
-  const [invoiceDetailMonth, setInvoiceDetailMonth] = useState('2026-08');
+
+  const hoje = new Date();
+  const mesAnoAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+  const [invoiceDetailMonth, setInvoiceDetailMonth] = useState(mesAnoAtual);
 
   // Custom Dynamic Categories state
   const [customCategories, setCustomCategories] = useState<Record<'ENTRADA' | 'SAIDA', string[]>>(() => {
@@ -77,7 +80,7 @@ function App() {
   });
 
   // Filtering and Searching states
-  const [selectedMonth, setSelectedMonth] = useState('2026-08'); // Default to August 2026
+  const [selectedMonth, setSelectedMonth] = useState(mesAnoAtual);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'TODOS' | 'ENTRADA' | 'SAIDA'>('TODOS');
   
@@ -633,33 +636,85 @@ function App() {
     }
   }, [userId]);
 
-  const months = [
-    { key: '2026-06', label: 'Junho de 2026' },
-    { key: '2026-07', label: 'Julho de 2026' },
-    { key: '2026-08', label: 'Agosto de 2026' },
-    { key: '2026-09', label: 'Setembro de 2026' },
-    { key: '2026-10', label: 'Outubro de 2026' }
-  ];
+  // ===== Helpers de data (sem travas, dinâmicos) =====
+  const NOMES_MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-  const currentIndex = months.findIndex(m => m.key === selectedMonth);
+  // A partir do ano/mês "YYYY-MM" avança ou recua N meses (infinito)
+  const addMeses = (mesAno: string, delta: number): string => {
+    const [a, m] = mesAno.split('-').map(Number);
+    if (!a || !m) return mesAno;
+    const total = a * 12 + (m - 1) + delta;
+    const novoAno = Math.floor(total / 12);
+    const novoMes = ((total % 12) + 12) % 12;
+    return `${novoAno}-${String(novoMes + 1).padStart(2, '0')}`;
+  };
 
-  const handlePrevMonth = () => {
-    if (currentIndex > 0) {
-      setSelectedMonth(months[currentIndex - 1].key);
+  const formatarMesLabel = (mesAno: string): string => {
+    const [a, m] = mesAno.split('-').map(Number);
+    if (!a || !m) return mesAno;
+    return `${NOMES_MESES[m - 1]} de ${a}`;
+  };
+
+  // Intervalo: 5 anos atrás → 10 anos no futuro (15 anos, 180 meses)
+  const ANO_ATUAL = hoje.getFullYear();
+  const ANO_INICIO = ANO_ATUAL - 5;
+  const ANO_FIM = ANO_ATUAL + 10;
+
+  const months = useMemo(() => {
+    const list: { key: string; label: string }[] = [];
+    for (let ano = ANO_INICIO; ano <= ANO_FIM; ano++) {
+      for (let mes = 1; mes <= 12; mes++) {
+        const key = `${ano}-${String(mes).padStart(2, '0')}`;
+        list.push({ key, label: `${NOMES_MESES[mes - 1]} de ${ano}` });
+      }
     }
+    return list;
+  }, [ANO_INICIO, ANO_FIM]);
+
+  // Navegação INFINITA (não depende do array months[] — cálculo matemático)
+  const handlePrevMonth = () => {
+    setSelectedMonth(prev => addMeses(prev, -1));
   };
 
   const handleNextMonth = () => {
-    if (currentIndex < months.length - 1) {
-      setSelectedMonth(months[currentIndex + 1].key);
-    }
+    setSelectedMonth(prev => addMeses(prev, +1));
   };
 
-  // Filtered month transactions based on active dates (using dataPostergar if postponed)
-  const monthTransactions = transactions.filter(tx => {
+  const selectedMonthLabel = months.find(m => m.key === selectedMonth)?.label ?? formatarMesLabel(selectedMonth);
+
+  // ===== Projeção de lançamentos: Avulso (exato) | Parcelado | Recorrente =====
+  // Devolve true se a transação cai (ou tem parcela prevista) no mês selecionado
+  const caiNoMesSelecionado = (tx: Transaction, mesAnoSel: string): boolean => {
     const activeDate = (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data;
-    return activeDate.startsWith(selectedMonth);
-  });
+    const mesAnoTx = activeDate.slice(0, 7);
+
+    const freq = (tx.frequencia || 'AVULSO').toUpperCase();
+
+    // === AVULSO: somente se data exata bater ===
+    if (freq === 'AVULSO') return mesAnoTx === mesAnoSel;
+
+    // === PARCELADO: 1ª parcela = mesAnoTx; última = +(totalParcelas-1) meses ===
+    if (freq === 'PARCELADO') {
+      const total = Number(tx.totalParcelas) || Number(tx.parcelaAtual) || 1;
+      if (total <= 1) return mesAnoTx === mesAnoSel;
+      const mesInicio = activeDate.slice(0, 7);
+      const mesFim = addMeses(mesInicio, total - 1);
+      // Comparação alfabética funciona em YYYY-MM
+      return mesAnoSel >= mesInicio && mesAnoSel <= mesFim;
+    }
+
+    // === RECORRENTE: todo mês a partir da data inicial (sem limite no futuro) ===
+    if (freq === 'RECORRENTE' || freq === 'RECORRENCIA') {
+      const mesInicio = activeDate.slice(0, 7);
+      return mesAnoSel >= mesInicio;
+    }
+
+    // Fallback
+    return mesAnoTx === mesAnoSel;
+  };
+
+  // Filtered month transactions (com projeção de parcelas e recorrentes)
+  const monthTransactions = transactions.filter(tx => caiNoMesSelecionado(tx, selectedMonth));
 
   // Filtered month work shifts
   const monthWorkShifts = workShifts.filter(e => e.data.startsWith(selectedMonth));
@@ -1951,7 +2006,8 @@ function App() {
       if (fatura && t.faturaId) {
         return t.faturaId === fatura.id;
       }
-      return t.data.startsWith(mesAno);
+      // Sem fatura atrelada: usa projeção (avulso / parcelado / recorrente)
+      return caiNoMesSelecionado(t, mesAno);
     });
   };
 
@@ -2801,17 +2857,15 @@ function App() {
                     <div className="inline-flex items-center space-x-3 px-4 py-1.5 rounded-full glass-pill text-xs font-semibold tracking-wide font-sans">
                       <button
                         onClick={handlePrevMonth}
-                        disabled={currentIndex === 0}
-                        className="text-white/70 hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        className="text-white/70 hover:text-white transition cursor-pointer"
                         title="Mês Anterior"
                       >
                         <ChevronLeft size={12} />
                       </button>
-                      <span className="uppercase">{months[currentIndex]?.label}</span>
+                      <span className="uppercase">{selectedMonthLabel}</span>
                       <button
                         onClick={handleNextMonth}
-                        disabled={currentIndex === months.length - 1}
-                        className="text-white/70 hover:text-white transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        className="text-white/70 hover:text-white transition cursor-pointer"
                         title="Próximo Mês"
                       >
                         <ChevronRight size={12} />
