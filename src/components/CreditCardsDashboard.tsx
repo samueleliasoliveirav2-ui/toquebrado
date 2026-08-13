@@ -11,7 +11,9 @@ import {
   Clock,
   FileUp,
   Wallet as WalletIcon,
-  Sparkles
+  Sparkles,
+  Menu,
+  RefreshCw
 } from 'lucide-react';
 import type {
   CreditCard as CreditCardType,
@@ -21,6 +23,7 @@ import type {
 } from '../types';
 import { computeInvoiceDerivedStatus as _computeInvoiceStatus } from '../types';
 import { BANK_PRESETS } from './CreditCardModal';
+import { PillMonthPicker } from './PillMonthPicker';
 
 const getCardPreset = (card: CreditCardType) => {
   if (card.banco && BANK_PRESETS[card.banco]) {
@@ -46,6 +49,10 @@ interface CreditCardsDashboardProps {
   _transactions: Transaction[];
   _accounts: BankAccount[];
   selectedMonth: string;
+  months: { key: string; label: string }[];
+  onMonthChange: (m: string) => void;
+  onOpenDrawer: () => void;
+  isSyncing?: boolean;
   onAddCard: () => void;
   onEditCard: (card: CreditCardType) => void;
   onViewInvoice: (card: CreditCardType) => void;
@@ -60,6 +67,10 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
   cards,
   invoices,
   selectedMonth,
+  months,
+  onMonthChange,
+  onOpenDrawer,
+  isSyncing,
   onAddCard,
   onEditCard,
   onViewInvoice,
@@ -170,7 +181,42 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans space-y-5">
+    <div className="w-full flex-1 flex flex-col bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
+
+      <header className="sticky top-0 z-30 px-4 pt-4 pb-3 bg-gradient-to-b from-slate-50 via-slate-50/95 to-transparent backdrop-blur-md">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={onOpenDrawer}
+            className="p-2 rounded-2xl bg-white border border-slate-200 shadow-xs hover:bg-slate-50 text-slate-700 transition-all cursor-pointer shrink-0 w-[42px] h-[42px] flex items-center justify-center"
+            title="Menu"
+          >
+            <Menu size={18} className="stroke-[2.5]" />
+          </button>
+
+          <div className="flex-1 max-w-[75%] mx-auto">
+            <PillMonthPicker
+              months={months}
+              selectedMonth={selectedMonth}
+              onChange={onMonthChange}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 min-w-[42px] justify-end">
+            {isSyncing && (
+              <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
+            )}
+            <button
+              onClick={onAddCard}
+              className="p-2 rounded-2xl bg-[#0e69b2]/10 hover:bg-[#0e69b2]/20 text-[#0e69b2] transition-all cursor-pointer shrink-0 w-[42px] h-[42px] flex items-center justify-center"
+              title="Adicionar Cartão"
+            >
+              <Plus size={16} className="stroke-[2.5]" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 flex flex-col p-4 space-y-5">
 
       {/* KPIs Dark Glass */}
       <div className="space-y-3">
@@ -492,6 +538,8 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
             })}
           </div>
         )}
+      </div>
+
       </div>
     </div>
   );

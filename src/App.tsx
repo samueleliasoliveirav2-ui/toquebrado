@@ -14,7 +14,6 @@ import { AccountsDashboard } from './components/AccountsDashboard';
 import { CreditCardsDashboard } from './components/CreditCardsDashboard';
 import { CreditCardModal, BANK_PRESETS } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
-import { PillMonthPicker } from './components/PillMonthPicker';
 import type { TemaVisual, UserProfile } from './types';
 import { supabase } from './lib/supabaseClient';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -3184,55 +3183,26 @@ function App() {
                 </main>
               </>
             ) : activeTab === 'DIARIAS' ? (
-              <>
-                <header className="sticky top-0 z-30 px-4 pt-4 pb-3 bg-gradient-to-b from-slate-50 via-slate-50/95 to-transparent backdrop-blur-md shrink-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => setIsDrawerOpen(true)}
-                      className="p-2 rounded-2xl bg-white border border-slate-200 shadow-xs hover:bg-slate-50 text-slate-700 transition-all cursor-pointer shrink-0 w-[42px] h-[42px] flex items-center justify-center"
-                      title="Menu"
-                    >
-                      <Menu size={18} className="stroke-[2.5]" />
-                    </button>
-
-                    <div className="flex-1 max-w-[75%] mx-auto">
-                      <PillMonthPicker
-                        months={months}
-                        selectedMonth={selectedMonth}
-                        onChange={setSelectedMonth}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0 min-w-[42px] justify-end">
-                      {isSyncing && (
-                        <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
-                      )}
-                      <button
-                        onClick={() => {
-                          setReportsInitialReport('DIARIAS_TRABALHO');
-                          setReportsRemountKey(prev => prev + 1);
-                          setActiveTab('RELATORIOS');
-                        }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0e69b2]/10 text-[#0e69b2] hover:bg-[#0e69b2]/20 transition-all cursor-pointer group"
-                        title="Abrir Relatórios de Diárias & Trabalho"
-                      >
-                        <BarChart2 size={13} className="stroke-[2.5]" />
-                        <span className="text-[10px] font-black uppercase tracking-wider hidden xs:inline">Relatórios</span>
-                      </button>
-                    </div>
-                  </div>
-                </header>
-
-                <WorkShiftDashboard
-                  entries={monthWorkShifts}
-                  onEditEntry={(entry) => {
-                    setEditingShiftEntry(entry);
-                    setIsShiftModalOpen(true);
-                  }}
-                  onSendToWallet={handleSendToWallet}
-                  onMarkAsPaid={handleMarkShiftAsPaid}
-                />
-              </>
+              <WorkShiftDashboard
+                key={reportsRemountKey}
+                entries={monthWorkShifts}
+                onEditEntry={(entry) => {
+                  setEditingShiftEntry(entry);
+                  setIsShiftModalOpen(true);
+                }}
+                onSendToWallet={handleSendToWallet}
+                onMarkAsPaid={handleMarkShiftAsPaid}
+                months={months}
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                onOpenDrawer={() => setIsDrawerOpen(true)}
+                isSyncing={isSyncing}
+                onGoToReports={() => {
+                  setReportsInitialReport('DIARIAS_TRABALHO');
+                  setReportsRemountKey(prev => prev + 1);
+                  setActiveTab('RELATORIOS');
+                }}
+              />
             ) : activeTab === 'RELATORIOS' ? (
               <ReportsDashboard
                 key={reportsRemountKey}
@@ -3255,70 +3225,34 @@ function App() {
                 onSaveTransfer={handleSaveTransfer}
               />
             ) : activeTab === 'CARTOES' ? (
-              <>
-                <header className="sticky top-0 z-30 px-4 pt-4 pb-3 bg-gradient-to-b from-slate-50 via-slate-50/95 to-transparent backdrop-blur-md shrink-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => setIsDrawerOpen(true)}
-                      className="p-2 rounded-2xl bg-white border border-slate-200 shadow-xs hover:bg-slate-50 text-slate-700 transition-all cursor-pointer shrink-0 w-[42px] h-[42px] flex items-center justify-center"
-                      title="Menu"
-                    >
-                      <Menu size={18} className="stroke-[2.5]" />
-                    </button>
-
-                    <div className="flex-1 max-w-[75%] mx-auto">
-                      <PillMonthPicker
-                        months={months}
-                        selectedMonth={selectedMonth}
-                        onChange={setSelectedMonth}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0 min-w-[42px] justify-end">
-                      {isSyncing && (
-                        <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
-                      )}
-                      <button
-                        onClick={() => {
-                          setEditingCreditCard(null);
-                          setIsCreditCardModalOpen(true);
-                        }}
-                        className="p-2 rounded-2xl bg-[#0e69b2]/10 hover:bg-[#0e69b2]/20 text-[#0e69b2] transition-all cursor-pointer"
-                        title="Adicionar Cartão"
-                      >
-                        <Plus size={16} className="stroke-[2.5]" />
-                      </button>
-                    </div>
-                  </div>
-                </header>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-slate-50 scrollbar-thin pb-28">
-                  <CreditCardsDashboard
-                    cards={creditCards}
-                    invoices={creditCardInvoices}
-                    _transactions={transactions}
-                    _accounts={accounts}
-                    selectedMonth={selectedMonth}
-                    onAddCard={() => {
-                      setEditingCreditCard(null);
-                      setIsCreditCardModalOpen(true);
-                    }}
-                    onEditCard={(card) => {
-                      setEditingCreditCard(card);
-                      setIsCreditCardModalOpen(true);
-                    }}
-                    onViewInvoice={handleViewInvoice}
-                    onPayInvoice={handlePayInvoiceFromDashboard}
-                    onImportPdfInvoice={() => {
-                      setPdfImportStep('UPLOAD');
-                      setPdfImportExtracted(null);
-                      setPdfImportFileName('');
-                      setPdfImportCartaoId(creditCards[0]?.id || defaultSampleCards[0]?.id || '');
-                      setIsPdfImportOpen(true);
-                    }}
-                  />
-                </div>
-              </>
+              <CreditCardsDashboard
+                cards={creditCards}
+                invoices={creditCardInvoices}
+                _transactions={transactions}
+                _accounts={accounts}
+                selectedMonth={selectedMonth}
+                months={months}
+                onMonthChange={setSelectedMonth}
+                onOpenDrawer={() => setIsDrawerOpen(true)}
+                isSyncing={isSyncing}
+                onAddCard={() => {
+                  setEditingCreditCard(null);
+                  setIsCreditCardModalOpen(true);
+                }}
+                onEditCard={(card) => {
+                  setEditingCreditCard(card);
+                  setIsCreditCardModalOpen(true);
+                }}
+                onViewInvoice={handleViewInvoice}
+                onPayInvoice={handlePayInvoiceFromDashboard}
+                onImportPdfInvoice={() => {
+                  setPdfImportStep('UPLOAD');
+                  setPdfImportExtracted(null);
+                  setPdfImportFileName('');
+                  setPdfImportCartaoId(creditCards[0]?.id || defaultSampleCards[0]?.id || '');
+                  setIsPdfImportOpen(true);
+                }}
+              />
             ) : (
               <>
                 {/* Header for Settings page */}

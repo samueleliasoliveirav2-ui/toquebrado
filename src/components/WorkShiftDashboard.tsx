@@ -1,19 +1,32 @@
 import React, { useState } from 'react';
-import { ArrowUpRight, ArrowDownRight, Briefcase, Car, Calendar, Send, Edit3, CheckCircle, Clock, ChevronDown, ChevronUp, Link, Tag, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Briefcase, Car, Calendar, Send, Edit3, CheckCircle, Clock, ChevronDown, ChevronUp, Link, Tag, Sparkles, Menu, BarChart2, RefreshCw } from 'lucide-react';
 import type { WorkShiftEntry } from '../types';
+import { PillMonthPicker } from './PillMonthPicker';
 
 interface WorkShiftDashboardProps {
   entries: WorkShiftEntry[];
   onEditEntry: (entry: WorkShiftEntry) => void;
   onSendToWallet: (date: string, activity: string, amount: number) => void;
   onMarkAsPaid: (id: string) => void;
+  months: Array<{ key: string; label: string }>;
+  selectedMonth: string;
+  onMonthChange: (m: string) => void;
+  onOpenDrawer: () => void;
+  isSyncing?: boolean;
+  onGoToReports?: () => void;
 }
 
 export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   entries,
   onEditEntry,
   onSendToWallet,
-  onMarkAsPaid
+  onMarkAsPaid,
+  months,
+  selectedMonth,
+  onMonthChange,
+  onOpenDrawer,
+  isSyncing,
+  onGoToReports
 }) => {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 
@@ -76,8 +89,44 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   return (
     <div className="w-full flex-1 flex flex-col bg-slate-50 overflow-y-auto pb-28 animate-fade-in font-sans">
 
+      <header className="sticky top-0 z-30 px-4 pt-4 pb-3 bg-gradient-to-b from-slate-50 via-slate-50/95 to-transparent backdrop-blur-md">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={onOpenDrawer}
+            className="p-2 rounded-2xl bg-white border border-slate-200 shadow-xs hover:bg-slate-50 text-slate-700 transition-all cursor-pointer shrink-0 w-[42px] h-[42px] flex items-center justify-center"
+            title="Menu"
+          >
+            <Menu size={18} className="stroke-[2.5]" />
+          </button>
+
+          <div className="flex-1 max-w-[75%] mx-auto">
+            <PillMonthPicker
+              months={months}
+              selectedMonth={selectedMonth}
+              onChange={onMonthChange}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 min-w-[42px] justify-end">
+            {isSyncing && (
+              <RefreshCw size={13} className="animate-spin text-[#0e69b2]" />
+            )}
+            {onGoToReports && (
+              <button
+                onClick={onGoToReports}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0e69b2]/10 text-[#0e69b2] hover:bg-[#0e69b2]/20 transition-all cursor-pointer group"
+                title="Abrir Relatórios de Diárias & Trabalho"
+              >
+                <BarChart2 size={13} className="stroke-[2.5]" />
+                <span className="text-[10px] font-black uppercase tracking-wider hidden xs:inline">Relatórios</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
       {/* Cards KPI Dark Glass */}
-      <div className="px-4 pt-4 pb-1 space-y-3">
+      <div className="px-4 pt-2 pb-1 space-y-3">
         {/* Ganho Bruto e A Receber (linha 1 - 2 cols) */}
         <div className="grid grid-cols-2 gap-2.5">
           {/* Ganho Bruto */}
