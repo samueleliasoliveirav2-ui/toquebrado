@@ -3037,55 +3037,77 @@ function App() {
                       </button>
                     </div>
 
-                    {/* Status Filter: conditional by filterType */}
-                    {(filterType === 'ENTRADA' || filterType === 'SAIDA') && (
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {filterType === 'ENTRADA' ? (
-                          <>
-                            {[
-                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
-                              { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
-                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
-                            ].map(opt => (
-                              <button
-                                key={opt.key}
-                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
-                                className={[
-                                  'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
-                                  statusFilter === opt.key
-                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
-                                    : `bg-white ${opt.color} hover:bg-slate-50`
-                                ].join(' ')}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </>
-                        ) : (
-                          <>
-                            {[
-                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
-                              { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
-                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
-                              { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
-                            ].map(opt => (
-                              <button
-                                key={opt.key}
-                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
-                                className={[
-                                  'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
-                                  statusFilter === opt.key
-                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
-                                    : `bg-white ${opt.color} hover:bg-slate-50`
-                                ].join(' ')}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    )}
+                    {/* Status Filter — AGORA APARECE SEMPRE (inclusive no modo TODOS) */}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      {filterType === 'ENTRADA' ? (
+                        <>
+                          {[
+                            { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
+                            { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
+                            { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
+                          ].map(opt => (
+                            <button
+                              key={opt.key}
+                              onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
+                              className={[
+                                'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
+                                statusFilter === opt.key
+                                  ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
+                                  : `bg-white ${opt.color} hover:bg-slate-50`
+                              ].join(' ')}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </>
+                      ) : filterType === 'SAIDA' ? (
+                        <>
+                          {[
+                            { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
+                            { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
+                            { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
+                            { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
+                          ].map(opt => (
+                            <button
+                              key={opt.key}
+                              onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
+                              className={[
+                                'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
+                                statusFilter === opt.key
+                                  ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
+                                  : `bg-white ${opt.color} hover:bg-slate-50`
+                              ].join(' ')}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </>
+                      ) : (
+                        // Modo Todos (filterType === TODOS) → Mostra TODOS os status disponíveis
+                        <>
+                          {[
+                            { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
+                            { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
+                            { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
+                            { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
+                            { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
+                          ].map(opt => (
+                            <button
+                              key={opt.key}
+                              onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
+                              className={[
+                                'px-3 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border border-slate-200 cursor-pointer',
+                                statusFilter === opt.key
+                                  ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
+                                  : `bg-white ${opt.color} hover:bg-slate-50`
+                              ].join(' ')}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* Summary filter toggle view inside INICIO (small top-left) */}
