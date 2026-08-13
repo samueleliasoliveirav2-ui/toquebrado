@@ -443,7 +443,13 @@ function App() {
           dataRecebimento: item.data_recebimento || undefined,
           observacao: item.observacao || undefined,
           vinculoId: item.vinculo_id || undefined,
-          contaId: item.conta_id || undefined
+          contaId: item.conta_id || undefined,
+          tipoRecebimento: (item.tipo_recebimento as any) || undefined,
+          qtdParcelas: item.qtd_parcelas !== null && item.qtd_parcelas !== undefined ? Number(item.qtd_parcelas) : undefined,
+          periodicidadeParcelas: (item.periodicidade_parcelas as any) || undefined,
+          parcelaAtual: item.parcela_atual !== null && item.parcela_atual !== undefined ? Number(item.parcela_atual) : undefined,
+          totalParcelas: item.total_parcelas !== null && item.total_parcelas !== undefined ? Number(item.total_parcelas) : undefined,
+          grupoId: (item.grupo_id || item.grupo) || undefined
         }));
         setWorkShifts(mapped);
       }
@@ -1121,10 +1127,92 @@ function App() {
     lancarCarteiraPrincipal?: boolean;
     formaPagamento?: string;
     contaId?: string;
+    tipoRecebimento?: 'UNICO' | 'PARCELADO' | 'RECORRENTE';
+    qtdParcelas?: number;
+    periodicidadeParcelas?: 'SEMANAL' | 'QUINZENAL' | 'MENSAL';
   }) => {
     if (!userId) return;
 
     try {
+      const addDays = (iso: string, days: number) => {
+        const d = new Date(iso + 'T12:00:00');
+        d.setDate(d.getDate() + days);
+        return d.toISOString().split('T')[0];
+      };
+      const addMonthsSafe = (iso: string, months: number) => {
+        const d = new Date(iso + 'T12:00:00');
+        const target = d.getMonth() + months;
+        const first = new Date(d.getFullYear(), target, 1, 12, 0, 0, 0);
+        const last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+        first.setDate(Math.min(d.getDate(), last));
+        return first.toISOString().split('T')[0];
+      };
+      const shiftDate = (iso: string, step: number, period?: 'SEMANAL' | 'QUINZENAL' | 'MENSAL') => {
+        const p = period || 'MENSAL';
+        if (p === 'MENSAL') return addMonthsSafe(iso, step);
+        if (p === 'SEMANAL') return addDays(iso, step * 7);
+        return addDays(iso, step * 15);
+      };
+
+      const tipoReceb = !payload.id && payload.tipo === 'ENTRADA' ? (payload.tipoRecebimento || 'UNICO') : 'UNICO';
+      const nParcelas = tipoReceb !== 'UNICO' && payload.qtdParcelas && payload.qtdParcelas >= 2 ? payload.qtdParcelas : 1;
+
+      // ---------------------------------------------------------------
+      // RAMO 1) PARCELAMENTO OU CONTRATO RECORRENTE (gerar N linhas)
+      // ---------------------------------------------------------------
+      if (!payload.id && (tipoReceb === 'PARCELADO' || tipoReceb === 'RECORRENTE') && nParcelas >= 2) {
+        const baseValorTotal = Number(payload.valor || 0);
+        const valorPorParcela = Number((baseValorTotal / nParcelas).toFixed(2));
+        const statusInicial = payload.status === 'RECEBIDO' ? 'RECEBIDO' : 'A_RECEBER';
+        const obsBase = (payload.observacao || '').trim();
+        const baseDataEvento = payload.data;
+        const baseDataRec = (payload.status !== 'RECEBIDO' && payload.dataRecebimento) ? payload.dataRecebimento : baseDataEvento;
+        const period = payload.periodicidadeParcelas || (tipoReceb === 'RECORRENTE' ? 'MENSAL' : 'MENSAL');
+        const grupo = `grp-rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const rows = [];
+        for (let i = 0; i < nParcelas; i++) {
+          const idxParcela = i + 1;
+          const dataEvento = tipoReceb === 'RECORRENTE' ? shiftDate(baseDataEvento, i, 'MENSAL') : baseDataEvento;
+          const dataRec = shiftDate(baseDataRec, i, period);
+          const label = tipoReceb === 'RECORRENTE' ? `Mensalidade` : `Parcela`;
+          const suffixObs = `${label} ${idxParcela}/${nParcelas}`;
+          const ultimoAjuste = idxParcela === nParcelas
+            ? Math.round((baseValorTotal - (valorPorParcela * nParcelas)) * 100) / 100
+            : 0;
+          const valorFinal = valorPorParcela + ultimoAjuste;
+          rows.push({
+            user_id: userId,
+            data: dataEvento,
+            atividade: payload.atividade,
+            tipo: payload.tipo,
+            categoria: payload.categoria || null,
+            valor: valorFinal,
+            valor_diaria: payload.valorDiaria || null,
+            quantidade_dias: payload.quantidadeDias || 1,
+            status: statusInicial,
+            data_recebimento: statusInicial === 'RECEBIDO' ? null : dataRec,
+            observacao: obsBase ? `${obsBase} · ${suffixObs}` : suffixObs,
+            vinculo_id: null,
+            conta_id: payload.contaId || null,
+            tipo_recebimento: tipoReceb,
+            qtd_parcelas: nParcelas,
+            periodicidade_parcelas: period,
+            parcela_atual: idxParcela,
+            total_parcelas: nParcelas,
+            grupo_id: grupo,
+            grupo: grupo
+          });
+        }
+
+        const { error } = await supabase
+          .from('diarias_trabalho')
+          .insert(rows);
+        if (error) throw error;
+
+        await fetchWorkShifts();
+        return;
+      }
+
       // Bulk inserts for multiple individual days
       if (!payload.id && payload.modoLancamento === 'INDIVIDUAL' && payload.quantidadeDias && payload.quantidadeDias > 1) {
         const rows = [];
@@ -1159,7 +1247,7 @@ function App() {
         if (error) throw error;
       } else {
         // Normal single row insert or update
-        const dbPayload = {
+        const dbPayload: Record<string, any> = {
           user_id: userId,
           data: payload.data,
           atividade: payload.atividade,
@@ -1174,6 +1262,28 @@ function App() {
           vinculo_id: payload.vinculoId && payload.vinculoId !== 'motorista-app' && payload.vinculoId !== 'geral-outros' ? payload.vinculoId : null,
           conta_id: payload.contaId || null
         };
+        if (!payload.id && payload.tipo === 'ENTRADA' && payload.tipoRecebimento) {
+          const tipoRec = payload.tipoRecebimento;
+          dbPayload.tipo_recebimento = tipoRec;
+          if (tipoRec !== 'UNICO') {
+            const total = payload.qtdParcelas && payload.qtdParcelas >= 2 ? payload.qtdParcelas : 1;
+            dbPayload.qtd_parcelas = total;
+            dbPayload.total_parcelas = total;
+            dbPayload.periodicidade_parcelas = payload.periodicidadeParcelas || 'MENSAL';
+            dbPayload.parcela_atual = 1;
+            const grupo = `grp-rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            dbPayload.grupo_id = grupo;
+            dbPayload.grupo = grupo;
+          }
+        }
+        if (payload.id && payload.tipoRecebimento) {
+          dbPayload.tipo_recebimento = payload.tipoRecebimento;
+          if (payload.qtdParcelas && payload.qtdParcelas >= 2) {
+            dbPayload.qtd_parcelas = payload.qtdParcelas;
+            dbPayload.total_parcelas = payload.qtdParcelas;
+          }
+          if (payload.periodicidadeParcelas) dbPayload.periodicidade_parcelas = payload.periodicidadeParcelas;
+        }
 
         if (payload.id) {
           const { error } = await supabase

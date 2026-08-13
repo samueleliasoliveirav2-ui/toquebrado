@@ -11,6 +11,9 @@ interface WorkShiftModalProps {
     modoLancamento?: 'UNICO' | 'INDIVIDUAL';
     lancarCarteiraPrincipal?: boolean;
     formaPagamento?: string;
+    tipoRecebimento?: 'UNICO' | 'PARCELADO' | 'RECORRENTE';
+    qtdParcelas?: number;
+    periodicidadeParcelas?: 'SEMANAL' | 'QUINZENAL' | 'MENSAL';
   }) => void;
   onDelete?: (id: string) => void;
   editingEntry?: WorkShiftEntry | null;
@@ -47,6 +50,11 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
   const [formaPagamento, setFormaPagamento] = useState<string>('Cartão de Crédito Pessoal');
   const [contaId, setContaId] = useState('');
 
+  // --- Novos campos: parcelamento / contrato recorrente ---
+  const [tipoRecebimento, setTipoRecebimento] = useState<'UNICO' | 'PARCELADO' | 'RECORRENTE'>('UNICO');
+  const [qtdParcelas, setQtdParcelas] = useState<number>(2);
+  const [periodicidadeParcelas, setPeriodicidadeParcelas] = useState<'SEMANAL' | 'QUINZENAL' | 'MENSAL'>('MENSAL');
+
   // Sync state on open/edit
   useEffect(() => {
     if (editingEntry) {
@@ -65,6 +73,9 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       setVinculoId(editingEntry.vinculoId || 'motorista-app');
       setLancarCarteiraPrincipal(false); // Do not support mirror changes in edit mode to avoid duplicates
       setContaId(editingEntry.contaId || (accounts[0]?.id || ''));
+      setTipoRecebimento(editingEntry.tipoRecebimento || 'UNICO');
+      setQtdParcelas(editingEntry.qtdParcelas || editingEntry.totalParcelas || 2);
+      setPeriodicidadeParcelas(editingEntry.periodicidadeParcelas || 'MENSAL');
     } else {
       const today = new Date().toISOString().split('T')[0];
       setData(today);
@@ -86,6 +97,9 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       setLancarCarteiraPrincipal(false);
       setFormaPagamento('Cartão de Crédito Pessoal');
       setContaId(accounts[0]?.id || '');
+      setTipoRecebimento('UNICO');
+      setQtdParcelas(2);
+      setPeriodicidadeParcelas('MENSAL');
     }
   }, [editingEntry, isOpen, accounts]);
 
@@ -100,10 +114,32 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
     }
   }, [atividade, tipo, editingEntry]);
 
+  const addDays = (iso: string, days: number) => {
+    const d = new Date(iso + 'T12:00:00');
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+  };
+  const addMonthsSafe = (iso: string, months: number) => {
+    const d = new Date(iso + 'T12:00:00');
+    const targetMonth = d.getMonth() + months;
+    const d2 = new Date(d.getFullYear(), targetMonth, 1, 12, 0, 0, 0);
+    const lastDay = new Date(d2.getFullYear(), d2.getMonth() + 1, 0).getDate();
+    d2.setDate(Math.min(d.getDate(), lastDay));
+    return d2.toISOString().split('T')[0];
+  };
+  const shiftDate = (iso: string, step: number, period: 'SEMANAL' | 'QUINZENAL' | 'MENSAL') => {
+    if (period === 'MENSAL') return addMonthsSafe(iso, step);
+    if (period === 'SEMANAL') return addDays(iso, step * 7);
+    return addDays(iso, step * 15);
+  };
+
   // Auto-calculate total value for display
   const calculatedTotal = tipo === 'ENTRADA' && atividade === 'Evento'
     ? (Number(valorDiaria || 0) * quantidadeDias)
     : Number(valor || 0);
+  const parcelaValor = !editingEntry && tipo === 'ENTRADA' && tipoRecebimento !== 'UNICO' && qtdParcelas >= 2
+    ? Number(calculatedTotal) / qtdParcelas
+    : null;
 
   if (!isOpen) return null;
 
@@ -129,6 +165,18 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       finalValor = Number(valor);
     }
 
+    if (tipo === 'ENTRADA' && !editingEntry && tipoRecebimento !== 'UNICO') {
+      if (!qtdParcelas || qtdParcelas < 2) {
+        return alert('Informe ao menos 2 parcelas / mensalidades');
+      }
+      if (qtdParcelas > 360) {
+        return alert('Número máximo de parcelas / mensalidades: 360');
+      }
+      if (!['SEMANAL', 'QUINZENAL', 'MENSAL'].includes(periodicidadeParcelas)) {
+        return alert('Periodicidade inválida');
+      }
+    }
+
     if (tipo === 'ENTRADA' && !recebidoMesmoDia && !dataRecebimento) {
       return alert('Selecione uma data prevista para o recebimento');
     }
@@ -139,6 +187,9 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       lancarCarteiraPrincipal?: boolean;
       formaPagamento?: string;
       contaId?: string;
+      tipoRecebimento?: 'UNICO' | 'PARCELADO' | 'RECORRENTE';
+      qtdParcelas?: number;
+      periodicidadeParcelas?: 'SEMANAL' | 'QUINZENAL' | 'MENSAL';
     } = {
       data,
       atividade,
@@ -154,7 +205,10 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
       vinculoId: tipo === 'SAIDA' ? vinculoId : undefined,
       lancarCarteiraPrincipal: tipo === 'SAIDA' && !editingEntry ? lancarCarteiraPrincipal : undefined,
       formaPagamento: tipo === 'SAIDA' && !editingEntry && lancarCarteiraPrincipal ? formaPagamento : undefined,
-      contaId: contaId || undefined
+      contaId: contaId || undefined,
+      tipoRecebimento: !editingEntry && tipo === 'ENTRADA' ? tipoRecebimento : editingEntry?.tipoRecebimento,
+      qtdParcelas: !editingEntry && tipo === 'ENTRADA' && tipoRecebimento !== 'UNICO' ? qtdParcelas : (editingEntry?.qtdParcelas ?? undefined),
+      periodicidadeParcelas: !editingEntry && tipo === 'ENTRADA' && tipoRecebimento !== 'UNICO' ? periodicidadeParcelas : (editingEntry?.periodicidadeParcelas ?? undefined)
     };
 
     if (editingEntry) {
@@ -351,6 +405,34 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculatedTotal)}
                 </span>
               </div>
+
+              {/* Resumo parcelamento / contrato */}
+              {!editingEntry && parcelaValor !== null && (
+                <div className="bg-white border border-slate-200/60 p-2.5 rounded-xl text-xs space-y-0.5 animate-fade-in">
+                  <div className="flex justify-between">
+                    <span className="font-bold text-slate-500">
+                      {tipoRecebimento === 'RECORRENTE' ? 'Valor Mensalidade:' : 'Valor Parcela:'}
+                    </span>
+                    <span className="font-extrabold text-slate-800">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parcelaValor)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-bold text-slate-500">Total Parcelado:</span>
+                    <span className="font-extrabold text-emerald-600">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parcelaValor * qtdParcelas)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-bold text-slate-500">1ª Recebimento:</span>
+                    <span className="font-extrabold text-slate-700">
+                      {new Date(shiftDate(dataRecebimento || data, 0, periodicidadeParcelas) + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      {' · '}
+                      {qtdParcelas}ª: {new Date(shiftDate(dataRecebimento || data, qtdParcelas - 1, periodicidadeParcelas) + 'T12:00:00').toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           ) : tipo === 'ENTRADA' ? (
             /* 2. ENTRADA para UBER / OUTROS */
@@ -470,6 +552,136 @@ export const WorkShiftModal: React.FC<WorkShiftModalProps> = ({
                       </select>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tipo de Recebimento (apenas ENTRADA, novo/nao edicao) */}
+          {tipo === 'ENTRADA' && (
+            <div className="bg-slate-50/50 p-3.5 border border-slate-200/50 rounded-2xl space-y-3 animate-fade-in">
+              <div>
+                <label className="block text-slate-500 text-[10px] font-bold uppercase mb-2">
+                  {editingEntry ? 'Tipo de Recebimento (definido na criação)' : 'Como você vai receber?'}
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    disabled={!!editingEntry}
+                    onClick={() => setTipoRecebimento('UNICO')}
+                    className={`py-2 px-2 rounded-lg font-black text-[10px] transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                      tipoRecebimento === 'UNICO'
+                        ? 'bg-white text-slate-800 shadow-xs border border-slate-200'
+                        : 'text-slate-500 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    À Vista
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!editingEntry}
+                    onClick={() => {
+                      setTipoRecebimento('PARCELADO');
+                      if (qtdParcelas < 2) setQtdParcelas(2);
+                    }}
+                    className={`py-2 px-2 rounded-lg font-black text-[10px] transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                      tipoRecebimento === 'PARCELADO'
+                        ? 'bg-white text-slate-800 shadow-xs border border-slate-200'
+                        : 'text-slate-500 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    Parcelado
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!editingEntry}
+                    onClick={() => {
+                      setTipoRecebimento('RECORRENTE');
+                      if (periodicidadeParcelas !== 'MENSAL') setPeriodicidadeParcelas('MENSAL');
+                      if (qtdParcelas < 2) setQtdParcelas(12);
+                    }}
+                    className={`py-2 px-2 rounded-lg font-black text-[10px] transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                      tipoRecebimento === 'RECORRENTE'
+                        ? 'bg-white text-slate-800 shadow-xs border border-slate-200'
+                        : 'text-slate-500 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    Contrato
+                  </button>
+                </div>
+              </div>
+
+              {/* Campos parcelado / contrato */}
+              {!editingEntry && tipoRecebimento !== 'UNICO' && (
+                <div className="grid grid-cols-2 gap-3 pt-1 animate-fade-in">
+                  <div>
+                    <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">
+                      {tipoRecebimento === 'RECORRENTE' ? 'Meses de Contrato' : 'Qtde Parcelas'}
+                    </label>
+                    <div className="relative">
+                      {tipoRecebimento === 'RECORRENTE' ? (
+                        <select
+                          value={qtdParcelas}
+                          onChange={(e) => setQtdParcelas(parseInt(e.target.value) || 2)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 shadow-3xs cursor-pointer"
+                        >
+                          {[2, 3, 4, 5, 6, 8, 10, 12, 18, 24, 36, 48, 60].map(n => (
+                            <option key={n} value={n}>{n} meses</option>
+                          ))}
+                          <option value={qtdParcelas && ![2,3,4,5,6,8,10,12,18,24,36,48,60].includes(qtdParcelas) ? qtdParcelas : -1}>
+                            Outro… ({qtdParcelas && ![2,3,4,5,6,8,10,12,18,24,36,48,60].includes(qtdParcelas) ? qtdParcelas : 12})
+                          </option>
+                        </select>
+                      ) : (
+                        <input
+                          type="number"
+                          min={2}
+                          max={360}
+                          value={qtdParcelas}
+                          onChange={(e) => setQtdParcelas(Math.min(360, Math.max(2, parseInt(e.target.value) || 2)))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 shadow-3xs"
+                        />
+                      )}
+                    </div>
+                    {/* quick chips parcelado */}
+                    {tipoRecebimento === 'PARCELADO' && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {[2, 3, 4, 5, 6, 8, 10, 12].map(n => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setQtdParcelas(n)}
+                            className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-colors cursor-pointer ${
+                              qtdParcelas === n
+                                ? 'bg-[#0e69b2] text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {n}x
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Periodicidade</label>
+                    <select
+                      value={periodicidadeParcelas}
+                      onChange={(e) => setPeriodicidadeParcelas(e.target.value as any)}
+                      disabled={tipoRecebimento === 'RECORRENTE'}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 shadow-3xs cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      <option value="SEMANAL">Semanal</option>
+                      <option value="QUINZENAL">Quinzenal</option>
+                      <option value="MENSAL">Mensal</option>
+                    </select>
+                    {tipoRecebimento === 'RECORRENTE' && (
+                      <p className="text-[9px] text-slate-500 font-semibold mt-1">
+                        Contrato = 1 mensalidade por mês.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -278,7 +278,15 @@ export interface WorkShiftEntry {
   observacao?: string;
   vinculoId?: string; // Links SAIDA (costs) to an ENTRADA event or activity
   contaId?: string; // Links shift or operational cost to a specific BankAccount
+  // --- Novos campos: parcelamento / contrato recorrente (recebimentos ENTRADA) ---
+  tipoRecebimento?: 'UNICO' | 'PARCELADO' | 'RECORRENTE';
+  qtdParcelas?: number;        // total de parcelas / mensalidades
+  periodicidadeParcelas?: 'SEMANAL' | 'QUINZENAL' | 'MENSAL';
+  parcelaAtual?: number;        // 1..qtdParcelas
+  totalParcelas?: number;       // alias de qtdParcelas (compatibilidade)
+  grupoId?: string;             // id comum p/ agrupar todas as parcelas de 1 contrato
 }
+
 
 export interface BankAccount {
   id: string;
