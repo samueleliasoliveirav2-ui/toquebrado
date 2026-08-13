@@ -16,10 +16,13 @@ import {
   Building2,
   PartyPopper,
   DollarSign,
-  Percent,
   Filter,
   Lock,
-  Sparkles
+  Sparkles,
+  Download,
+  Trash2,
+  FileSpreadsheet,
+  Search
 } from 'lucide-react';
 import type { Transaction, WorkShiftEntry } from '../types';
 
@@ -38,6 +41,8 @@ interface ReportsDashboardProps {
   transactions: Transaction[];
   workShifts: WorkShiftEntry[];
   onOpenDrawer: () => void;
+  onMarkShiftAsPaid?: (id: string) => void;
+  onDeleteWorkShift?: (id: string) => void;
 }
 
 const RELATORIOS_ABAS: Array<{
@@ -53,12 +58,15 @@ const RELATORIOS_ABAS: Array<{
 export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   transactions,
   workShifts,
-  onOpenDrawer
+  onOpenDrawer,
+  onMarkShiftAsPaid,
+  onDeleteWorkShift
 }) => {
   const [activeReport, setActiveReport] = useState<TipoRelatorio>('VISAO_GERAL');
 
   // Shared filters
-  const [periodFilter, setPeriodFilter] = useState<'ESTE_MES' | 'MES_ANTERIOR' | 'ULTIMOS_3_MESES' | 'PERSONALIZADO' | 'MES_ANO'>('ESTE_MES');
+  const [periodFilter, setPeriodFilter] = useState<'ESTE_MES' | 'MES_ANTERIOR' | 'ULTIMOS_3_MESES' | 'ANO' | 'PERSONALIZADO' | 'MES_ANO'>('ESTE_MES');
+  const [selectedAno, setSelectedAno] = useState<string>(() => String(new Date().getFullYear()));
   const [selectedMesAno, setSelectedMesAno] = useState<string>(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -71,6 +79,10 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   // Filtros Status Lançamentos
   const [tipoLancFilter, setTipoLancFilter] = useState<TipoLancamentoFilter>('TODOS');
   const [abaStatusLanc, setAbaStatusLanc] = useState<AbaStatusLanc>('TODOS');
+
+  // Filtros Diarias & Trabalho
+  const [selectedEventoId, setSelectedEventoId] = useState<string>('TODOS');
+  const [abaReceitasWork, setAbaReceitasWork] = useState<'TODOS' | 'RECEBIDOS' | 'A_RECEBER'>('TODOS');
 
   const now = new Date();
   const year = now.getFullYear();
@@ -97,6 +109,11 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
       s = firstDay.toISOString().split('T')[0];
       e = now.toISOString().split('T')[0];
       rotulo = 'Últimos 3 Meses';
+    } else if (periodFilter === 'ANO') {
+      const y = Number(selectedAno) || year;
+      s = `${y}-01-01`;
+      e = `${y}-12-31`;
+      rotulo = `Ano de ${y}`;
     } else if (periodFilter === 'MES_ANO') {
       const [y, m] = selectedMesAno.split('-').map(Number);
       const firstDay = new Date(y, (m || 1) - 1, 1);
@@ -110,7 +127,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
       rotulo = 'Período Personalizado';
     }
     return { filterStartStr: s, filterEndStr: e, rotuloPeriodo: rotulo };
-  }, [periodFilter, selectedMesAno, startDate, endDate, year, month]);
+  }, [periodFilter, selectedAno, selectedMesAno, startDate, endDate, year, month]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -332,28 +349,164 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
     ].filter(a => a.bruto > 0 || a.custos > 0);
   }, [workShiftsPeriodo]);
 
-  const detalhesEventos = useMemo(() => {
-    const eventosEntrada = workShiftsPeriodo.filter(e => e.tipo === 'ENTRADA' && e.atividade === 'Evento');
-    return eventosEntrada.map(evt => {
-      const custosVinculados = workShiftsPeriodo.filter(e =>
-        e.tipo === 'SAIDA' &&
-        (evt.id && (e.vinculoId === evt.id || (e.atividade === 'Evento' && e.data === evt.data)))
-      );
-      const totalCustos = custosVinculados.reduce((s, e) => s + e.valor, 0);
+  // ---------------------------------------------------------------------------
+  //  BLOCO 3 EXTENDIDO: RELATORIO DIARIAS & TRABALHO (NOVO ESCOPO)
+  // ---------------------------------------------------------------------------
+
+  // Aplicar filtro adicional de Contratante / Evento selecionado
+  const workShiftsFiltradosEvento = useMemo(() => {
+    if (selectedEventoId === 'TODOS') return workShiftsPeriodo;
+    const idsRelevantes = new Set<string>([selectedEventoId]);
+    // Incluir também SAIDAS vinculadas por vinculoId = entrada selecionada
+    workShiftsPeriodo.forEach(e => {
+      if (e.tipo === 'SAIDA' && e.vinculoId && idsRelevantes.has(e.vinculoId)) return;
+    });
+    // Evento escolhido: manter entradas com esse id, e saidas cujo vinculo_id bate
+    return workShiftsPeriodo.filter(e => {
+      if (e.id === selectedEventoId) return true;
+      if (e.tipo === 'SAIDA' && e.vinculoId && idsRelevantes.has(e.vinculoId)) return true;
+      return false;
+    });
+  }, [workShiftsPeriodo, selectedEventoId]);
+
+  // KPIs do relatorio
+  const workKPIsFull = useMemo(() => {
+    const entradas = workShiftsFiltradosEvento.filter(e => e.tipo === 'ENTRADA');
+    const saidas = workShiftsFiltradosEvento.filter(e => e.tipo === 'SAIDA');
+    const bruto = entradas.reduce((s, e) => s + e.valor, 0);
+    const custos = saidas.reduce((s, e) => s + e.valor, 0);
+    const recebidos = entradas.filter(e => e.status !== 'A_RECEBER').reduce((s, e) => s + e.valor, 0);
+    const aReceber = entradas.filter(e => e.status === 'A_RECEBER').reduce((s, e) => s + e.valor, 0);
+    const lucroLiquido = recebidos - custos;
+    const margem = bruto > 0 ? (lucroLiquido / bruto) * 100 : 0;
+    return { bruto, custos, recebidos, aReceber, lucroLiquido, margem, qtdReceitas: entradas.length, qtdCustos: saidas.length };
+  }, [workShiftsFiltradosEvento]);
+
+  // Lista de receitas detalhada (somente entradas)
+  const receitasWork = useMemo(() => {
+    return workShiftsFiltradosEvento
+      .filter(e => e.tipo === 'ENTRADA')
+      .map(e => ({
+        id: e.id,
+        data: e.data,
+        contratante: e.observacao || e.atividade || 'Evento',
+        atividade: e.atividade || 'Outro',
+        qtdDias: e.quantidadeDias || 1,
+        valorDiaria: e.valorDiaria || (e.valor / (e.quantidadeDias || 1)),
+        valorTotal: e.valor,
+        status: (e.status || 'RECEBIDO') as 'RECEBIDO' | 'A_RECEBER',
+        dataRecebimento: e.status === 'A_RECEBER' ? (e.dataRecebimento || e.data) : undefined,
+        parcela: e.totalParcelas ? `${e.parcelaAtual || 1}/${e.totalParcelas}` : undefined,
+        tipoReceb: e.tipoRecebimento
+      }))
+      .sort((a, b) => b.data.localeCompare(a.data));
+  }, [workShiftsFiltradosEvento]);
+
+  const receitasWorkFiltradasStatus = useMemo(() => {
+    if (abaReceitasWork === 'RECEBIDOS') return receitasWork.filter(r => r.status === 'RECEBIDO');
+    if (abaReceitasWork === 'A_RECEBER') return receitasWork.filter(r => r.status === 'A_RECEBER');
+    return receitasWork;
+  }, [receitasWork, abaReceitasWork]);
+
+  // Gastos por Categoria (analise A)
+  const gastosPorCategoria = useMemo(() => {
+    const saidas = workShiftsFiltradosEvento.filter(e => e.tipo === 'SAIDA');
+    const totalGasto = saidas.reduce((s, e) => s + e.valor, 0);
+    const mapa: Record<string, { total: number; qtd: number }> = {};
+    saidas.forEach(e => {
+      const cat = e.categoria || 'Outros';
+      if (!mapa[cat]) mapa[cat] = { total: 0, qtd: 0 };
+      mapa[cat].total += e.valor;
+      mapa[cat].qtd += 1;
+    });
+    const lista = Object.keys(mapa).map((nome, idx) => {
+      const item = mapa[nome];
       return {
-        id: evt.id,
-        nome: evt.observacao || 'Evento',
-        qtdDias: evt.quantidadeDias || 1,
-        ganhoBruto: evt.valor,
-        valorDiaria: evt.valorDiaria,
-        custos: totalCustos,
-        lucroLiquido: evt.valor - totalCustos,
-        status: evt.status || 'RECEBIDO',
-        data: evt.data,
-        dataRecebimento: evt.dataRecebimento
+        nome,
+        total: item.total,
+        qtd: item.qtd,
+        percentualTotal: totalGasto > 0 ? (item.total / totalGasto) * 100 : 0,
+        percentualReceita: workKPIsFull.bruto > 0 ? (item.total / workKPIsFull.bruto) * 100 : 0,
+        cor: getColorForCategory(nome, idx)
       };
-    }).sort((a, b) => b.data.localeCompare(a.data));
-  }, [workShiftsPeriodo]);
+    }).sort((a, b) => b.total - a.total);
+    return {
+      totalGasto,
+      totalGastoPctReceita: workKPIsFull.bruto > 0 ? (totalGasto / workKPIsFull.bruto) * 100 : 0,
+      lista
+    };
+  }, [workShiftsFiltradosEvento, workKPIsFull.bruto]);
+
+  // Rentabilidade por Evento (analise B)
+  const rentabilidadePorEvento = useMemo(() => {
+    const entradas = workShiftsFiltradosEvento.filter(e => e.tipo === 'ENTRADA');
+    const result = entradas.map(entrada => {
+      const saidas = workShiftsFiltradosEvento.filter(e =>
+        e.tipo === 'SAIDA' &&
+        ((entrada.id && (e.vinculoId === entrada.id ||
+          (e.atividade === entrada.atividade && e.data === entrada.data))))
+      );
+      const custos = saidas.reduce((s, e) => s + e.valor, 0);
+      const lucro = entrada.valor - custos;
+      const margem = entrada.valor > 0 ? (lucro / entrada.valor) * 100 : 0;
+      return {
+        id: entrada.id,
+        nome: entrada.observacao || entrada.atividade || 'Evento',
+        atividade: entrada.atividade,
+        data: entrada.data,
+        receitaBruta: entrada.valor,
+        custos,
+        lucro,
+        margem,
+        qtdDias: entrada.quantidadeDias || 1,
+        status: (entrada.status || 'RECEBIDO') as 'RECEBIDO' | 'A_RECEBER'
+      };
+    }).sort((a, b) => b.receitaBruta - a.receitaBruta);
+    return result;
+  }, [workShiftsFiltradosEvento]);
+
+  // Export CSV
+  const gerarCsvRelatorio = () => {
+    const linhasReceitas = receitasWork.map(r => [
+      'RECEITA',
+      r.data,
+      r.contratante.replace(/[;\r\n]/g, ' '),
+      r.atividade,
+      r.qtdDias,
+      r.valorDiaria.toFixed(2),
+      r.valorTotal.toFixed(2),
+      r.status,
+      r.dataRecebimento || '',
+      r.parcela || ''
+    ].join(';'));
+    const linhasCustos = workShiftsFiltradosEvento
+      .filter(e => e.tipo === 'SAIDA')
+      .map(e => [
+        'CUSTO',
+        e.data,
+        (e.observacao || e.categoria || '').replace(/[;\r\n]/g, ' '),
+        e.atividade || '',
+        '1',
+        e.valor.toFixed(2),
+        e.valor.toFixed(2),
+        'PAGO',
+        '',
+        ''
+      ].join(';'));
+    const header = [
+      'TIPO;DATA;CONTRATANTE;ATIVIDADE;QTD_DIAS;VLR_UNIT;VLR_TOTAL;STATUS;DATA_RECEBIMENTO;PARCELA'
+    ];
+    const csv = '\uFEFF' + [...header, ...linhasReceitas, ...linhasCustos].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `relatorio_diarias_trabalho_${rotuloPeriodo.replace(/[^\d\w]/g,'_')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   // Donut chart params
   const radius = 50;
@@ -453,6 +606,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                 <option value="MES_ANO">Mês / Ano</option>
                 <option value="MES_ANTERIOR">Mês Anterior</option>
                 <option value="ULTIMOS_3_MESES">Últimos 3 Meses</option>
+                <option value="ANO">Ano Inteiro</option>
                 <option value="PERSONALIZADO">Personalizado</option>
               </select>
             </div>
@@ -485,11 +639,28 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
               </div>
             ) : (
               <div>
-              <label className="block text-slate-500 text-[9px] font-bold uppercase mb-1">Análise de</label>
-              <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs text-slate-800 font-bold shadow-3xs flex items-center gap-1.5">
-                <Briefcase size={12} className="text-[#0e69b2]" />
-                Diárias & Trabalho
-              </div>
+              <label className="block text-slate-500 text-[9px] font-bold uppercase mb-1">Contratante / Evento</label>
+              <select
+                value={selectedEventoId}
+                onChange={(e) => setSelectedEventoId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs text-slate-800 font-semibold cursor-pointer shadow-3xs"
+              >
+                <option value="TODOS">Todos os Eventos / Serviços</option>
+                {(() => {
+                  const nomes = new Map<string, string>();
+                  workShifts
+                    .filter(e => e.tipo === 'ENTRADA')
+                    .forEach(e => {
+                      const nome = (e.observacao || e.atividade || 'Evento').slice(0, 40);
+                      if (!nomes.has(e.id)) nomes.set(e.id, nome);
+                    });
+                  return Array.from(nomes.entries())
+                    .sort((a, b) => a[1].localeCompare(b[1]))
+                    .map(([id, nome]) => (
+                      <option key={id} value={id}>{nome}</option>
+                    ));
+                })()}
+              </select>
             </div>
             )}
           </div>
@@ -503,6 +674,22 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                 onChange={(e) => setSelectedMesAno(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-blue-500 shadow-3xs"
               />
+            </div>
+          )}
+
+          {periodFilter === 'ANO' && (
+            <div className="pt-1 animate-fade-in">
+              <label className="block text-slate-500 text-[9px] font-bold uppercase mb-1">Ano Referência</label>
+              <select
+                value={selectedAno}
+                onChange={(e) => setSelectedAno(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs text-slate-800 font-bold cursor-pointer focus:outline-none focus:border-blue-500 shadow-3xs"
+              >
+                {Array.from({ length: 8 }).map((_, i) => {
+                  const y = (year - 3) + i;
+                  return <option key={y} value={String(y)}>{y}</option>;
+                })}
+              </select>
             </div>
           )}
 
@@ -859,11 +1046,37 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
       )}
 
       {/* =============================================== */}
-      {/*  RELATÓRIO 3: DIÁRIAS & TRABALHO */}
+      {/*  RELATÓRIO 3: DIÁRIAS & TRABALHO (NOVO) */}
       {/* =============================================== */}
       {activeReport === 'DIARIAS_TRABALHO' && (
         <>
-          {/* 5 KPIs principais */}
+          {/* Barra superior com Exportar CSV */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-[#0e69b2] flex items-center justify-center shrink-0 text-white">
+                <FileSpreadsheet size={14} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 block truncate">
+                  Análise de Diárias & Trabalho
+                </h2>
+                <p className="text-[9px] font-bold text-slate-500 truncate">
+                  {rotuloPeriodo} · {selectedEventoId === 'TODOS' ? 'Todos os Eventos' : '1 Evento Selecionado'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={gerarCsvRelatorio}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border border-emerald-500 text-[10px] font-black uppercase tracking-wider shadow-md shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <Download size={12} />
+              Exportar CSV
+            </button>
+          </div>
+
+          {/* ============================================================ */}
+          {/*  BLOCO 1: KPIs de RECEITAS + CUSTOS                          */}
+          {/* ============================================================ */}
           <div className="grid grid-cols-2 gap-2.5">
             <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-3.5 rounded-2xl shadow-md shadow-blue-500/20 flex flex-col text-left col-span-2">
               <div className="flex items-center justify-between">
@@ -873,9 +1086,50 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                 </div>
                 <Briefcase size={16} className="opacity-70" />
               </div>
-              <span className="text-lg font-black mt-1">
-                {formatCurrency(workKPIs.bruto)}
+              <div className="flex items-end justify-between mt-1">
+                <span className="text-lg font-black leading-none">
+                  {formatCurrency(workKPIsFull.bruto)}
+                </span>
+                <span className="text-[9px] font-bold opacity-80">
+                  {workKPIsFull.qtdReceitas} jobs
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-white border border-emerald-200/60 p-3 rounded-2xl shadow-3xs flex flex-col text-left">
+              <div className="flex items-center gap-1 mb-1">
+                <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <CheckCircle2 size={12} className="text-emerald-700" />
+                </div>
+                <span className="text-[8px] uppercase tracking-wider font-black text-slate-600 leading-none">Recebidos (Liquidado)</span>
+              </div>
+              <span className="text-sm font-black text-emerald-700 truncate">
+                +{formatCurrency(workKPIsFull.recebidos)}
               </span>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-500"
+                  style={{ width: `${workKPIsFull.bruto > 0 ? Math.max(0, Math.min(100, (workKPIsFull.recebidos / workKPIsFull.bruto) * 100)) : 0}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white border border-amber-200/60 p-3 rounded-2xl shadow-3xs flex flex-col text-left">
+              <div className="flex items-center gap-1 mb-1">
+                <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <Clock size={12} className="text-amber-700" />
+                </div>
+                <span className="text-[8px] uppercase tracking-wider font-black text-slate-600 leading-none">Valores a Receber</span>
+              </div>
+              <span className="text-sm font-black text-amber-700 truncate">
+                +{formatCurrency(workKPIsFull.aReceber)}
+              </span>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500"
+                  style={{ width: `${workKPIsFull.bruto > 0 ? Math.max(0, Math.min(100, (workKPIsFull.aReceber / workKPIsFull.bruto) * 100)) : 0}%` }}
+                />
+              </div>
             </div>
 
             <div className="bg-white border border-rose-200/60 p-3 rounded-2xl shadow-3xs flex flex-col text-left">
@@ -884,55 +1138,396 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                 <span className="text-[8px] uppercase tracking-wider font-black text-slate-600 leading-none">Custos Operacionais</span>
               </div>
               <span className="text-sm font-black text-rose-700 truncate">
-                -{formatCurrency(workKPIs.custos)}
+                -{formatCurrency(workKPIsFull.custos)}
               </span>
-            </div>
-
-            <div className="bg-white border border-emerald-200/60 p-3 rounded-2xl shadow-3xs flex flex-col text-left">
-              <div className="flex items-center gap-1 mb-1">
-                <Sparkles size={12} className="text-emerald-700" />
-                <span className="text-[8px] uppercase tracking-wider font-black text-slate-600 leading-none">Lucro Líquido Realizado</span>
-              </div>
-              <span className={[
-                'text-sm font-black truncate',
-                workKPIs.lucroLiquido >= 0 ? 'text-emerald-700' : 'text-rose-700'
-              ].join(' ')}>
-                {workKPIs.lucroLiquido >= 0 ? '+' : ''}{formatCurrency(workKPIs.lucroLiquido)}
-              </span>
-            </div>
-
-            <div className="bg-white border border-amber-200/60 p-3 rounded-2xl shadow-3xs flex flex-col text-left">
-              <div className="flex items-center gap-1 mb-1">
-                <Clock size={12} className="text-amber-700" />
-                <span className="text-[8px] uppercase tracking-wider font-black text-slate-600 leading-none">Valores a Receber</span>
-              </div>
-              <span className="text-sm font-black text-amber-700 truncate">
-                +{formatCurrency(workKPIs.aReceber)}
+              <span className="text-[9px] font-bold text-slate-500 mt-0.5">
+                {gastosPorCategoria.totalGastoPctReceita.toFixed(1)}% do faturamento
               </span>
             </div>
 
             <div className="bg-white border border-blue-200/60 p-3 rounded-2xl shadow-3xs flex flex-col text-left">
               <div className="flex items-center gap-1 mb-1">
-                <Percent size={12} className="text-[#0e69b2]" />
-                <span className="text-[8px] uppercase tracking-wider font-black text-slate-600 leading-none">Margem de Lucro</span>
+                <Sparkles size={12} className="text-[#0e69b2]" />
+                <span className="text-[8px] uppercase tracking-wider font-black text-slate-600 leading-none">Lucro Líq. Projetado</span>
               </div>
-              <span className="text-sm font-black text-[#0e69b2] truncate">
-                {workKPIs.margem.toFixed(1)}%
+              <span className={[
+                'text-sm font-black truncate',
+                workKPIsFull.lucroLiquido >= 0 ? 'text-emerald-700' : 'text-rose-700'
+              ].join(' ')}>
+                {workKPIsFull.lucroLiquido >= 0 ? '+' : ''}{formatCurrency(workKPIsFull.lucroLiquido)}
               </span>
               <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
-                  style={{ width: `${Math.max(0, Math.min(100, workKPIs.margem))}%` }}
+                  className={[
+                    'h-full rounded-full transition-all duration-500',
+                    workKPIsFull.lucroLiquido >= 0
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600'
+                      : 'bg-gradient-to-r from-rose-500 to-rose-600'
+                  ].join(' ')}
+                  style={{ width: `${Math.max(0, Math.min(100, Math.abs(workKPIsFull.margem)))}%` }}
                 />
               </div>
             </div>
           </div>
 
-          {/* Comparativo por Atividade */}
+          {/* ============================================================ */}
+          {/*  BLOCO 1.1: DETALHAMENTO DE RECEITAS (abrir rápido)         */}
+          {/* ============================================================ */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs space-y-3">
             <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
               <BarChart3 size={12} className="text-[#0e69b2]" />
-              Comparativo por Atividade
+              Relatório de Recebimentos
+              <span className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-600">
+                {receitasWork.length} lançamentos
+              </span>
+            </div>
+
+            {/* Abas rápidas */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-1 flex gap-1">
+              {([
+                ['TODOS', 'Todos', receitasWork.length],
+                ['RECEBIDOS', 'Recebidos', receitasWork.filter(r => r.status === 'RECEBIDO').length],
+                ['A_RECEBER', 'A Receber', receitasWork.filter(r => r.status === 'A_RECEBER').length]
+              ] as Array<['TODOS' | 'RECEBIDOS' | 'A_RECEBER', string, number]>).map(([id, rotulo, qtd]) => {
+                const ativo = abaReceitasWork === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setAbaReceitasWork(id)}
+                    className={[
+                      'flex-1 flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-lg transition-all duration-200 text-[9px] font-black uppercase tracking-wider cursor-pointer',
+                      ativo
+                        ? 'bg-[#0e69b2] text-white shadow-sm shadow-blue-500/20'
+                        : 'text-slate-600 hover:bg-white active:scale-[0.98]'
+                    ].join(' ')}
+                  >
+                    <span>{rotulo}</span>
+                    <span className={ativo ? 'text-white/80' : 'text-slate-500'}>
+                      {qtd}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Lista detalhada */}
+            {receitasWorkFiltradasStatus.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                <Search className="text-slate-400 mb-2" size={26} />
+                <p className="text-slate-700 text-xs font-bold">Nenhuma receita para este filtro.</p>
+                <p className="text-slate-500 text-[10px] mt-1">Troque o período ou a aba.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                {receitasWorkFiltradasStatus.map(r => {
+                  const isAReceber = r.status === 'A_RECEBER';
+                  return (
+                    <div key={r.id} className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <div className={[
+                            'w-8 h-8 rounded-lg shrink-0 flex items-center justify-center border text-white',
+                            r.atividade === 'Evento'
+                              ? 'bg-purple-600 border-purple-200'
+                              : r.atividade === 'Motorista de App'
+                              ? 'bg-[#0e69b2] border-blue-200'
+                              : 'bg-slate-600 border-slate-200'
+                          ].join(' ')}>
+                            {r.atividade === 'Evento'
+                              ? <PartyPopper size={14} />
+                              : r.atividade === 'Motorista de App'
+                              ? <Car size={14} />
+                              : <Building2 size={14} />}
+                          </div>
+                          <div className="text-left min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-extrabold text-slate-800 truncate">
+                                {r.contratante}
+                              </span>
+                              <span className={[
+                                'text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border',
+                                isAReceber
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              ].join(' ')}>
+                                {isAReceber ? 'A RECEBER' : 'RECEBIDO'}
+                              </span>
+                              {r.parcela && (
+                                <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border bg-blue-50 text-blue-700 border-blue-200">
+                                  {r.tipoReceb === 'RECORRENTE' ? 'Contrato' : 'Parc.'} {r.parcela}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[9px] font-bold text-slate-500 uppercase">
+                              <span className="px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700">
+                                {formatDate(r.data)}
+                              </span>
+                              <span>{r.qtdDias} {r.qtdDias === 1 ? 'dia' : 'dias'}</span>
+                              {isAReceber && r.dataRecebimento && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 flex items-center gap-0.5">
+                                  <Clock size={9} /> Prev. {formatDate(r.dataRecebimento)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-black text-emerald-700 block leading-none">
+                            +{formatCurrency(r.valorTotal)}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-500 mt-0.5 block">
+                            {formatCurrency(r.valorDiaria)}/dia
+                          </span>
+                        </div>
+                      </div>
+
+                      {isAReceber && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => onMarkShiftAsPaid && onMarkShiftAsPaid(r.id)}
+                            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border border-emerald-500 text-[9px] font-black uppercase tracking-wider shadow-sm shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer"
+                          >
+                            <CheckCircle2 size={11} />
+                            Dar Baixa (Recebido)
+                          </button>
+                          {onDeleteWorkShift && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm('Excluir este lançamento de receita?')) {
+                                  onDeleteWorkShift(r.id);
+                                }
+                              }}
+                              title="Excluir lançamento"
+                              className="px-2 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 active:scale-[0.98] transition-all cursor-pointer"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ============================================================ */}
+          {/*  BLOCO 2A: GASTOS POR CATEGORIA (Analise A)                  */}
+          {/* ============================================================ */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
+              <Car size={12} className="text-[#f97316]" />
+              Gastos de Rua por Categoria
+              <span className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded-md bg-rose-50 border border-rose-200 text-rose-700">
+                -{formatCurrency(gastosPorCategoria.totalGasto)}
+              </span>
+            </div>
+
+            {gastosPorCategoria.lista.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                <TrendingDown className="text-slate-400 mb-2" size={24} />
+                <p className="text-slate-700 text-xs font-bold">Nenhum custo de rua no período.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {/* Donut Chart */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-center">
+                  <div className="relative w-36 h-36">
+                    <svg viewBox="0 0 120 120" className="w-full h-full transform -rotate-90">
+                      {(() => {
+                        let accumulated = 0;
+                        return gastosPorCategoria.lista.map((cat) => {
+                          const strokeOffset = circ - (cat.percentualTotal / 100) * circ;
+                          const rotation = (accumulated / 100) * 360;
+                          accumulated += cat.percentualTotal;
+                          return (
+                            <circle
+                              key={cat.nome}
+                              cx="60"
+                              cy="60"
+                              r={radius}
+                              fill="transparent"
+                              stroke={cat.cor}
+                              strokeWidth={strokeWidth}
+                              strokeDasharray={circ}
+                              strokeDashoffset={strokeOffset}
+                              transform={`rotate(${rotation} 60 60)`}
+                              className="transition-all duration-500 ease-out"
+                            />
+                          );
+                        });
+                      })()}
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-[8px] uppercase font-extrabold text-slate-500">Total Gasto</span>
+                      <span className="text-xs font-black text-rose-700 mt-0.5">
+                        {formatCurrency(gastosPorCategoria.totalGasto)}
+                      </span>
+                      <span className="text-[8px] font-bold text-slate-500 mt-0.5">
+                        {gastosPorCategoria.totalGastoPctReceita.toFixed(1)}% do bruto
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela % */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 divide-y divide-slate-200/70">
+                  {gastosPorCategoria.lista.map(cat => (
+                    <div key={cat.nome} className="py-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: cat.cor }}
+                        />
+                        <div className="text-left min-w-0">
+                          <span className="text-[11px] font-extrabold text-slate-800 block truncate">{cat.nome}</span>
+                          <span className="text-[9px] font-bold text-slate-500 block">
+                            {cat.qtd} {cat.qtd === 1 ? 'lançamento' : 'lançamentos'} · {cat.percentualTotal.toFixed(1)}% dos custos
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-black text-rose-700 block leading-none">
+                          -{formatCurrency(cat.total)}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-500 mt-0.5 block">
+                          {cat.percentualReceita.toFixed(1)}% do bruto
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ============================================================ */}
+          {/*  BLOCO 2B: RENTABILIDADE POR EVENTO (Analise B)              */}
+          {/* ============================================================ */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
+              <PartyPopper size={12} className="text-purple-600" />
+              Rentabilidade por Evento / Job
+              <span className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded-md bg-purple-50 border border-purple-200 text-purple-700">
+                {rentabilidadePorEvento.length} eventos
+              </span>
+            </div>
+
+            {rentabilidadePorEvento.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                <Briefcase className="text-slate-400 mb-2" size={24} />
+                <p className="text-slate-700 text-xs font-bold">Nenhum evento cadastrado neste período.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {rentabilidadePorEvento.map(evt => (
+                  <div key={evt.id} className="bg-gradient-to-r from-purple-50/70 to-slate-50 border border-purple-200/70 rounded-xl p-3 space-y-2.5">
+                    {/* Linha 1: Nome + Lucro */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0">
+                          <PartyPopper size={14} />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-extrabold text-slate-800 block truncate">
+                              {evt.nome}
+                            </span>
+                            <span className={[
+                              'text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border',
+                              evt.status === 'RECEBIDO'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            ].join(' ')}>
+                              {evt.status === 'RECEBIDO' ? 'RECEBIDO' : 'A RECEBER'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[9px] font-bold text-slate-500 uppercase">
+                            <span className="px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700">
+                              {formatDate(evt.data)}
+                            </span>
+                            <span>{evt.qtdDias} {evt.qtdDias === 1 ? 'dia' : 'dias'}</span>
+                            <span className="px-1.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700">
+                              {evt.atividade}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className={[
+                          'text-xs font-black block leading-none',
+                          evt.lucro >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                        ].join(' ')}>
+                          {evt.lucro >= 0 ? '+' : ''}{formatCurrency(evt.lucro)}
+                        </span>
+                        <span className={[
+                          'text-[9px] font-bold mt-0.5 block',
+                          evt.margem >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                        ].join(' ')}>
+                          Margem {evt.margem.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Grid 4 valores: Bruto · Custos · Lucro · Margem */}
+                    <div className="grid grid-cols-4 gap-1.5 text-[10px]">
+                      <div className="bg-white rounded-lg border border-slate-200 p-2 text-center">
+                        <span className="font-black text-slate-500 uppercase block text-[8px]">Bruto</span>
+                        <span className="font-black text-slate-800 block mt-0.5">{formatCurrency(evt.receitaBruta)}</span>
+                      </div>
+                      <div className="bg-white rounded-lg border border-rose-200/60 p-2 text-center">
+                        <span className="font-black text-rose-600 uppercase block text-[8px]">Custos</span>
+                        <span className="font-black text-rose-700 block mt-0.5">-{formatCurrency(evt.custos)}</span>
+                      </div>
+                      <div className="bg-white rounded-lg border border-slate-200 p-2 text-center">
+                        <span className="font-black text-slate-500 uppercase block text-[8px]">Custo/Dia</span>
+                        <span className="font-black text-slate-800 block mt-0.5">
+                          {formatCurrency(evt.qtdDias > 0 ? (evt.custos / evt.qtdDias) : 0)}
+                        </span>
+                      </div>
+                      <div className="bg-white rounded-lg border border-slate-200 p-2 text-center">
+                        <span className="font-black text-slate-500 uppercase block text-[8px]">Dia</span>
+                        <span className={[
+                          'font-black block mt-0.5',
+                          evt.lucro >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                        ].join(' ')}>
+                          {formatCurrency(evt.qtdDias > 0 ? (evt.lucro / evt.qtdDias) : 0)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Barra de margem */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[9px] font-bold">
+                        <span className="text-slate-500 uppercase tracking-wider">Representatividade vs Faturamento</span>
+                        <span className={evt.margem >= 0 ? 'text-emerald-700' : 'text-rose-700'}>
+                          {evt.margem.toFixed(1)}% margem
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className={[
+                            'h-full rounded-full transition-all duration-500',
+                            evt.margem >= 0
+                              ? 'bg-gradient-to-r from-purple-500 to-emerald-500'
+                              : 'bg-gradient-to-r from-rose-500 to-rose-600'
+                          ].join(' ')}
+                          style={{ width: `${Math.max(0, Math.min(100, Math.abs(evt.margem) || 2))}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Rodape: Comparativo atividade antigo mantido como bonus */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
+              <BarChart3 size={12} className="text-[#0e69b2]" />
+              Comparativo por Tipo de Atividade
             </div>
 
             {atividadesComparativo.length === 0 ? (
@@ -995,86 +1590,6 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </div>
-
-          {/* Detalhamento por Evento */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs space-y-3">
-            <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
-              <PartyPopper size={12} className="text-purple-600" />
-              Detalhamento de Eventos
-            </div>
-
-            {detalhesEventos.length === 0 ? (
-              <p className="text-center py-6 text-xs font-bold text-slate-500">
-                Nenhum evento agendado no período.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {detalhesEventos.map(evt => (
-                  <div key={evt.id} className="bg-gradient-to-r from-purple-50/70 to-slate-50 border border-purple-200/70 rounded-xl p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0">
-                          <PartyPopper size={14} />
-                        </div>
-                        <div className="text-left min-w-0">
-                          <span className="text-xs font-extrabold text-slate-800 block truncate">
-                            {evt.nome}
-                          </span>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="text-[9px] font-bold text-slate-500 uppercase flex items-center gap-0.5">
-                              <Calendar size={9} /> {evt.qtdDias} {evt.qtdDias === 1 ? 'dia' : 'dias'}
-                            </span>
-                            <span className="text-slate-400">•</span>
-                            <span className="text-[9px] font-bold text-slate-500">
-                              {formatDateFull(evt.data)}
-                            </span>
-                            <span className={[
-                              'text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md border',
-                              evt.status === 'RECEBIDO'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            ].join(' ')}>
-                              {evt.status === 'RECEBIDO' ? 'RECEBIDO' : 'A RECEBER'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <span className={[
-                        'text-sm font-black shrink-0',
-                        evt.lucroLiquido >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                      ].join(' ')}>
-                        {evt.lucroLiquido >= 0 ? '+' : ''}{formatCurrency(evt.lucroLiquido)}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-1.5 text-[10px]">
-                      <div className="bg-white/80 rounded-lg border border-purple-200/70 p-2 text-center">
-                        <span className="font-black text-slate-500 uppercase block text-[8px]">Bruto</span>
-                        <span className="font-black text-slate-800 block mt-0.5">{formatCurrency(evt.ganhoBruto)}</span>
-                      </div>
-                      <div className="bg-white/80 rounded-lg border border-rose-200/60 p-2 text-center">
-                        <span className="font-black text-rose-600 uppercase block text-[8px]">Custos</span>
-                        <span className="font-black text-rose-700 block mt-0.5">-{formatCurrency(evt.custos)}</span>
-                      </div>
-                      <div className="bg-white/80 rounded-lg border border-slate-200 p-2 text-center">
-                        <span className="font-black text-slate-500 uppercase block text-[8px]">Diária</span>
-                        <span className="font-black text-[#0e69b2] block mt-0.5">
-                          {evt.valorDiaria ? formatCurrency(evt.valorDiaria) : '-'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {evt.status === 'A_RECEBER' && evt.dataRecebimento && (
-                      <div className="flex items-center gap-1 text-[9px] font-bold text-amber-700 uppercase bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                        <Clock size={10} />
-                        Recebimento previsto: {formatDateFull(evt.dataRecebimento)}
-                      </div>
-                    )}
-                  </div>
-                ))}
               </div>
             )}
           </div>

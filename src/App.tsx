@@ -3246,6 +3246,8 @@ function App() {
                 transactions={transactions}
                 workShifts={workShifts}
                 onOpenDrawer={() => setIsDrawerOpen(true)}
+                onMarkShiftAsPaid={handleMarkShiftAsPaid}
+                onDeleteWorkShift={handleDeleteWorkShift}
               />
             ) : activeTab === 'CONTAS' ? (
               <AccountsDashboard
