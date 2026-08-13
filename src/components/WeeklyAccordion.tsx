@@ -16,7 +16,8 @@ import {
   Pencil,
   CreditCard as CardIcon,
   Wallet,
-  Tag
+  Tag,
+  FileText
 } from 'lucide-react';
 import type { Transaction, BankAccount } from '../types';
 
@@ -376,10 +377,21 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
 
                       {/* ÁREA EXPANDÍVEL INLINE: detalhes rápidos (Accordion) */}
                       <div
-                        className={`overflow-hidden transition-all duration-350 ease-out ${isExpandedTx ? 'max-h-[420px] opacity-100' : 'max-h-0 opacity-0'}`}
+                        className={`overflow-hidden transition-all duration-350 ease-out ${isExpandedTx ? 'max-h-[560px] opacity-100' : 'max-h-0 opacity-0'}`}
                       >
                         <div className="px-3.5 pb-3.5">
                           <div className="pt-3 border-t border-slate-100 text-[11.5px] space-y-2.5">
+                            {/* Descrição completa */}
+                            <div className="flex items-start gap-2 pb-1.5 border-b border-dashed border-slate-100">
+                              <FileText size={12} className="text-slate-400 shrink-0 mt-0.5" />
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <label className="text-[9.5px] font-black uppercase tracking-[0.15em] text-slate-400">Descrição</label>
+                                <span className="text-[13px] font-extrabold text-slate-800 leading-snug mt-0.5 whitespace-pre-wrap break-words">
+                                  {tx.descricao}
+                                </span>
+                              </div>
+                            </div>
+
                             {/* Linha 1: Conta + Categoria */}
                             <div className="flex items-center justify-between gap-4">
                               <div className="flex items-center gap-1.5 min-w-0 flex-1">
