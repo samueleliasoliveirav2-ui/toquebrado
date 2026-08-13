@@ -189,6 +189,36 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   animation: fadeIn 0.2s ease-out forwards;
 }
 
+@keyframes slideUpSmall {
+  from {
+    transform: translateY(30%);
+    opacity: 0.92;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up-sm {
+  animation: slideUpSmall 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes popIn {
+  from {
+    transform: translate(-50%, 10%) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-pop-in {
+  animation: popIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 @keyframes slideRight {
   from {
     transform: translateX(-100%);

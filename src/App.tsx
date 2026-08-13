@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles, FileUp, CheckSquare, Square, Upload, FileText as FileTextIcon, BarChart3, LayoutList } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles, FileUp, CheckSquare, Square, Upload, FileText as FileTextIcon, BarChart3, LayoutList, Tag, Check } from 'lucide-react';
 import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice, ExtractedInvoiceData, ExtractedInvoiceItem } from './types';
 import { CATEGORIES, INITIAL_TRANSACTIONS, computeInvoiceDerivedStatus } from './types';
 import { StatsHeader } from './components/StatsHeader';
@@ -93,6 +94,7 @@ function App() {
   const [selectedWalletCard, setSelectedWalletCard] = useState<CreditCard | null>(null);
   const [inicioViewMode, setInicioViewMode] = useState<'LIST' | 'CHART'>('LIST');
   const [statusFilter, setStatusFilter] = useState<'TODOS' | TransactionStatus>('TODOS');
+  const [statusMenuAberto, setStatusMenuAberto] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('SAIDA');
@@ -3010,8 +3012,8 @@ function App() {
                       </button>
                     </div>
 
-                    {/* Line 2 — Segmented Control (Todos/Receitas/Despesas) + Status Chips (scroll horizontal single line) */}
-                    <div className="flex items-center gap-2">
+                    {/* Line 2 — Segmented Control (Tipo) + Botão Único Status (Dropdown / BottomSheet) */}
+                    <div className="flex items-center justify-between gap-2">
                       {/* Segmented Control Type Filter (fixed size, no shrink) */}
                       <div className="flex-shrink-0 flex items-center gap-0.5 bg-white border border-slate-200 p-0.5 rounded-2xl text-xs font-bold shadow-inner">
                         <button
@@ -3048,76 +3050,117 @@ function App() {
                         </button>
                       </div>
 
-                      {/* Status Chips — Single Line Horizontal Scroll */}
-                      <div className="flex-1 min-w-0 flex flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-                        {filterType === 'ENTRADA' ? (
+                      {/* Botão Único de Status (Pill Compacto) */}
+                      {(() => {
+                        // Monta opções de status com base no filterType
+                        type Opt = { key: 'TODOS' | TransactionStatus; label: string; dotColor: string; textColor: string; bgColor: string };
+                        const opcoesPadrao: Opt[] = [
+                          { key: 'TODOS', label: 'Todos os Status', dotColor: 'bg-slate-400', textColor: 'text-slate-700', bgColor: 'bg-slate-100' },
+                          { key: 'PAGO', label: 'Pagos', dotColor: 'bg-emerald-500', textColor: 'text-emerald-700', bgColor: 'bg-emerald-50' },
+                          { key: 'RECEBIDO', label: 'Recebidos', dotColor: 'bg-emerald-500', textColor: 'text-emerald-700', bgColor: 'bg-emerald-50' },
+                          { key: 'PENDENTE', label: 'Pendentes', dotColor: 'bg-amber-500', textColor: 'text-amber-700', bgColor: 'bg-amber-50' },
+                          { key: 'POSTERGAR', label: 'Postergados', dotColor: 'bg-orange-500', textColor: 'text-orange-700', bgColor: 'bg-orange-50' },
+                        ];
+                        let statusOpts: Opt[] = opcoesPadrao;
+                        if (filterType === 'ENTRADA') {
+                          statusOpts = [
+                            opcoesPadrao[0],
+                            opcoesPadrao[2], // RECEBIDO
+                            opcoesPadrao[3], // PENDENTE
+                          ];
+                        } else if (filterType === 'SAIDA') {
+                          statusOpts = [
+                            opcoesPadrao[0],
+                            opcoesPadrao[1], // PAGO
+                            opcoesPadrao[3], // PENDENTE
+                            opcoesPadrao[4], // POSTERGAR
+                          ];
+                        }
+                        const statusAtual: Opt = statusOpts.find(o => o.key === statusFilter) ?? statusOpts[0];
+                        const isTodos = statusFilter === 'TODOS';
+
+                        return (
                           <>
-                            {[
-                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
-                              { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
-                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
-                            ].map(opt => (
-                              <button
-                                key={opt.key}
-                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
-                                className={[
-                                  'flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all border border-slate-200 cursor-pointer',
-                                  statusFilter === opt.key
-                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
-                                    : `bg-white ${opt.color} hover:bg-slate-50`
-                                ].join(' ')}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
+                            <button
+                              onClick={() => setStatusMenuAberto(true)}
+                              className={[
+                                'flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all border shadow-sm cursor-pointer active:scale-95',
+                                isTodos
+                                  ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                                  : `${statusAtual.bgColor} border-transparent ${statusAtual.textColor} hover:brightness-95`
+                              ].join(' ')}
+                            >
+                              <Tag size={12} strokeWidth={2.5} className={isTodos ? 'opacity-70' : ''} />
+                              <span className="font-black uppercase tracking-wide text-[10px]">Status:</span>
+                              <span className="font-black capitalize">{statusAtual.label.replace(/^Todos os Status$/, 'Todos')}</span>
+                              <ChevronDown size={12} strokeWidth={2.8} className="opacity-80" />
+                            </button>
+
+                            {/* BOTTOM SHEET DE STATUS via React Portal (fora do overflow) */}
+                            {statusMenuAberto && typeof document !== 'undefined' && createPortal(
+                              <>
+                                {/* Backdrop */}
+                                <div
+                                  className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-fade-in cursor-pointer"
+                                  onClick={() => setStatusMenuAberto(false)}
+                                  aria-hidden
+                                />
+                                {/* Bottom Sheet / Modal responsiva */}
+                                <div className="fixed z-[100] inset-x-0 sm:inset-x-auto sm:max-w-md sm:w-[92%] sm:left-1/2 sm:-translate-x-1/2 bottom-0 sm:bottom-auto sm:top-[14%] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-slate-900/30 border border-slate-200 animate-slide-up-sm sm:animate-pop-in overflow-hidden">
+                                  {/* Handle */}
+                                  <div className="pt-3 pb-1 flex justify-center">
+                                    <div className="w-11 h-1.5 rounded-full bg-slate-200" />
+                                  </div>
+                                  {/* Header */}
+                                  <div className="px-5 pt-2 pb-3 border-b border-slate-100 flex items-center justify-between">
+                                    <div>
+                                      <p className="text-[9px] uppercase tracking-[0.18em] font-black text-slate-400">FILTRAR POR</p>
+                                      <h3 className="text-[15px] font-black text-slate-800 tracking-tight mt-0.5">Status de Lançamento</h3>
+                                    </div>
+                                    <button
+                                      onClick={() => setStatusMenuAberto(false)}
+                                      className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all cursor-pointer"
+                                    >
+                                      <X size={15} strokeWidth={2.4} />
+                                    </button>
+                                  </div>
+                                  {/* Opções */}
+                                  <div className="p-3 pb-5 space-y-1.5 max-h-[62vh] overflow-y-auto">
+                                    {statusOpts.map((opt) => {
+                                      const selecionado = statusFilter === opt.key;
+                                      return (
+                                        <button
+                                          key={opt.key}
+                                          onClick={() => { setStatusFilter(opt.key); setStatusMenuAberto(false); }}
+                                          className={[
+                                            'w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-[13px] font-bold transition-all cursor-pointer text-left border',
+                                            selecionado
+                                              ? `${opt.bgColor} border-transparent ${opt.textColor} shadow-sm ring-2 ring-offset-1 ring-offset-white ring-slate-900/5`
+                                              : 'bg-white border-slate-100 text-slate-700 hover:bg-slate-50 hover:border-slate-200'
+                                          ].join(' ')}
+                                        >
+                                          <span className={[
+                                            'w-3.5 h-3.5 rounded-full ring-4 ring-offset-1 ring-offset-transparent flex-shrink-0',
+                                            opt.dotColor,
+                                            selecionado ? 'ring-slate-900/10' : 'ring-white/0'
+                                          ].join(' ')} />
+                                          <span className="flex-1 font-black capitalize tracking-wide">{opt.label}</span>
+                                          {selecionado && (
+                                            <span className={['w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0', opt.bgColor, opt.textColor].join(' ')}>
+                                              <Check size={13} strokeWidth={3.2} />
+                                            </span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </>,
+                              document.body
+                            )}
                           </>
-                        ) : filterType === 'SAIDA' ? (
-                          <>
-                            {[
-                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
-                              { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
-                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
-                              { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
-                            ].map(opt => (
-                              <button
-                                key={opt.key}
-                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
-                                className={[
-                                  'flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all border border-slate-200 cursor-pointer',
-                                  statusFilter === opt.key
-                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
-                                    : `bg-white ${opt.color} hover:bg-slate-50`
-                                ].join(' ')}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </>
-                        ) : (
-                          <>
-                            {[
-                              { key: 'TODOS', label: 'Todos', color: 'text-slate-700' },
-                              { key: 'PAGO', label: 'Pago', color: 'text-emerald-600' },
-                              { key: 'RECEBIDO', label: 'Recebido', color: 'text-emerald-600' },
-                              { key: 'PENDENTE', label: 'Pendente', color: 'text-amber-600' },
-                              { key: 'POSTERGAR', label: 'Postergado', color: 'text-orange-600' },
-                            ].map(opt => (
-                              <button
-                                key={opt.key}
-                                onClick={() => setStatusFilter(opt.key as 'TODOS' | TransactionStatus)}
-                                className={[
-                                  'flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all border border-slate-200 cursor-pointer',
-                                  statusFilter === opt.key
-                                    ? 'bg-[#0e69b2] text-white border-[#0e69b2] shadow-sm shadow-blue-500/20'
-                                    : `bg-white ${opt.color} hover:bg-slate-50`
-                                ].join(' ')}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
