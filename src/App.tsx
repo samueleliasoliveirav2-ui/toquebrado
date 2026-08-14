@@ -3829,38 +3829,48 @@ function App() {
                       </button>
                     </div>
 
-                    {/* Line 2 — Segmented Control (Tipo) + Botão Único Status (Dropdown / BottomSheet) */}
-                    <div className="flex items-center justify-between gap-2">
-                      {/* Segmented Control Type Filter (fixed size, no shrink) */}
-                      <div className="flex-shrink-0 flex items-center gap-0.5 bg-white border border-slate-200 p-0.5 rounded-2xl text-xs font-bold shadow-inner">
+                    {/* Line 2 — Segmented Control (Tipo) + Botão Único Status (Dropdown / BottomSheet)
+                       CORRECAO v1.8.4: flex-wrap para nao cortar o STATUS: Postergado/Pendente no mobile (print enviado usuario).
+                       - Quando nao couber na mesma linha, o select STATUS automaticamente vai para LINHA DE BAIXO, alinhado direita.
+                       - NUNCA MAIS CORTA A PALAVRA pela borda direita.
+                    */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 w-full min-w-0">
+                      {/* Segmented Control Type Filter
+                          CORRECAO v1.8.4: Removido flex-shrink-0 (que era 0 = nunca encolhia, empurrava status para fora).
+                          Agora min-w-[40%] max-w-[60%], ajusta ao espaco, quebra se precisar.
+                      */}
+                      <div className="flex flex-wrap items-center gap-0.5 bg-white border border-slate-200 p-0.5 rounded-2xl text-xs font-bold shadow-inner min-w-[40%] max-w-[60%] overflow-hidden">
                         <button
                           onClick={() => { setFilterType('TODOS'); setStatusFilter('TODOS'); }}
-                          className={`py-1.5 px-3 rounded-xl text-[10px] font-extrabold text-center transition-all cursor-pointer whitespace-nowrap ${
+                          className={`py-1.5 px-2 rounded-xl font-extrabold text-center transition-all cursor-pointer flex-1 min-w-[52px] ${
                             filterType === 'TODOS'
                               ? 'bg-slate-200 text-slate-800 shadow-sm'
                               : 'text-slate-500 hover:text-slate-600'
                           }`}
+                          style={{ fontSize: 'clamp(8px, 2.6vw, 10px)' }}
                         >
                           Todos
                         </button>
                         <button
                           onClick={() => { setFilterType('ENTRADA'); setStatusFilter('TODOS'); }}
-                          className={`py-1.5 px-3 rounded-xl text-[10px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+                          className={`py-1.5 px-2 rounded-xl font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer flex-1 min-w-[68px] ${
                             filterType === 'ENTRADA'
                               ? 'bg-slate-200 text-emerald-600 shadow-sm'
                               : 'text-slate-500 hover:text-slate-600'
                           }`}
+                          style={{ fontSize: 'clamp(8px, 2.6vw, 10px)' }}
                         >
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                           Receitas
                         </button>
                         <button
                           onClick={() => { setFilterType('SAIDA'); setStatusFilter('TODOS'); }}
-                          className={`py-1.5 px-3 rounded-xl text-[10px] font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+                          className={`py-1.5 px-2 rounded-xl font-extrabold text-center transition-all flex items-center justify-center gap-1 cursor-pointer flex-1 min-w-[72px] ${
                             filterType === 'SAIDA'
                               ? 'bg-slate-200 text-rose-500 shadow-sm'
                               : 'text-slate-500 hover:text-slate-600'
                           }`}
+                          style={{ fontSize: 'clamp(8px, 2.6vw, 10px)' }}
                         >
                           <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                           Despesas
@@ -3901,16 +3911,28 @@ function App() {
                             <button
                               onClick={() => setStatusMenuAberto(true)}
                               className={[
-                                'flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all border shadow-sm cursor-pointer active:scale-95',
+                                /* CORRECAO v1.8.4: BOTAO STATUS NUNCA MAIS CORTA A PALAVRA NO MOBILE.
+                                   - Removido flex-shrink-0 (NAO EMPURRA FORA).
+                                   - Removido whitespace-nowrap (PERMITE QUEBRAR LINHA se precisar).
+                                   - flex-wrap + items-center = "STATUS:" + valor podem ficar em 2 linhas se necessário (ex: "STATUS:" encima, "Postergado" abaixo)
+                                   - max-w-[55%] = NUNCA passa de 55% da tela (garante espaco pros pills ao lado).
+                                   - min-w-[110px] = nao fica muuuito pequeno.
+                                   - Fonte clamp: min 9px, max 11px.
+                                   - items-start = alinhar bem se tiver 2 linhas.
+                                */
+                                'flex flex-wrap items-center gap-x-1 gap-y-0.5 px-2.5 py-1.5 rounded-full font-bold transition-all border shadow-sm cursor-pointer active:scale-95 min-w-[110px] max-w-[55%] overflow-hidden justify-end',
                                 isTodos
                                   ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                                   : `${statusAtual.bgColor} border-transparent ${statusAtual.textColor} hover:brightness-95`
                               ].join(' ')}
+                              style={{ fontSize: 'clamp(9px, 2.8vw, 11px)' }}
                             >
-                              <Tag size={12} strokeWidth={2.5} className={isTodos ? 'opacity-70' : ''} />
-                              <span className="font-black uppercase tracking-wide text-[10px]">Status:</span>
-                              <span className="font-black capitalize">{statusAtual.label.replace(/^Todos os Status$/, 'Todos')}</span>
-                              <ChevronDown size={12} strokeWidth={2.8} className="opacity-80" />
+                              <Tag size={11} strokeWidth={2.5} className={`${isTodos ? 'opacity-70' : ''} shrink-0`} />
+                              <span className="font-black uppercase tracking-wide shrink-0" style={{ fontSize: 'clamp(7.5px, 2.3vw, 9px)' }}>Status:</span>
+                              <span className="font-black capitalize text-right break-words">
+                                {statusAtual.label.replace(/^Todos os Status$/, 'Todos')}
+                              </span>
+                              <ChevronDown size={11} strokeWidth={2.8} className="opacity-80 shrink-0" />
                             </button>
 
                             {/* BOTTOM SHEET DE STATUS via React Portal (fora do overflow) */}
