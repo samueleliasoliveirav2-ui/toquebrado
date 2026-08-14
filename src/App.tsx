@@ -1058,33 +1058,41 @@ function App() {
     else /* A_RECEBER ou indefinido */ txStatus = 'PENDENTE';
 
     const dataVencimento = (ws.dataRecebimento || ws.data).slice(0, 10);
+    // WorkShiftEntry campos REAIS (types.ts): atividade, categoria, observacao, valorDiaria...
     const categoriaPadrao = ws.tipo === 'ENTRADA'
-      ? (ws.tipoServico || 'Diária / Trabalho')
+      ? (ws.atividade || 'Diária / Trabalho')
       : (ws.categoria || 'Custos de Rua');
     const descricaoCompleta = ws.tipo === 'ENTRADA'
-      ? (ws.clienteNome ? `🎟️ ${ws.clienteNome}${ws.tipoServico ? ' · ' + ws.tipoServico : ''}` : (ws.descricao || 'Recebimento de Diária'))
-      : (ws.descricao || categoriaPadrao || 'Custo de rua (trabalho)');
+      ? `🎟️ ${ws.atividade || 'Diária'}${ws.tipoRecebimento === 'PARCELADO' ? ` · Parcela ${ws.parcelaAtual || 1}/${ws.qtdParcelas || ws.totalParcelas || 'N'}` : ''}${ws.tipoRecebimento === 'RECORRENTE' ? ' · Recorrente' : ''}`
+      : (ws.observacao || ws.categoria || 'Custo de rua (trabalho)');
 
-    return {
-      id: `ws__${ws.id}`,
-      userId: ws.userId,
+    const { id: _wsId, ..._rest } = ws; void _rest;
+    const baseId = `ws__${ws.id}`;
+
+    const txLike: Transaction & { _isWorkShift?: boolean; _workShiftId?: string } = {
+      id: baseId,
+      data: dataVencimento,
       descricao: descricaoCompleta,
       categoria: categoriaPadrao,
-      subcategory: ws.tipoServico || undefined,
-      valor: Number(ws.valor || 0),
+      categoriaId: undefined,
+      subcategory: ws.categoria || (ws.tipo === 'ENTRADA' ? ws.atividade : undefined),
       tipo: ws.tipo,
-      data: dataVencimento,
+      valor: Number(ws.valor || 0),
       status: txStatus,
       juros: 0,
       contaId: ws.contaId || undefined,
       cartaoId: undefined,
-      categoriaId: undefined,
-      observacao: ws.observacoes,
-      recorrente: false,
-      criadoEm: ws.criadoEm,
-      // Flag custom (nao existe no tipo Transaction — uso apenas runtime para NÃO editar workShift por modal de Transaction pessoal)
-      ...({ _isWorkShift: true, _workShiftId: ws.id } as any),
-    };
+      observacao: ws.observacao,
+      recorrente: ws.tipoRecebimento === 'RECORRENTE',
+      frequencia: (ws.tipoRecebimento === 'PARCELADO' ? 'PARCELADO' : (ws.tipoRecebimento === 'RECORRENTE' ? 'RECORRENTE' : 'AVULSO')),
+      parcelaAtual: ws.parcelaAtual,
+      totalParcelas: (ws.qtdParcelas || ws.totalParcelas),
+      grupoRecorrenciaId: ws.grupoId,
+      // Campos usados apenas em runtime (nao existem no tipo Transaction — cast via any:)
+    } as any;
+    (txLike as any)._isWorkShift = true;
+    (txLike as any)._workShiftId = ws.id;
+    return txLike;
   });
   // Array UNIFICADO (transactions pessoais + workShifts convertidos) —
   // é este que entra em filtros (busca/tipo/status) E na listagem semanal.
