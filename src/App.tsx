@@ -3358,23 +3358,27 @@ function App() {
             <div className="relative w-64 max-w-[80vw] h-full bg-brand-gradient-drawer text-white flex flex-col p-5 shadow-2xl border-r border-white/10 z-10 animate-slide-right overflow-hidden">
               {/* Header section with close and branding */}
               <div className="flex items-start justify-between gap-2 pb-4 border-b border-white/10 w-full">
-                <div className="flex flex-col text-left min-w-0 w-full overflow-hidden">
+                <div className="flex flex-col text-left min-w-0 w-full">
                   {/* ======== LOGO NOVA (knotfin → KOEE, TÔQUEBRADO!) ========
                       Paleta IGUAL ao desenho antigo knotfin:
                         "KOEE,"      = BRANCO PURO (igual "knot")
                         "TÔQUEBRADO!" = LARANJA ÂMBAR (igual "fin")
-                      Fonte: clamp() responsivo = NUNCA MAIS VAZA borda direita drawer.
-                      - Mobile compacto (360px → drawer ~288px = max 80vw): minimo 16px → CABE INTEIRO.
-                      - Tablets/Desktop: max 24px (igual text-2xl original 24px).
-                      - truncate + min-w-0 = GARANTIA ANTI-VAZAMENTO ABSOLUTO
-                        (mesmo que nome seja enorme, nao ultrapassa a borda direita).
+
+                      ======= NÃO TEM RETICÊNCIAS (PONTOS ...) NUNCA MAIS =======
+                      Usamos clamp() com FONTE MÍNIMA BEM MENOR para GARANTIR
+                      que caiba INTEIRO em QUALQUER tela:
+                        - Celular MAIS compacto (320px iPhone SE 1ªger):
+                          Drawer ~256px, texto útil ≈ 220px.
+                          Fonte mínima = 13px (LETRAS BEM PEQUENAS).
+                          "KOEE, TÔQUEBRADO!" ≈ 200px → SOBRA 20px! ✅
+                        - Tablets/Desktop: máximo 24px (bonito original).
+                      letterSpacing -0.03em deixa letras MAIS JUNTAS, mais cabem.
                   */}
                   <h1
-                    className="m-0 p-0 leading-none font-black font-sans whitespace-nowrap select-none
-                               min-w-0 w-full overflow-hidden text-ellipsis"
+                    className="m-0 p-0 leading-none font-black font-sans whitespace-nowrap select-none min-w-0"
                     style={{
-                      fontSize: 'clamp(16px, 5vw, 24px)',
-                      letterSpacing: '-0.02em',
+                      fontSize: 'clamp(13px, 4.3vw, 24px)',
+                      letterSpacing: '-0.03em',
                     }}
                   >
                     <span className="text-white">KOEE,</span>{' '}
@@ -3382,8 +3386,8 @@ function App() {
                   </h1>
                   {/* Slogan Workspace → "No final a conta fecha!" */}
                   <span
-                    className="text-white/60 font-bold font-sans mt-1 whitespace-nowrap min-w-0 w-full overflow-hidden text-ellipsis"
-                    style={{ fontSize: 'clamp(9px, 2.7vw, 11px)' }}
+                    className="text-white/60 font-bold font-sans mt-1 whitespace-nowrap min-w-0"
+                    style={{ fontSize: 'clamp(8px, 2.4vw, 11px)' }}
                   >
                     No final a conta fecha!
                   </span>
