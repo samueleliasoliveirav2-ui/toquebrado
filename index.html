@@ -2,18 +2,25 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="alternate icon" type="image/png" href="/favicon.png" />
-    <link rel="shortcut icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>tôquebrado · Koee, finanças inteligentes.</title>
     <meta name="description" content="tôquebrado — Koee! Controle pessoal inteligente: receitas, despesas, diárias, cartões, insights e relatórios." />
     <meta name="theme-color" content="#0B1020">
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <!-- FAVICONS (ordem Chrome/Windows prefere: ICO → PNG → SVG) + CACHE BUST v1.3.2 -->
+    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="/favicon.ico?v=14082026">
+    <link rel="shortcut icon" href="/favicon.ico?v=14082026">
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=14082026">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg?v=14082026">
+
+    <!-- iOS / iPadOS Home Screen -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=14082026">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="tôquebrado">
-    <link rel="manifest" href="/manifest.json">
+
+    <!-- PWA Android (v= força cache bust ao atualizar deploy) -->
+    <link rel="manifest" href="/manifest.json?v=14082026">
   </head>
   <body>
     <div id="root"></div>
