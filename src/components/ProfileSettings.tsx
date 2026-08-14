@@ -136,6 +136,14 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
 
     setSalvando(true);
     try {
+      // CUIDADO: avatarUrl pode ser string | null.
+      // NULL = "excluir foto" — precisa MANTER null para o patch, NÃO converter para undefined!
+      // Apenas undefined = "não quero alterar o avatar neste save"
+      const avatarPatch: { avatarUrl?: string | null } = {};
+      if (typeof formAvatarUrl !== 'undefined') {
+        avatarPatch.avatarUrl = formAvatarUrl;  // pode ser string (definir foto) OU null (excluir foto)
+      }
+
       const patch: Partial<UserProfile> & {
         currentPassword?: string;
         newPassword?: string;
@@ -143,10 +151,10 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
         nomeCompleto: formNome.trim() || undefined,
         email: formEmail.trim() || undefined,
         telefone: formTelefone.trim() || undefined,
-        avatarUrl: formAvatarUrl || undefined,
         moedaPadrao: moeda,
         temaVisual: tema,
-        ocultarSaldosDefault
+        ocultarSaldosDefault,
+        ...avatarPatch
       };
       if (querAlterarSenha) {
         patch.currentPassword = senhaAtual;

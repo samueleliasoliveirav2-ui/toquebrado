@@ -1615,23 +1615,50 @@ function App() {
   }): Promise<boolean> => {
     if (!userId) return false;
     try {
+      // 0) DEBUG LOG (para investigar se o avatar está chegando até aqui!)
+      console.log('[handleSaveProfile] patch recebido:', JSON.stringify({
+        nomeCompleto: patch.nomeCompleto,
+        email: patch.email,
+        telefone: patch.telefone,
+        // avatarUrl: MENSAGEM ESPECIAL para identificar string / null / undefined corretamente
+        avatarUrl_kind:
+          patch.avatarUrl === null ? 'NULL (excluir foto)' :
+          typeof patch.avatarUrl === 'string' ?
+            'STRING_BASE64_' + (patch.avatarUrl.startsWith('data:image/') ? 'OK' : 'NAO_BASE64') + '_LEN_' + patch.avatarUrl.length :
+            'UNDEFINED (nao altera avatar)',
+        moedaPadrao: patch.moedaPadrao,
+        temaVisual: patch.temaVisual,
+        ocultarSaldosDefault: patch.ocultarSaldosDefault
+      }, null, 2));
+
       // 1) Tenta atualizar na tabela profiles
       const dbPayload: Record<string, any> = { updated_at: new Date().toISOString() };
       if (patch.nomeCompleto !== undefined) dbPayload.nome_completo = patch.nomeCompleto;
       if (patch.email !== undefined) dbPayload.email = patch.email;
       if (patch.telefone !== undefined) dbPayload.telefone = patch.telefone;
-      if (patch.avatarUrl !== undefined) dbPayload.avatar_url = patch.avatarUrl;
+      if (patch.avatarUrl !== undefined) dbPayload.avatar_url = patch.avatarUrl;  // ACEITA string OU null (excluir foto)
       if (patch.moedaPadrao !== undefined) dbPayload.moeda_padrao = patch.moedaPadrao;
       if (patch.temaVisual !== undefined) dbPayload.tema_visual = patch.temaVisual;
       if (patch.ocultarSaldosDefault !== undefined) dbPayload.ocultar_saldos_default = patch.ocultarSaldosDefault;
 
       if (Object.keys(dbPayload).length > 1) {
+        console.log('[handleSaveProfile] dbPayload enviado p/ Supabase:', JSON.stringify({
+          ...dbPayload,
+          avatar_url: dbPayload.avatar_url === null ? 'NULL' :
+             (typeof dbPayload.avatar_url === 'string' ? 'BASE64_LEN_' + dbPayload.avatar_url.length : dbPayload.avatar_url)
+        }, null, 2));
+
         const { error: errProfile } = await supabase
           .from('profiles')
           .upsert({ id: userId, ...dbPayload });
         if (errProfile) {
-          console.error('handleSaveProfile profiles error:', errProfile.message || errProfile);
+          console.error('handleSaveProfile profiles error:', errProfile.message || errProfile, errProfile);
+          triggerToast('Erro ao salvar perfil: ' + (errProfile.message || 'desconhecido'));
+          return false;
         }
+        console.log('[handleSaveProfile] Sucesso no upsert do profiles!');
+      } else {
+        console.log('[handleSaveProfile] Nenhum campo para salvar no banco (dbPayload só com updated_at). Skipando UPSERT.');
       }
 
       // 2) Atualiza o email/login no auth.user se solicitado (quando tiver permissao)
@@ -1651,6 +1678,7 @@ function App() {
       }
 
       // 3) Reflete o estado na UI instantaneamente (atualiza state + storage)
+      let avatarFinal: string | null = null;
       setUserProfile(prev => {
         const next: UserProfile = prev || {
           id: userId,
@@ -1664,18 +1692,32 @@ function App() {
           nomeCompleto: patch.nomeCompleto !== undefined ? patch.nomeCompleto : next.nomeCompleto,
           email: patch.email !== undefined ? patch.email : next.email,
           telefone: patch.telefone !== undefined ? patch.telefone : next.telefone,
-          avatarUrl: patch.avatarUrl !== undefined ? patch.avatarUrl : next.avatarUrl,
+          avatarUrl: patch.avatarUrl !== undefined ? patch.avatarUrl : (next.avatarUrl ?? null),
           moedaPadrao: patch.moedaPadrao ?? next.moedaPadrao,
           temaVisual: patch.temaVisual ?? next.temaVisual,
           ocultarSaldosDefault: patch.ocultarSaldosDefault ?? next.ocultarSaldosDefault,
           tipoPlano: next.tipoPlano
         };
 
+        // Guardamos o resultado FINAL para sincronizar o header do App.tsx (AvatarDropdown)
+        avatarFinal = (merged.avatarUrl ?? null);
+
         if (merged.nomeCompleto) setCurrentUser(merged.nomeCompleto);
         if (merged.email) setUserEmail(merged.email);
         setIsBalanceVisible(!merged.ocultarSaldosDefault);
         return merged;
       });
+
+      // 4) SINCRONIZA O AVATAR DO HEADER GLOBAL (AvatarDropdown no topo da tela ajustes!)
+      // — SEMPRE! Tanto para salvar FOTO, quanto para EXCLUIR (null), quanto para refresh...
+      // Colocamos fora do setter para garantir que o React agende a atualização do state settingsAvatarUrl
+      // (setUserProfile é async/batch então já pegamos avatarFinal calculado)
+      if (avatarFinal === null) {
+        console.log('[handleSaveProfile] Sync final settingsAvatarUrl = NULL (sem foto)');
+      } else {
+        console.log('[handleSaveProfile] Sync final settingsAvatarUrl = BASE64, tamanho:', (avatarFinal as string).length);
+      }
+      setSettingsAvatarUrl(avatarFinal);
 
       if (patch.nomeCompleto) {
         try {

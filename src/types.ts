@@ -22,7 +22,7 @@ export interface UserProfile {
   nomeCompleto?: string;
   email?: string;
   telefone?: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;  // null = sem foto / excluido / volta a iniciais
   moedaPadrao: typeof MOEDAS_PADRAO[number]['codigo'];
   temaVisual: TemaVisual;
   ocultarSaldosDefault: boolean;
