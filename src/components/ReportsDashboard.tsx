@@ -354,12 +354,59 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   // =============================================
   //  BLOCO 3 — DIÁRIAS & TRABALHO
   // =============================================
-  const workShiftsPeriodo = useMemo(() => {
-    return workShifts.filter(e => {
-      if (filterStartStr && e.data < filterStartStr) return false;
-      if (filterEndStr && e.data > filterEndStr) return false;
+
+  // Helpers inline (cópia do App.tsx para evitar circularidade)
+  const addMesesReport = (mesAno: string, delta: number): string => {
+    const [a, m] = mesAno.split('-').map(Number);
+    if (!a || !m) return mesAno;
+    const total = a * 12 + (m - 1) + delta;
+    const novoAno = Math.floor(total / 12);
+    const novoMes = ((total % 12) + 12) % 12;
+    return `${novoAno}-${String(novoMes + 1).padStart(2, '0')}`;
+  };
+
+  // WorkShift cai no período — PRIORIDADE = dataRecebimento (vencimento parcela)
+  const caiWorkShiftNoPeriodo = (e: WorkShiftEntry): boolean => {
+    const dataVencimento = e.dataRecebimento || e.data;
+    const tipo = (e.tipoRecebimento || 'UNICO').toUpperCase();
+    const totalParcelas = Number(e.totalParcelas) || Number(e.qtdParcelas) || 1;
+    const parcelaAtual = Number(e.parcelaAtual) || 1;
+
+    if (tipo === 'UNICO' || totalParcelas <= 1) {
+      // Período: usa dataVencimento DENTRO do intervalo do relatório
+      if (filterStartStr && dataVencimento < filterStartStr) return false;
+      if (filterEndStr && dataVencimento > filterEndStr) return false;
       return true;
-    });
+    }
+
+    // PARCELADO / RECORRENTE: projeção
+    const periodicidade = e.periodicidadeParcelas || 'MENSAL';
+    const mesesPorParcela = periodicidade === 'SEMANAL' ? 1 : periodicidade === 'QUINZENAL' ? 1 : 1;
+    const mesInicioVenc = dataVencimento.slice(0, 7);
+    const deltaParaPrimeira = -(parcelaAtual - 1);
+    const mesPrimeiraParcela = addMesesReport(mesInicioVenc, deltaParaPrimeira * mesesPorParcela);
+    const mesUltimaParcela = tipo === 'RECORRENTE'
+      ? '9999-12'
+      : addMesesReport(mesPrimeiraParcela, (totalParcelas - 1) * mesesPorParcela);
+
+    // Intervalo: MÊS selecionado (primeiro dia do mês)
+    const mesPeriodoInicio = filterStartStr ? filterStartStr.slice(0, 7) : mesInicioVenc;
+    const mesPeriodoFim = filterEndStr ? filterEndStr.slice(0, 7) : mesInicioVenc;
+    const mesPeriodo = (mesPeriodoInicio === mesPeriodoFim) ? mesPeriodoInicio : null;
+
+    if (mesPeriodo) {
+      // Modo mês (mais comum no relatório por período): verifica se mês do filtro está entre 1ª e última parcela
+      return mesPeriodo >= mesPrimeiraParcela && mesPeriodo <= mesUltimaParcela;
+    }
+
+    // Intervalo customizado (ex: trimestre): considera dataVencimento da parcela atual
+    if (filterStartStr && dataVencimento < filterStartStr) return false;
+    if (filterEndStr && dataVencimento > filterEndStr) return false;
+    return true;
+  };
+
+  const workShiftsPeriodo = useMemo(() => {
+    return workShifts.filter(caiWorkShiftNoPeriodo);
   }, [workShifts, filterStartStr, filterEndStr]);
 
   const workKPIs = useMemo(() => {
@@ -428,12 +475,14 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
   }, [workShiftsFiltradosEvento]);
 
   // Lista de receitas detalhada (somente entradas)
+  // Ordena e exibe PELA DATA DE VENCIMENTO (dataRecebimento) — NÃO data evento!
   const receitasWork = useMemo(() => {
     return workShiftsFiltradosEvento
       .filter(e => e.tipo === 'ENTRADA')
       .map(e => ({
         id: e.id,
-        data: e.data,
+        data: e.dataRecebimento || e.data,   // 👈 dataChave = vencimento
+        dataEvento: e.data,                  // mantém data original para referência
         contratante: e.observacao || e.atividade || 'Evento',
         atividade: e.atividade || 'Outro',
         qtdDias: e.quantidadeDias || 1,
@@ -444,7 +493,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({
         parcela: e.totalParcelas ? `${e.parcelaAtual || 1}/${e.totalParcelas}` : undefined,
         tipoReceb: e.tipoRecebimento
       }))
-      .sort((a, b) => b.data.localeCompare(a.data));
+      .sort((a, b) => b.data.localeCompare(a.data));  // 👈 ordena por data vencimento decrescente
   }, [workShiftsFiltradosEvento]);
 
   const receitasWorkFiltradasStatus = useMemo(() => {

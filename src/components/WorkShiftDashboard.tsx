@@ -69,13 +69,15 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
   const lucroProjetado = totalGanhos - custosRua;
   const pendingCount = entries.filter(e => e.tipo === 'ENTRADA' && e.status === 'A_RECEBER').length;
 
-  // 2. Group entries by date
+  // 2. Group entries by DATE OF DUE (dataRecebimento = vencimento), fallback data evento
+  // Cada parcela aparece no MÊS do seu vencimento, NÃO no mês do evento principal!
   const groupedByDate: Record<string, WorkShiftEntry[]> = {};
   entries.forEach(e => {
-    if (!groupedByDate[e.data]) {
-      groupedByDate[e.data] = [];
+    const dataChave = e.dataRecebimento || e.data;
+    if (!groupedByDate[dataChave]) {
+      groupedByDate[dataChave] = [];
     }
-    groupedByDate[e.data].push(e);
+    groupedByDate[dataChave].push(e);
   });
 
   // Sort dates descending
@@ -268,7 +270,7 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
               return (
                 <div key={dateKey} className="glass bg-white border border-slate-200/70 rounded-2xl shadow-3xs overflow-hidden">
                   
-                  {/* Day Header Summary bar */}
+                  {/* Day Header Summary bar — data do VENCIMENTO */}
                   <div className="bg-slate-50/65 px-4 py-3 flex items-center justify-between border-b border-slate-100">
                     <div className="flex flex-col">
                       <span className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
@@ -358,11 +360,11 @@ export const WorkShiftDashboard: React.FC<WorkShiftDashboardProps> = ({
                                   </p>
                                 )}
 
-                                {/* Forecast dates */}
-                                {isPending && entry.dataRecebimento && (
-                                  <p className="text-[9px] text-amber-600 font-extrabold mt-0.5 flex items-center gap-0.5">
+                                {/* Forecast dates — SEMPRE mostra data vencimento, mesmo se já recebido */}
+                                {entry.dataRecebimento && (
+                                  <p className={`text-[9px] font-extrabold mt-0.5 flex items-center gap-0.5 ${isPending ? 'text-amber-600' : 'text-slate-500'}`}>
                                     <Clock size={9} />
-                                    Previsão: {formatDate(entry.dataRecebimento)}
+                                    {isPending ? 'Previsão' : 'Vencimento'}: {formatDate(entry.dataRecebimento)}
                                   </p>
                                 )}
                                 {entry.observacao && !isEvento && (

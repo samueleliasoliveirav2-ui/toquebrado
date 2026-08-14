@@ -684,6 +684,7 @@ function App() {
 
   // ===== Projeção de lançamentos: Avulso (exato) | Parcelado | Recorrente =====
   // Devolve true se a transação cai (ou tem parcela prevista) no mês selecionado
+  // Usa data de vencimento/postergar como PRIORIDADE sobre data do evento
   const caiNoMesSelecionado = (tx: Transaction, mesAnoSel: string): boolean => {
     const activeDate = (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data;
     const mesAnoTx = activeDate.slice(0, 7);
@@ -713,11 +714,47 @@ function App() {
     return mesAnoTx === mesAnoSel;
   };
 
+  // ==== WorkShift (Diárias/Eventos): PRIORIDADE = dataRecebimento (vencimento da parcela) ====
+  // Mesma lógica de projeção, mas campos específicos de WorkShift
+  const caiWorkShiftNoMes = (e: WorkShiftEntry, mesAnoSel: string): boolean => {
+    // ⚠️ Data PRINCIPAL para filtro/mês: dataRecebimento (vencimento), senão fallback data do evento
+    const dataVencimento = e.dataRecebimento || e.data;
+    const mesAnoVenc = dataVencimento.slice(0, 7);
+
+    const tipo = (e.tipoRecebimento || 'UNICO').toUpperCase();
+    const totalParcelas = Number(e.totalParcelas) || Number(e.qtdParcelas) || 1;
+    const parcelaAtual = Number(e.parcelaAtual) || 1;
+
+    if (tipo === 'UNICO' || totalParcelas <= 1) {
+      return mesAnoVenc === mesAnoSel;
+    }
+
+    if (tipo === 'PARCELADO') {
+      const mesInicio = dataVencimento.slice(0, 7);
+      // Usa parcelaAtual para calcular a data "base" correta da 1ª parcela (pois pode já ter vencido)
+      // Ex: parcela atual = 2, venc em 20/08 → 1ª parcela foi em 20/07 (1 mês antes)
+      const deltaParaPrimeira = -(parcelaAtual - 1);
+      // Ajusta para periodicidade (hoje MENSAL default)
+      const periodicidade = e.periodicidadeParcelas || 'MENSAL';
+      const mesesPorParcela = periodicidade === 'SEMANAL' ? 1 : periodicidade === 'QUINZENAL' ? 1 : 1;
+      const mesPrimeiraParcela = addMeses(mesInicio, deltaParaPrimeira * mesesPorParcela);
+      const mesUltimaParcela = addMeses(mesPrimeiraParcela, (totalParcelas - 1) * mesesPorParcela);
+      return mesAnoSel >= mesPrimeiraParcela && mesAnoSel <= mesUltimaParcela;
+    }
+
+    if (tipo === 'RECORRENTE') {
+      const mesInicio = dataVencimento.slice(0, 7);
+      return mesAnoSel >= mesInicio;
+    }
+
+    return mesAnoVenc === mesAnoSel;
+  };
+
   // Filtered month transactions (com projeção de parcelas e recorrentes)
   const monthTransactions = transactions.filter(tx => caiNoMesSelecionado(tx, selectedMonth));
 
-  // Filtered month work shifts
-  const monthWorkShifts = workShifts.filter(e => e.data.startsWith(selectedMonth));
+  // Filtered month work shifts (usa dataRecebimento como vencimento + projeção parcelas)
+  const monthWorkShifts = workShifts.filter(e => caiWorkShiftNoMes(e, selectedMonth));
 
   // Cumulative Balance (All-time actual liquid: RECEIVED entries - PAID exits)
   const saldoAcumulado = transactions.reduce((sum, tx) => {
