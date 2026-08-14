@@ -16,6 +16,7 @@ import { CreditCardsDashboard } from './components/CreditCardsDashboard';
 import { CreditCardModal, BANK_PRESETS } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
 import { KnotfinLogo } from './components/KnotfinLogo';
+import { AvatarDropdown } from './components/AvatarDropdown';
 import type { TemaVisual, UserProfile } from './types';
 import { supabase } from './lib/supabaseClient';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -101,6 +102,7 @@ function App() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('SAIDA');
+  const [settingsAvatarUrl, setSettingsAvatarUrl] = useState<string | null>(null);
 
   // --- Importacao Fatura PDF ---
   const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
@@ -2765,6 +2767,8 @@ function App() {
                 {/* Ajustes Link */}
                 <button
                   onClick={() => {
+                    // Sincroniza o estado do avatar com o userProfile (último salvo) ao abrir AJUSTES
+                    setSettingsAvatarUrl(userProfile?.avatarUrl ?? null);
                     setActiveTab('PERFIL');
                     setIsDrawerOpen(false);
                   }}
@@ -3417,24 +3421,33 @@ function App() {
               />
             ) : (
               <>
-                {/* Header for Settings page */}
-                <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-3">
+                {/* Header for Settings page + AVATAR DROPDOWN (topo visível IMEDIATAMENTE!) */}
+                <header className="px-5 pb-3.5 pt-4.5 border-b border-slate-100 bg-white flex items-center justify-between shrink-0 gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <button
                       onClick={() => setIsDrawerOpen(true)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-655 hover:text-slate-800 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-655 hover:text-slate-800 transition-colors cursor-pointer shrink-0"
                       title="Menu"
                     >
                       <Menu size={20} />
                     </button>
                     
-                    <span className="text-sm font-extrabold text-slate-800 font-sans">
+                    <span className="text-sm font-extrabold text-slate-800 font-sans truncate">
                       Ajustes & Conta
                     </span>
                   </div>
                   
-                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 py-1 px-2.5 rounded-xl text-[9px] text-slate-500 font-bold font-sans">
-                    Versão {CURRENT_VERSION}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 py-1 px-2.5 rounded-xl text-[9px] text-slate-500 font-bold font-sans">
+                      Versão {CURRENT_VERSION}
+                    </div>
+                    {/* Avatar Interativo com Dropdown — IMEDIATAMENTE visível no topo! */}
+                    <AvatarDropdown
+                      size="md"
+                      avatarUrl={settingsAvatarUrl}
+                      userName={userProfile?.nomeCompleto || currentUser}
+                      onChangeAvatar={setSettingsAvatarUrl}
+                    />
                   </div>
                 </header>
 
@@ -3448,6 +3461,10 @@ function App() {
                   onDeleteMockData={handleDeleteMockData}
                   mockTransactionsCount={mockTransactionsCount}
                   isSyncing={isSyncing}
+                  // Controlled state: o estado principal é no App.tsx (header GLOBAL), sync com ProfileSettings
+                  localAvatarUrl={settingsAvatarUrl}
+                  onLocalAvatarChange={setSettingsAvatarUrl}
+                  showInternalHeader={false}  // Header interno já está no topo! Sem duplicar!
                 />
               </>
             )}

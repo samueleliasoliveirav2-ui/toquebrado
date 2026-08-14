@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Camera,
   ChevronRight,
   Database,
   Eye,
@@ -16,12 +15,11 @@ import {
   Trash2,
   User as UserIcon,
   Mail,
-  Lock,
-  X,
-  FolderOpen
+  Lock
 } from 'lucide-react';
 import type { MOEDAS_PADRAO, TemaVisual, TipoPlanoConta, UserProfile } from '../types';
 import { MOEDAS_PADRAO as MOEDAS } from '../types';
+import { AvatarDropdown } from './AvatarDropdown';
 
 interface ProfileSettingsProps {
   userName: string;
@@ -36,6 +34,11 @@ interface ProfileSettingsProps {
   onDeleteMockData: () => void;
   mockTransactionsCount: number;
   isSyncing: boolean;
+  // Controlled state do Avatar (para sincronizar com o header GLOBAL da tela)
+  localAvatarUrl?: string | null;
+  onLocalAvatarChange?: (base64OrNull: string | null) => void;
+  // Se true, mostra o header interno (avatar + nome) — no cenário de header GLOBAL, passa false
+  showInternalHeader?: boolean;
 }
 
 const TEMA_LABELS: { key: TemaVisual; label: string; emoji: string }[] = [
@@ -59,16 +62,11 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   onSeedData,
   onDeleteMockData,
   mockTransactionsCount,
-  isSyncing
+  isSyncing,
+  localAvatarUrl,
+  onLocalAvatarChange,
+  showInternalHeader = false
 }) => {
-  const getInitials = (name: string) =>
-    name
-      .split(' ')
-      .slice(0, 2)
-      .map(p => p[0])
-      .join('')
-      .toUpperCase();
-
   const planoAtual = userProfile?.tipoPlano || 'PESSOAL';
   const planoMeta = PLANO_META[planoAtual];
 
@@ -76,7 +74,13 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   const [formNome, setFormNome] = useState(userProfile?.nomeCompleto || userName);
   const [formEmail, setFormEmail] = useState(userProfile?.email || userEmail);
   const [formTelefone, setFormTelefone] = useState(userProfile?.telefone || '');
-  const [formAvatarUrl, setFormAvatarUrl] = useState<string | null>(userProfile?.avatarUrl || null);
+  // Avatar: prioriza controlled prop (header global), fallback estado local
+  const [localAvatarInternal, setLocalAvatarInternal] = useState<string | null>(userProfile?.avatarUrl || null);
+  const formAvatarUrl = typeof localAvatarUrl !== 'undefined' ? localAvatarUrl : localAvatarInternal;
+  const setFormAvatarUrl = (v: string | null) => {
+    if (onLocalAvatarChange) onLocalAvatarChange(v);
+    setLocalAvatarInternal(v);
+  };
 
   const [moeda, setMoeda] = useState<typeof MOEDAS_PADRAO[number]['codigo']>(
     userProfile?.moedaPadrao || 'BRL'
@@ -95,30 +99,6 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   const [salvando, setSalvando] = useState(false);
   const [confirmarLogout, setConfirmarLogout] = useState(false);
 
-  // -------------------- Dropdown / Menu de Ações do Avatar --------------------
-  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
-  const avatarBtnRef = useRef<HTMLButtonElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Fecha dropdown ao clicar fora
-  useEffect(() => {
-    if (!avatarMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (avatarBtnRef.current && !avatarBtnRef.current.contains(e.target as Node)) {
-        setAvatarMenuOpen(false);
-      }
-    };
-    const handlerEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setAvatarMenuOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('keydown', handlerEsc);
-    return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('keydown', handlerEsc);
-    };
-  }, [avatarMenuOpen]);
-
   // -------------------- SYNC userProfile incoming --------------------
   useEffect(() => {
     if (!userProfile) return;
@@ -132,30 +112,8 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
     if (typeof userProfile.ocultarSaldosDefault === 'boolean') {
       setOcultarSaldosDefault(userProfile.ocultarSaldosDefault);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userProfile]);
-
-  // -------------------- Avatar handlers --------------------
-  // Ao escolher arquivo: converte para Base64, fecha dropdown e atualiza preview
-  const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = (ev.target?.result as string) || '';
-      if (dataUrl) {
-        setFormAvatarUrl(dataUrl);
-        setAvatarMenuOpen(false);
-      }
-    };
-    reader.readAsDataURL(file);
-    // Reseta input para permitir selecionar o mesmo arquivo em seguida
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleRemoveAvatar = () => {
-    setFormAvatarUrl(null);
-    setAvatarMenuOpen(false);
-  };
 
   // -------------------- Save --------------------
   const handleSave = async () => {
@@ -185,7 +143,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
         nomeCompleto: formNome.trim() || undefined,
         email: formEmail.trim() || undefined,
         telefone: formTelefone.trim() || undefined,
-        avatarUrl: formAvatarUrl || undefined,   // undefined = remove a foto do profile
+        avatarUrl: formAvatarUrl || undefined,
         moedaPadrao: moeda,
         temaVisual: tema,
         ocultarSaldosDefault
@@ -209,170 +167,46 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
     <div className="w-full flex-1 flex flex-col p-4 pb-40 space-y-5 animate-fade-in bg-slate-50 overflow-y-auto scrollbar-thin">
 
       {/* ========================================================
-           HEADER DO PERFIL
+           HEADER INTERNO DO PERFIL (opcional — default false)
+           Usado apenas se a tela NÃO tiver header GLOBAL com avatar.
       ========================================================== */}
-      <div className="relative rounded-[28px] overflow-hidden shadow-sm bg-gradient-to-br from-[#0e69b2] via-[#2f83d4] to-[#3b82f6] text-white">
-        <div className="absolute inset-0 opacity-25 pointer-events-none">
-          <div className="absolute -top-8 -left-8 w-40 h-40 rounded-full bg-white/30 blur-3xl" />
-          <div className="absolute -bottom-16 -right-6 w-56 h-56 rounded-full bg-white/20 blur-3xl" />
-        </div>
-
-        <div className="relative p-5 flex flex-col items-center gap-3 text-center">
-          {/* Avatar Clicável com Dropdown */}
-          <div className="relative shrink-0 z-30">
-            {/* Hidden input de arquivo (acionado via dropdown opção 1) */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarFileUpload}
-            />
-
-            {/* Botão Avatar principal */}
-            <button
-              type="button"
-              ref={avatarBtnRef}
-              onClick={() => setAvatarMenuOpen(o => !o)}
-              className="group block relative focus:outline-none"
-              title="Editar foto de perfil"
-            >
-              <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/70 shadow-xl bg-white flex items-center justify-center text-[#0e69b2] text-2xl font-black transition group-hover:ring-white group-hover:scale-[1.02]">
-                {formAvatarUrl ? (
-                  <img
-                    src={formAvatarUrl}
-                    alt="Avatar"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <span className="uppercase">{getInitials(formNome || userName)}</span>
-                )}
-              </div>
-              {/* Overlay câmera/lápis indicando interatividade */}
-              <div className="absolute inset-0 w-24 h-24 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center pointer-events-none">
-                <div className="flex flex-col items-center text-white">
-                  <Camera size={18} strokeWidth={2.5} />
-                  <span className="text-[8px] font-black uppercase tracking-wider mt-0.5">Editar</span>
-                </div>
-              </div>
-              {/* Badge câmera fixo no canto inferior direito (indicador sutil) */}
-              <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white text-[#0e69b2] border-2 border-white/80 shadow-lg flex items-center justify-center">
-                <Camera size={14} strokeWidth={2.5} />
-              </div>
-            </button>
-
-            {/* ========== Dropdown / Menu de Ações FLUTUANTE ========== */}
-            {avatarMenuOpen && (
-              <>
-                {/* Backdrop invisível que captura clique fora em touch devices */}
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setAvatarMenuOpen(false)}
-                  aria-hidden="true"
-                />
-                <div
-                  className="absolute z-50 left-1/2 -translate-x-1/2 mt-2 w-[240px] origin-top animate-pop-in"
-                  role="menu"
-                  aria-label="Opções de foto do perfil"
-                >
-                  <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-900/15 overflow-hidden ring-1 ring-black/5">
-                    {/* Header opcional: fecha X */}
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50/50">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                        Foto de Perfil
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setAvatarMenuOpen(false)}
-                        className="p-1 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-slate-800 cursor-pointer"
-                        aria-label="Fechar menu"
-                      >
-                        <X size={12} strokeWidth={2.5} />
-                      </button>
-                    </div>
-
-                    <div className="p-1.5 space-y-1">
-                      {/* Opção 1: Selecionar arquivo */}
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl hover:bg-blue-50 text-slate-700 hover:text-[#0e69b2] transition-colors group cursor-pointer"
-                        role="menuitem"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-700 border border-slate-200 group-hover:border-blue-200 flex items-center justify-center shrink-0">
-                          <FolderOpen size={14} strokeWidth={2.3} />
-                        </div>
-                        <div className="text-left">
-                          <span className="block text-[11.5px] font-extrabold leading-tight">
-                            📂 Selecionar arquivo
-                          </span>
-                          <span className="block text-[9px] text-slate-500 leading-snug group-hover:text-blue-700/80">
-                            Enviar foto da galeria / celular
-                          </span>
-                        </div>
-                      </button>
-
-                      {/* Opção 2: Excluir foto — só aparece se existir uma foto atualmente */}
-                      {formAvatarUrl && (
-                        <>
-                          <div className="h-px bg-slate-100 mx-1" aria-hidden="true" />
-                          <button
-                            type="button"
-                            onClick={handleRemoveAvatar}
-                            className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl hover:bg-rose-50 text-slate-700 hover:text-rose-700 transition-colors group cursor-pointer"
-                            role="menuitem"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-rose-100 text-slate-600 group-hover:text-rose-700 border border-slate-200 group-hover:border-rose-200 flex items-center justify-center shrink-0">
-                              <Trash2 size={14} strokeWidth={2.3} />
-                            </div>
-                            <div className="text-left">
-                              <span className="block text-[11.5px] font-extrabold leading-tight">
-                                🗑️ Excluir foto atual
-                              </span>
-                              <span className="block text-[9px] text-slate-500 leading-snug group-hover:text-rose-700/80">
-                                Voltar para avatar com iniciais
-                              </span>
-                            </div>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Setinha apontando pro avatar */}
-                  <div
-                    aria-hidden="true"
-                    className="absolute left-1/2 -translate-x-1/2 -top-1.5 w-3 h-3 rotate-45 bg-white border-t border-l border-slate-200 z-50"
-                  />
-                </div>
-              </>
-            )}
+      {showInternalHeader && (
+        <div className="relative rounded-[28px] overflow-hidden shadow-sm bg-gradient-to-br from-[#0e69b2] via-[#2f83d4] to-[#3b82f6] text-white">
+          <div className="absolute inset-0 opacity-25 pointer-events-none">
+            <div className="absolute -top-8 -left-8 w-40 h-40 rounded-full bg-white/30 blur-3xl" />
+            <div className="absolute -bottom-16 -right-6 w-56 h-56 rounded-full bg-white/20 blur-3xl" />
           </div>
 
-          {/* Info */}
-          <div className="space-y-1 min-w-0 w-full">
-            <h2 className="text-lg font-black truncate leading-tight">
-              {formNome || userName || 'Sem nome'}
-            </h2>
-            <p className="text-[11px] font-semibold text-white/85 truncate">
-              {formEmail || userEmail || 'sem@email.com'}
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 mt-2">
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${planoMeta.cor}`}>
-                <ShieldCheck size={10} />
-                {planoMeta.label}
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/15 border border-white/20 text-white text-[10px] font-bold">
-                <Globe2 size={10} />
-                {MOEDAS.find(m => m.codigo === moeda)?.rotulo || 'BRL (R$)'}
-              </span>
+          <div className="relative p-5 flex flex-col items-center gap-3 text-center">
+            <AvatarDropdown
+              size="lg"
+              avatarUrl={formAvatarUrl}
+              userName={formNome || userName}
+              onChangeAvatar={setFormAvatarUrl}
+            />
+
+            {/* Info */}
+            <div className="space-y-1 min-w-0 w-full">
+              <h2 className="text-lg font-black truncate leading-tight">
+                {formNome || userName || 'Sem nome'}
+              </h2>
+              <p className="text-[11px] font-semibold text-white/85 truncate">
+                {formEmail || userEmail || 'sem@email.com'}
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 mt-2">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${planoMeta.cor}`}>
+                  <ShieldCheck size={10} />
+                  {planoMeta.label}
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/15 border border-white/20 text-white text-[10px] font-bold">
+                  <Globe2 size={10} />
+                  {MOEDAS.find(m => m.codigo === moeda)?.rotulo || 'BRL (R$)'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ========================================================
            DADOS PESSOAIS
