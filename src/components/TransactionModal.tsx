@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Check, RefreshCw, CreditCard as CreditCardIcon, Wallet, Info } from 'lucide-react';
-import type { Transaction, TransactionType, TransactionStatus, BankAccount, CreditCard } from '../types';
+import type { Transaction, TransactionType, TransactionStatus, BankAccount, CreditCard, Category, CategoryType } from '../types';
+import { MAP_TIPO_CATEGORIA } from '../categoriesDefaults';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -11,8 +12,10 @@ interface TransactionModalProps {
   ) => void;
   onDelete?: (id: string, scope?: 'ONLY_THIS' | 'THIS_AND_FUTURE') => void;
   editingTransaction?: Transaction | null;
-  categoriesList: Record<TransactionType, string[]>;
+  categoriesList: Record<TransactionType, string[]>;  // legacy (mantemos para compatibilidade temporaria)
+  categories: Category[];                              // NOVO: categorias com type + subcategories
   onAddNewCategory: (tipo: TransactionType, category: string) => void;
+  onAddFullCategory?: (payload: { name: string; type: CategoryType; subcategories: string[] }) => string | null;
   accounts?: BankAccount[];
   creditCards?: CreditCard[];
   onInvoiceTransactionSaved?: (cartaoId: string, mesAnoAlocacao: string) => void;
@@ -26,7 +29,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   onDelete,
   editingTransaction,
   categoriesList,
+  categories,
   onAddNewCategory,
+  onAddFullCategory,
   accounts = [],
   creditCards = [],
   onInvoiceTransactionSaved,
@@ -42,6 +47,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   }, [isOpen, defaultType, editingTransaction]);
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
+  const [categoriaId, setCategoriaId] = useState<string | null>(null);
+  const [subcategory, setSubcategory] = useState<string>('');
   const [valor, setValor] = useState<number | ''>('');
   const [data, setData] = useState('');
   const [status, setStatus] = useState<TransactionStatus>('PENDENTE');
@@ -57,6 +64,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [frequencia, setFrequencia] = useState<'AVULSO' | 'RECORRENTE' | 'PARCELADO'>('AVULSO');
   const [periodicidade, setPeriodicidade] = useState<'SEMANAL' | 'MENSAL' | 'ANUAL'>('MENSAL');
   const [totalParcelas, setTotalParcelas] = useState<number | ''>('');
+  const [parcelaAtual, setParcelaAtual] = useState<number | undefined>(undefined);
+  const [grupoRecorrenciaId, setGrupoRecorrenciaId] = useState<string | undefined>(undefined);
+  const [dataCompra, setDataCompra] = useState<string | undefined>(undefined);
   const [tipoCalculoParcela, setTipoCalculoParcela] = useState<'TOTAL' | 'PARCELA'>('PARCELA');
 
   // Confirmation Overlays states
@@ -67,12 +77,40 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
+  // ============================================================
+  // FILTRO ESTRITO: Categorias SOMENTE do TIPO selecionado (ENTRADA / SAIDA)
+  // + subcategorias disponiveis da categoria selecionada
+  // ============================================================
+  const availableCategoriesTyped: Category[] = useMemo(() => {
+    const ctType = MAP_TIPO_CATEGORIA[tipo];
+    return categories
+      .filter(c => c.type === ctType)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [tipo, categories]);
+
+  const availableCategoryNames = useMemo(
+    () => Array.from(new Set([...availableCategoriesTyped.map(c => c.name), ...categoriesList[tipo]])),
+    [availableCategoriesTyped, categoriesList, tipo]
+  );
+
+  const selectedCategoryObj: Category | undefined = useMemo(() => {
+    if (!categoria) return undefined;
+    return availableCategoriesTyped.find(c => c.name === categoria);
+  }, [availableCategoriesTyped, categoria]);
+
+  const subcategoriesList: string[] = useMemo(
+    () => selectedCategoryObj?.subcategories ?? [],
+    [selectedCategoryObj]
+  );
+
   // Pre-populate if editing
   useEffect(() => {
     if (editingTransaction) {
       setTipo(editingTransaction.tipo);
       setDescricao(editingTransaction.descricao);
       setCategoria(editingTransaction.categoria);
+      setCategoriaId(editingTransaction.categoriaId ?? null);
+      setSubcategory(editingTransaction.subcategory ?? '');
       setValor(editingTransaction.valor);
       setData(editingTransaction.data);
       setStatus(editingTransaction.status);
@@ -82,7 +120,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setFrequencia(editingTransaction.frequencia || 'AVULSO');
       setPeriodicidade(editingTransaction.periodicidade || 'MENSAL');
       setTotalParcelas(editingTransaction.totalParcelas || '');
+      setParcelaAtual(editingTransaction.parcelaAtual);
       setTipoCalculoParcela('PARCELA');
+      setGrupoRecorrenciaId(editingTransaction.grupoRecorrenciaId);
+      setDataCompra(editingTransaction.dataCompra);
       setIsAddingNew(false);
       setNewCategoryName('');
       setShowSaveScopeDialog(false);
@@ -95,10 +136,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setFormaPagamento('CONTA');
         setCartaoId('');
       }
-    } else {
+    } else if (isOpen) {
       setTipo(defaultType || 'SAIDA');
       setDescricao('');
       setCategoria('');
+      setCategoriaId(null);
+      setSubcategory('');
       setValor('');
       const today = new Date().toISOString().split('T')[0];
       setData(today);
@@ -109,21 +152,31 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setFrequencia('AVULSO');
       setPeriodicidade('MENSAL');
       setTotalParcelas('');
+      setParcelaAtual(undefined);
       setTipoCalculoParcela('PARCELA');
+      setGrupoRecorrenciaId(undefined);
+      setDataCompra(undefined);
       setIsAddingNew(false);
       setNewCategoryName('');
       setShowSaveScopeDialog(false);
       setShowDeleteScopeDialog(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingTransaction, isOpen, accounts]);
 
-  // Adjust categories list when tipo changes
-  const availableCategories = categoriesList[tipo];
+  // Adjust categories list when tipo changes + sync categoriaId/subcategory
   useEffect(() => {
-    if (!editingTransaction && availableCategories.length > 0 && !isAddingNew) {
-      setCategoria(availableCategories[0]);
+    if (!editingTransaction && availableCategoryNames.length > 0 && !isAddingNew) {
+      const atualValida = categoria && availableCategoryNames.includes(categoria);
+      if (!atualValida) {
+        setCategoria(availableCategoryNames[0]);
+      }
     }
-  }, [tipo, editingTransaction, categoriesList, isAddingNew]);
+    const matchingCat = availableCategoriesTyped.find(c => c.name === categoria);
+    setCategoriaId(matchingCat ? matchingCat.id : null);
+    // Reset subcategoria sempre que trocar tipo/categoria
+    setSubcategory('');
+  }, [tipo, availableCategoryNames, availableCategoriesTyped, editingTransaction, isAddingNew, categoria]);
 
   // Adjust status if invalid for the type
   useEffect(() => {
@@ -164,6 +217,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     } else {
       setIsAddingNew(false);
       setCategoria(val);
+      const matchingCat = availableCategoriesTyped.find(c => c.name === val);
+      setCategoriaId(matchingCat ? matchingCat.id : null);
+      setSubcategory('');
     }
   };
 
@@ -172,8 +228,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     tipoCalculoParcela?: 'TOTAL' | 'PARCELA';
   } => {
     let finalCategory = categoria;
+    let finalCategoriaId: string | null = categoriaId;
+    let finalSubcategory: string | null = subcategory || null;
+
     if (isAddingNew) {
       finalCategory = newCategoryName.trim();
+      finalCategoriaId = null;
+      finalSubcategory = null;
     }
 
     const usaCartao = tipo === 'SAIDA' && formaPagamento === 'CARTAO' && !!selectedCard;
@@ -183,6 +244,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       tipo,
       descricao: descricao.trim(),
       categoria: finalCategory,
+      categoriaId: finalCategoriaId,
+      subcategory: finalSubcategory,
       valor: Number(valor),
       data,
       status,
@@ -192,10 +255,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       frequencia,
       periodicidade: frequencia === 'RECORRENTE' ? periodicidade : undefined,
       totalParcelas: frequencia === 'PARCELADO' ? (Number(totalParcelas) || undefined) : undefined,
-      parcelaAtual: editingTransaction?.parcelaAtual || (frequencia === 'PARCELADO' ? 1 : undefined),
-      grupoRecorrenciaId: editingTransaction?.grupoRecorrenciaId || undefined,
+      parcelaAtual: parcelaAtual ?? (frequencia === 'PARCELADO' ? 1 : undefined),
+      grupoRecorrenciaId,
       cartaoId: usaCartao ? selectedCard.id : (editingTransaction?.cartaoId || undefined),
-      dataCompra: usaCartao ? data : (editingTransaction?.dataCompra || undefined),
+      faturaId: editingTransaction?.faturaId || undefined,
+      dataCompra: usaCartao ? data : (dataCompra ?? editingTransaction?.dataCompra ?? undefined),
       tipoCalculoParcela
     };
   };
@@ -221,12 +285,22 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
 
     let finalCategory = categoria;
+    let finalCategoriaId: string | null = categoriaId;
+
     if (isAddingNew) {
       const trimmedNewCat = newCategoryName.trim();
       if (!trimmedNewCat) {
         return alert('Digite o nome da nova categoria');
       }
       onAddNewCategory(tipo, trimmedNewCat);
+      if (onAddFullCategory) {
+        const newCatId = onAddFullCategory({
+          name: trimmedNewCat,
+          type: MAP_TIPO_CATEGORIA[tipo],
+          subcategories: []
+        });
+        finalCategoriaId = newCatId;
+      }
       finalCategory = trimmedNewCat;
     }
 
@@ -241,6 +315,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       const payload = getPayload();
       const savePayload = {
         ...payload,
+        ...(isAddingNew && finalCategoriaId ? { categoriaId: finalCategoriaId } : {}),
         ...(frequencia === 'PARCELADO' ? { tipoCalculoParcela } : {})
       };
       if (editingTransaction) {
@@ -655,13 +730,18 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           {/* Categoria & Data Row */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-500 text-xs font-bold uppercase mb-1.5">Categoria</label>
+              <label className="block text-slate-500 text-xs font-bold uppercase mb-1.5">
+                Categoria {tipo === 'ENTRADA' ? '🟢' : '🔴'}
+                <span className="ml-1 text-[9px] font-semibold text-slate-400 uppercase">
+                  ({tipo === 'ENTRADA' ? 'Só Receitas' : 'Só Despesas'})
+                </span>
+              </label>
               <select
                 value={isAddingNew ? 'ADD_NEW_CAT' : categoria}
                 onChange={(e) => handleCategoryChange(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-slate-800 focus:outline-none focus:border-blue-500 text-sm font-semibold cursor-pointer shadow-2xs"
               >
-                {availableCategories.map((cat) => (
+                {availableCategoryNames.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat}
                   </option>
@@ -696,6 +776,30 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               />
             </div>
           </div>
+
+          {/* Subcategoria — 2º Dropdown (só aparece se a categoria selecionada tiver subcategorias) */}
+          {!isAddingNew && subcategoriesList.length > 0 && (
+            <div className="animate-fade-in">
+              <label className="block text-slate-500 text-xs font-bold uppercase mb-1.5">
+                Subcategoria
+                <span className="ml-1 text-[9px] font-semibold text-slate-400">
+                  • {subcategoriesList.length} disponível(eis)
+                </span>
+              </label>
+              <select
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+                className="w-full bg-indigo-50/70 border border-indigo-200 rounded-xl px-3 py-3 text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-semibold cursor-pointer shadow-2xs"
+              >
+                <option value="">— Nenhuma / Detalhar depois —</option>
+                {subcategoriesList.map((sub) => (
+                  <option key={sub} value={sub}>
+                    {sub}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Status Selection */}
           <div>

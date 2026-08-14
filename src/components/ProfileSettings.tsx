@@ -17,9 +17,10 @@ import {
   Mail,
   Lock
 } from 'lucide-react';
-import type { MOEDAS_PADRAO, TemaVisual, TipoPlanoConta, UserProfile } from '../types';
+import type { MOEDAS_PADRAO, TemaVisual, TipoPlanoConta, UserProfile, Category, CategoryType } from '../types';
 import { MOEDAS_PADRAO as MOEDAS } from '../types';
 import { AvatarDropdown } from './AvatarDropdown';
+import { CategoryListAccordion } from './CategoryListAccordion';
 
 interface ProfileSettingsProps {
   userName: string;
@@ -39,6 +40,12 @@ interface ProfileSettingsProps {
   onLocalAvatarChange?: (base64OrNull: string | null) => void;
   // Se true, mostra o header interno (avatar + nome) — no cenário de header GLOBAL, passa false
   showInternalHeader?: boolean;
+  // ======= NOVO: Categorias / Subcategorias =======
+  categories: Category[];
+  onNewCategory: (type: CategoryType) => void;
+  onEditCategory: (cat: Category) => void;
+  onDeleteCategory: (id: string) => Promise<boolean>;
+  onAddSubcategory: (cat: Category) => void;
 }
 
 const TEMA_LABELS: { key: TemaVisual; label: string; emoji: string }[] = [
@@ -65,7 +72,12 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   isSyncing,
   localAvatarUrl,
   onLocalAvatarChange,
-  showInternalHeader = false
+  showInternalHeader = false,
+  categories,
+  onNewCategory,
+  onEditCategory,
+  onDeleteCategory,
+  onAddSubcategory
 }) => {
   const planoAtual = userProfile?.tipoPlano || 'PESSOAL';
   const planoMeta = PLANO_META[planoAtual];
@@ -417,6 +429,21 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
               {erroSenha}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* ========================================================
+           GERENCIAR CATEGORIAS & SUBCATEGORIAS (NOVO!)
+      ========================================================== */}
+      <section className="space-y-3.5">
+        <div className="glass rounded-2xl p-4 border border-slate-200/60 bg-white/95 shadow-xs">
+          <CategoryListAccordion
+            categories={categories}
+            onNewCategory={onNewCategory}
+            onEditCategory={onEditCategory}
+            onDeleteCategory={onDeleteCategory}
+            onAddSubcategory={onAddSubcategory}
+          />
         </div>
       </section>
 

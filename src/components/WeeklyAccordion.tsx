@@ -331,6 +331,11 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                               <span className="text-[10px] text-slate-500 font-medium">
                                 {activeDate.split('-')[2]} Ago • {tx.categoria}
+                                {tx.subcategory && (
+                                  <span className="ml-1 inline-flex items-center gap-1 bg-indigo-100/70 text-indigo-800 px-1.5 py-0.5 rounded-full font-extrabold tracking-tight">
+                                    › {tx.subcategory}
+                                  </span>
+                                )}
                               </span>
                               {isPostponed && (
                                 <span className="text-[8px] text-slate-600 font-bold line-through">
@@ -403,6 +408,11 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                                 <Tag size={12} className="text-slate-400 shrink-0" />
                                 <span className="text-slate-500 font-bold shrink-0">Categoria:</span>
                                 <span className="text-slate-800 font-extrabold">{tx.categoria}</span>
+                                {tx.subcategory && (
+                                  <span className="ml-1 inline-flex items-center gap-0.5 bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[10px] font-black tracking-tight border border-indigo-200/70">
+                                    › {tx.subcategory}
+                                  </span>
+                                )}
                               </div>
                             </div>
 

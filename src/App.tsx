@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Minus, Search, RefreshCw, LogOut, Loader2, AlertTriangle, Info, Home, Settings, Menu, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Briefcase, BarChart2, Wallet, CreditCard as CreditCardIcon, Eye, EyeOff, Sparkles, FileUp, CheckSquare, Square, Upload, FileText as FileTextIcon, BarChart3, LayoutList, Tag, Check } from 'lucide-react';
-import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice, ExtractedInvoiceData, ExtractedInvoiceItem } from './types';
+import type { Transaction, TransactionStatus, TransactionType, WorkShiftEntry, BankAccount, AccountTransfer, CreditCard, CreditCardInvoice, ExtractedInvoiceData, ExtractedInvoiceItem, Category, CategoryType, UserProfile, TemaVisual } from './types';
 import { CATEGORIES, INITIAL_TRANSACTIONS, computeInvoiceDerivedStatus } from './types';
+import { DEFAULT_CATEGORIES } from './categoriesDefaults';
 import { StatsHeader } from './components/StatsHeader';
 import { WeeklyAccordion } from './components/WeeklyAccordion';
 import { TransactionModal } from './components/TransactionModal';
@@ -17,7 +18,7 @@ import { CreditCardModal, BANK_PRESETS } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
 import { KnotfinLogo } from './components/KnotfinLogo';
 import { AvatarDropdown } from './components/AvatarDropdown';
-import type { TemaVisual, UserProfile } from './types';
+import { CategoryModal } from './components/CategoryModal';
 import { supabase } from './lib/supabaseClient';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
@@ -128,6 +129,269 @@ function App() {
   const [showToast, setShowToast] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('SAIDA');
   const [settingsAvatarUrl, setSettingsAvatarUrl] = useState<string | null>(null);
+
+  // ============================================================
+  // CATEGORIES / SUBCATEGORIES (Novo modulo!)
+  // ============================================================
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+
+  // Helper: gera UUID local (caso nao consigamos pegar do Supabase insert de primeira)
+  const genCategoryId = (): string => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+    return 'cat_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  };
+
+  // --- Fetch Categories from Supabase ---
+  const fetchCategories = async (uid: string): Promise<Category[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', uid);
+      if (error) {
+        console.error('[fetchCategories] Supabase error:', error.message || error);
+        return [];
+      }
+      if (!data || data.length === 0) return [];
+
+      return data.map((row: any) => ({
+        id: String(row.id),
+        userId: row.user_id,
+        name: String(row.name || ''),
+        type: (row.type === 'INCOME' ? 'INCOME' : 'EXPENSE') as CategoryType,
+        subcategories: Array.isArray(row.subcategories) ? row.subcategories.map(String) : [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+    } catch (e) {
+      console.error('[fetchCategories] exception:', e);
+      return [];
+    }
+  };
+
+  // --- Seed DEFAULT_CATEGORIES se tabela estiver vazia ---
+  const seedCategoriesIfEmpty = async (uid: string, currentCategories: Category[]): Promise<Category[]> => {
+    if (currentCategories.length > 0) return currentCategories;
+
+    try {
+      const rows: any[] = DEFAULT_CATEGORIES.map((c) => ({
+        user_id: uid,
+        name: c.name,
+        type: c.type,
+        subcategories: c.subcategories
+      }));
+      const { data, error } = await supabase
+        .from('categories')
+        .insert(rows)
+        .select('*');
+      if (error) {
+        console.warn('[seedCategoriesIfEmpty] Supabase error:', error.message || error);
+        // Fallback: salva em memoria com ids gerados localmente
+        return DEFAULT_CATEGORIES.map((c) => ({
+          id: genCategoryId(),
+          userId: uid,
+          name: c.name,
+          type: c.type,
+          subcategories: [...c.subcategories]
+        }));
+      }
+      if (!data) return [];
+      return data.map((row: any) => ({
+        id: String(row.id),
+        userId: row.user_id,
+        name: String(row.name || ''),
+        type: (row.type === 'INCOME' ? 'INCOME' : 'EXPENSE') as CategoryType,
+        subcategories: Array.isArray(row.subcategories) ? row.subcategories.map(String) : [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+    } catch (e) {
+      console.error('[seedCategoriesIfEmpty] exception:', e);
+      return DEFAULT_CATEGORIES.map((c) => ({
+        id: genCategoryId(),
+        userId: uid,
+        name: c.name,
+        type: c.type,
+        subcategories: [...c.subcategories]
+      }));
+    }
+  };
+
+  // --- CRUD: Add Category ---
+  const handleAddCategory = async (payload: Omit<Category, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<Category | null> => {
+    if (!userId) return null;
+    try {
+      const row = {
+        user_id: userId,
+        name: payload.name.trim(),
+        type: payload.type,
+        subcategories: (payload.subcategories || []).map(String)
+      };
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([row])
+        .select('*');
+      if (error) throw error;
+      if (!data || data.length === 0) return null;
+      const r = data[0];
+      const newCat: Category = {
+        id: String(r.id),
+        userId: r.user_id,
+        name: String(r.name || ''),
+        type: (r.type === 'INCOME' ? 'INCOME' : 'EXPENSE') as CategoryType,
+        subcategories: Array.isArray(r.subcategories) ? r.subcategories.map(String) : [],
+        createdAt: r.created_at,
+        updatedAt: r.updated_at
+      };
+      setCategories(prev => [...prev, newCat]);
+      return newCat;
+    } catch (e: any) {
+      console.error('[handleAddCategory] error:', e?.message || e);
+      triggerToast('Não foi possível criar categoria: ' + (e?.message || 'desconhecido'));
+      // Fallback optimistic local
+      const newCatLocal: Category = {
+        id: genCategoryId(),
+        userId,
+        name: payload.name.trim(),
+        type: payload.type,
+        subcategories: [...(payload.subcategories || [])]
+      };
+      setCategories(prev => [...prev, newCatLocal]);
+      return newCatLocal;
+    }
+  };
+
+  // --- CRUD: Update Category ---
+  const handleUpdateCategory = async (
+    categoryId: string,
+    changes: Partial<Omit<Category, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
+  ): Promise<boolean> => {
+    if (!userId || !categoryId) return false;
+    try {
+      const dbPayload: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (changes.name !== undefined) dbPayload.name = String(changes.name).trim();
+      if (changes.type !== undefined) dbPayload.type = changes.type;
+      if (changes.subcategories !== undefined) dbPayload.subcategories = changes.subcategories.map(String);
+
+      const { error } = await supabase
+        .from('categories')
+        .update(dbPayload)
+        .eq('id', categoryId)
+        .eq('user_id', userId);
+      if (error) throw error;
+
+      setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, ...changes, name: changes.name !== undefined ? changes.name.trim() : c.name } : c));
+      return true;
+    } catch (e: any) {
+      console.error('[handleUpdateCategory] error:', e?.message || e);
+      triggerToast('Não foi possível atualizar categoria: ' + (e?.message || 'desconhecido'));
+      return false;
+    }
+  };
+
+  // --- CRUD: Delete Category ---
+  const handleDeleteCategory = async (categoryId: string): Promise<boolean> => {
+    if (!userId || !categoryId) return false;
+    try {
+      // Validação: existe transaction com esta categoriaId ou categoria (nome)?
+      const cat = categories.find(c => c.id === categoryId);
+      if (cat) {
+        const hasTransactions = transactions.some(tx =>
+          tx.categoriaId === categoryId ||
+          tx.categoria === cat.name
+        );
+        if (hasTransactions) {
+          triggerToast('Não é possível excluir: existem lançamentos vinculados a esta categoria.');
+          return false;
+        }
+      }
+
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId)
+        .eq('user_id', userId);
+      if (error) throw error;
+      setCategories(prev => prev.filter(c => c.id !== categoryId));
+      triggerToast('Categoria excluída!');
+      return true;
+    } catch (e: any) {
+      console.error('[handleDeleteCategory] error:', e?.message || e);
+      triggerToast('Não foi possível excluir categoria: ' + (e?.message || 'desconhecido'));
+      return false;
+    }
+  };
+
+  // ======= CATEGORY MODAL wrappers (abri modal com contexto correto) =======
+  const openNewCategoryModal = (type: CategoryType) => {
+    setEditingCategory(null);
+    // Default type = selecionado. Depois o user pode mudar no modal.
+    setIsCategoryModalOpen(true);
+    // Setamos um editing fake? Nao. Pre-setamos no state do modal via useEffect.
+    // Mas para que o modal abra já com o type correto (Receita/Despesa), passamos via
+    // um estado extra OU nós forçamos o editingCategory parcial. Simples: criamos "defaultTypeForNew"
+    setCategoryModalDefaultType(type);
+  };
+  const openEditCategoryModal = (cat: Category) => {
+    setEditingCategory(cat);
+    setCategoryModalDefaultType(cat.type);
+    setIsCategoryModalOpen(true);
+  };
+  const openAddSubcategoryModal = async (cat: Category) => {
+    // Abre o modal de edição já posicionado no input de subcategoria
+    openEditCategoryModal(cat);
+  };
+  // Estado temporario para pre-setar o tipo inicial do modal ao criar NOVA categoria
+  const [categoryModalDefaultType, setCategoryModalDefaultType] = useState<CategoryType>('EXPENSE');
+
+  // Handler do SAVE do CategoryModal
+  const handleCategoryModalSave = async (
+    payload: { name: string; type: CategoryType; subcategories: string[] },
+    existingId?: string
+  ): Promise<boolean> => {
+    if (existingId) {
+      return await handleUpdateCategory(existingId, payload);
+    } else {
+      const created = await handleAddCategory(payload);
+      return !!created;
+    }
+  };
+
+  // Helper para TransactionModal: cria categoria COMPLETA (com tipo + subcategories)
+  // e retorna o ID (UUID Supabase OU local gen) — usado quando user cadastra categoria
+  // nova INLINE dentro do modal de lançamentos.
+  const handleAddFullCategory = (payload: { name: string; type: CategoryType; subcategories: string[] }): string => {
+    let genId: string | null = null;
+    handleAddCategory(payload).then(created => {
+      if (created) {
+        // Nada — state já atualizado no handleAddCategory
+      }
+    });
+    // Retorno sincrono: se a operação for assincrona o id correto
+    // só chega no próximo setState, então geramos temporário local
+    // garantindo unicidade.
+    genId = genCategoryId();
+    // Mas se ja existir uma category com nome + type no state, usa o id dela
+    const existing = categories.find(c => c.name === payload.name.trim() && c.type === payload.type);
+    return existing?.id ?? genId;
+  };
+
+  // --- Helper: converte array de Category[] -> Record<tipo, string[]> compat (transactions modal antigo) ---
+  const legacyCategoriesList = useMemo<Record<TransactionType, string[]>>(() => {
+    const income = categories.filter(c => c.type === 'INCOME').map(c => c.name);
+    const expense = categories.filter(c => c.type === 'EXPENSE').map(c => c.name);
+
+    // Merge com o customCategories local p/ retrocompatibilidade
+    const mergedEntradas = Array.from(new Set([...(customCategories?.ENTRADA ?? []), ...income]));
+    const mergedSaidas = Array.from(new Set([...(customCategories?.SAIDA ?? []), ...expense]));
+
+    return {
+      ENTRADA: mergedEntradas,
+      SAIDA: mergedSaidas
+    };
+  }, [categories, customCategories]);
 
   // --- Importacao Fatura PDF ---
   const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
@@ -296,6 +560,17 @@ function App() {
     };
   }, []);
 
+  // Helper async para carregar perfil + categorias juntos e evitar race conditions
+  const loadUserData = async (uid: string) => {
+    // Carrega os 2 em paralelo para mais performance
+    const profilePromise = fetchUserProfile(uid);
+    const categoriesPromise = fetchCategories(uid);
+    const [, fetchedCats] = await Promise.all([profilePromise, categoriesPromise]);
+    // Seed DEFAULT_CATEGORIES se o usuario nao tem nenhuma (primeiro login apos o deploy)
+    const seededCats = await seedCategoriesIfEmpty(uid, fetchedCats ?? []);
+    setCategories(seededCats);
+  };
+
   // 1. Session check and listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -304,7 +579,7 @@ function App() {
         setCurrentUser(nome);
         setUserEmail(session.user.email || '');
         setUserId(session.user.id);
-        fetchUserProfile(session.user.id);
+        loadUserData(session.user.id);
       }
       setLoading(false);
     });
@@ -315,7 +590,7 @@ function App() {
         setCurrentUser(nome);
         setUserEmail(session.user.email || '');
         setUserId(session.user.id);
-        fetchUserProfile(session.user.id);
+        loadUserData(session.user.id);
       } else {
         setCurrentUser(null);
         setUserEmail('');
@@ -323,6 +598,7 @@ function App() {
         setUserProfile(null);
         setTransactions([]);
         setWorkShifts([]);
+        setCategories([]);
       }
       setLoading(false);
     });
@@ -1711,7 +1987,7 @@ function App() {
 
       // 3) Reflete o estado na UI instantaneamente (atualiza state + storage)
       let avatarFinal: string | null = null;
-      setUserProfile(prev => {
+      setUserProfile((prev: UserProfile | null) => {
         const next: UserProfile = prev || {
           id: userId,
           moedaPadrao: 'BRL',
@@ -3559,6 +3835,12 @@ function App() {
                   localAvatarUrl={settingsAvatarUrl}
                   onLocalAvatarChange={setSettingsAvatarUrl}
                   showInternalHeader={false}  // Header interno já está no topo! Sem duplicar!
+                  // ======= NOVO: Gerenciar Categorias & Subcategorias =======
+                  categories={categories}
+                  onNewCategory={openNewCategoryModal}
+                  onEditCategory={openEditCategoryModal}
+                  onDeleteCategory={handleDeleteCategory}
+                  onAddSubcategory={openAddSubcategoryModal}
                 />
               </>
             )}
@@ -3590,8 +3872,10 @@ function App() {
         onSave={handleSaveTransaction}
         onDelete={handleDeleteTransaction}
         editingTransaction={editingTransaction}
-        categoriesList={customCategories}
+        categoriesList={legacyCategoriesList}
+        categories={categories}
         onAddNewCategory={handleAddNewCategory}
+        onAddFullCategory={handleAddFullCategory}
         accounts={accounts}
         creditCards={creditCards}
         defaultType={modalDefaultType}
@@ -3630,6 +3914,18 @@ function App() {
         onDelete={handleDeleteCreditCard}
         editingCard={editingCreditCard}
         accounts={accounts}
+      />
+
+      {/* Category Modal (Nova / Editar Categoria + Subcategorias em chips) */}
+      <CategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          setEditingCategory(null);
+        }}
+        editingCategory={editingCategory}
+        defaultType={categoryModalDefaultType}
+        onSave={handleCategoryModalSave}
       />
 
       {/* Invoice Detail Modal (BottomSheet) */}

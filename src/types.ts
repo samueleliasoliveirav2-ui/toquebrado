@@ -1,5 +1,16 @@
 export type TransactionType = 'ENTRADA' | 'SAIDA';
 export type TransactionStatus = 'PENDENTE' | 'RECEBIDO' | 'PAGO' | 'POSTERGAR';
+export type CategoryType = 'INCOME' | 'EXPENSE';
+
+export interface Category {
+  id: string;
+  userId: string;
+  name: string;
+  type: CategoryType;   // INCOME = Receita / EXPENSE = Despesa
+  subcategories: string[];  // Nomes das subcategorias (chips)
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export const MOEDAS_PADRAO = [
   { codigo: 'BRL', simbolo: 'R$', rotulo: 'Real (BRL)' },
@@ -33,7 +44,9 @@ export interface Transaction {
   id: string;
   data: string; // YYYY-MM-DD
   descricao: string;
-  categoria: string;
+  categoria: string;          // Nome da categoria (mantemos para retrocompatibilidade)
+  categoriaId?: string | null;        // ID da Category associada (NOVO)
+  subcategory?: string | null;        // Nome da subcategoria selecionada (NOVO)
   tipo: TransactionType;
   valor: number;
   status: TransactionStatus;
