@@ -23,7 +23,32 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 const CURRENT_VERSION = '1.0.1';
 
+// Helper: gera 2 letras iniciais (uppercase) para fallback avatar SEM foto
+// Ex: "Samuel Elias Oliveira" => "SE" | "Maria" => "MA" | "" => "U" (user)
+function getInitials(name: string | undefined | null): string {
+  if (!name) return 'U';
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return 'U';
+  const first = words[0][0] ?? 'U';
+  const second = words.length >= 2 ? (words[words.length - 1][0] ?? first) : first;
+  return (first + second).toUpperCase();
+}
 
+// Paleta de cores determinística para fallback avatar (cor baseada no nome => sempre a mesma cor p/ msm user)
+function getAvatarAccentColor(name: string | undefined | null): string {
+  const palette = [
+    'from-blue-500 to-indigo-600',
+    'from-violet-500 to-purple-600',
+    'from-pink-500 to-rose-600',
+    'from-amber-500 to-orange-600',
+    'from-emerald-500 to-teal-600',
+    'from-sky-500 to-cyan-600',
+    'from-fuchsia-500 to-pink-600',
+    'from-lime-500 to-emerald-600'
+  ];
+  const seed = (name ?? 'U').split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return palette[seed % palette.length];
+}
 
 function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
@@ -318,18 +343,25 @@ function App() {
         return;
       }
       if (data) {
+        // CUIDADO com avatarUrl: preserva NULL (excluída) OU string (base64). Nao converta null para undefined!
+        const avatarFromDb: string | null | undefined =
+          data.avatar_url === null ? null :
+          (typeof data.avatar_url === 'string' ? data.avatar_url : undefined);
+
         const profile: UserProfile = {
           id: data.id,
           nomeCompleto: data.nome_completo || undefined,
           email: data.email || undefined,
           telefone: data.telefone || undefined,
-          avatarUrl: data.avatar_url || undefined,
+          avatarUrl: avatarFromDb,
           moedaPadrao: data.moeda_padrao || 'BRL',
           temaVisual: (data.tema_visual as TemaVisual) || 'LIGHT',
           ocultarSaldosDefault: !!data.ocultar_saldos_default,
           tipoPlano: data.tipo_plano || 'PESSOAL'
         };
         setUserProfile(profile);
+        // Sync IMEDIATO do avatar da tela Ajustes (header global) = o que esta no banco
+        setSettingsAvatarUrl(profile.avatarUrl ?? null);
         // Reflete instantaneamente no header/sidebar
         if (profile.nomeCompleto) setCurrentUser(profile.nomeCompleto);
         if (profile.email) setUserEmail(profile.email);
@@ -2717,11 +2749,25 @@ function App() {
                 </button>
               </div>
 
-              {/* User Identity info inside drawer */}
-              <div className="py-4 border-b border-white/10 mb-4 text-left font-sans">
-                <p className="text-[9px] uppercase font-extrabold text-white/50">Logado como</p>
-                <p className="text-xs font-bold text-white truncate mt-0.5">{currentUser}</p>
-                <p className="text-[10px] text-white/55 font-semibold truncate">{userEmail}</p>
+              {/* User Identity info inside drawer (COM FOTO DE PERFIL DINAMICA!) */}
+              <div className="py-5 border-b border-white/10 mb-4 text-left font-sans flex flex-col items-start gap-3">
+                {/* Avatar grande no drawer (foto ou iniciais) */}
+                {userProfile?.avatarUrl ? (
+                  <img 
+                    src={userProfile.avatarUrl} 
+                    alt="Foto de Perfil" 
+                    className="w-14 h-14 rounded-2xl object-cover ring-2 ring-white/30 shadow-lg"
+                  />
+                ) : (
+                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${getAvatarAccentColor(currentUser)} ring-2 ring-white/30 shadow-lg flex items-center justify-center text-xl font-black text-white tracking-tight`}>
+                    {getInitials(currentUser)}
+                  </div>
+                )}
+                <div className="min-w-0 w-full">
+                  <p className="text-[9px] uppercase font-extrabold text-white/50 mb-0.5">Logado como</p>
+                  <p className="text-xs font-bold text-white truncate">{currentUser}</p>
+                  <p className="text-[10px] text-white/55 font-semibold truncate">{userEmail}</p>
+                </div>
               </div>
 
               {/* Navigation list items */}
@@ -2871,17 +2917,23 @@ function App() {
                 {/* Top Header Navigation (Revolut Inspired Mesh Background) */}
                 <header className="revolut-hero-bg text-white pt-6 pb-12 px-5 rounded-b-[36px] shadow-revolut-glow relative shrink-0">
                   <div className="flex items-center justify-between gap-3 mb-6">
-                    {/* Profile Avatar & Drawer Menu Trigger */}
+                    {/* Profile Avatar & Drawer Menu Trigger (DINAMICO! foto se existir senao iniciais) */}
                     <button
                       onClick={() => setIsDrawerOpen(true)}
                       className="flex items-center space-x-2.5 p-1.5 pr-3 rounded-full glass-pill hover:bg-white/25 transition cursor-pointer"
                       title="Menu"
                     >
-                      <img 
-                        src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" 
-                        alt="Samuel Avatar" 
-                        className="w-8 h-8 rounded-full object-cover ring-2 ring-white/60"
-                      />
+                      {userProfile?.avatarUrl ? (
+                        <img 
+                          src={userProfile.avatarUrl} 
+                          alt="Foto de Perfil" 
+                          className="w-8 h-8 rounded-full object-cover ring-2 ring-white/60"
+                        />
+                      ) : (
+                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${getAvatarAccentColor(currentUser)} ring-2 ring-white/60 flex items-center justify-center text-[10px] font-black text-white tracking-tight`}>
+                          {getInitials(currentUser)}
+                        </div>
+                      )}
                       <Menu size={12} className="text-white/90" />
                     </button>
 
