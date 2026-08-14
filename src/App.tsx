@@ -1043,6 +1043,9 @@ function App() {
   const monthWorkShifts = workShifts.filter(e => caiWorkShiftNoMes(e, selectedMonth));
 
   // Cumulative Balance (All-time actual liquid: RECEIVED entries - PAID exits)
+  // INCLUI workShifts (Diárias/Trabalhos):
+  //  + WorkShift ENTRADA status === "RECEBIDO" (saldo real)
+  //  - WorkShift SAIDA (custos de rua, saída sempre confirmada, nao tem status pendente)
   const saldoAcumulado = transactions.reduce((sum, tx) => {
     if (tx.tipo === 'ENTRADA' && tx.status === 'RECEBIDO') {
       return sum + tx.valor;
@@ -1050,17 +1053,31 @@ function App() {
       return sum - (tx.valor + (tx.juros || 0));
     }
     return sum;
+  }, 0) + workShifts.reduce((sum, ws) => {
+    if (ws.tipo === 'ENTRADA' && (ws.status === 'RECEBIDO' || !ws.status)) {
+      // RECEBIDO ou sem status (antigos default RECEBIDO)
+      return sum + ws.valor;
+    }
+    if (ws.tipo === 'SAIDA') {
+      // WorkShift SAIDA = custo rua sempre pago (nao tem status)
+      return sum - ws.valor;
+    }
+    return sum;
   }, 0);
 
   // Projected Income this month (All ENTRADAs in selected month)
-  const totalEntradasMes = monthTransactions
-    .filter(tx => tx.tipo === 'ENTRADA')
-    .reduce((sum, tx) => sum + tx.valor, 0);
+  // INCLUI workShifts ENTRADA (qualquer status: RECEBIDO + A_RECEBER = projetado, igual transacoes pessoais)
+  const totalEntradasMes = (
+    monthTransactions.filter(tx => tx.tipo === 'ENTRADA').reduce((sum, tx) => sum + tx.valor, 0)
+    + monthWorkShifts.filter(ws => ws.tipo === 'ENTRADA').reduce((sum, ws) => sum + ws.valor, 0)
+  );
 
   // Projected Expenses this month (All SAIDAs in selected month + their juros)
-  const totalSaidasMes = monthTransactions
-    .filter(tx => tx.tipo === 'SAIDA')
-    .reduce((sum, tx) => sum + tx.valor + (tx.juros || 0), 0);
+  // INCLUI workShifts SAIDA (custos de rua, sempre do mes selecionado, sem juros)
+  const totalSaidasMes = (
+    monthTransactions.filter(tx => tx.tipo === 'SAIDA').reduce((sum, tx) => sum + tx.valor + (tx.juros || 0), 0)
+    + monthWorkShifts.filter(ws => ws.tipo === 'SAIDA').reduce((sum, ws) => sum + ws.valor, 0)
+  );
 
   // ============================================================
   // HERO FINANCEIRO "TÔ QUEBRADO?" (Etapa 1)
@@ -1074,7 +1091,7 @@ function App() {
     let boldText = 'Vamos entender como está seu mês';
     let descriptionText = 'Vamos entender como está seu mês.';
 
-    const hasAnyData = transactions.length > 0 && (totalEntradasMes > 0 || totalSaidasMes > 0);
+    const hasAnyData = (transactions.length > 0 || workShifts.length > 0) && (totalEntradasMes > 0 || totalSaidasMes > 0);
 
     if (hasAnyData) {
       if (saldoAcumulado < 0 || (totalSaidasMes > 0 && saldoAcumulado < totalSaidasMes * 0.4)) {
