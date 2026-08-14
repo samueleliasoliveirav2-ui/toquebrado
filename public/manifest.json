@@ -1,11 +1,11 @@
 {
-  "name": "knotfin · Decisões inteligentes",
-  "short_name": "knotfin",
+  "name": "tôquebrado · Koee, finanças inteligentes.",
+  "short_name": "tôquebrado",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#050a14",
-  "theme_color": "#094d80",
-  "description": "knotfin - Controle pessoal inteligente: receitas, despesas, diárias, cartões e relatórios em um só lugar.",
+  "background_color": "#0B1020",
+  "theme_color": "#0B1020",
+  "description": "tôquebrado — Koee! Controle pessoal inteligente: receitas, despesas, diárias, cartões, insights e relatórios.",
   "icons": [
     {
       "src": "/favicon.svg",
