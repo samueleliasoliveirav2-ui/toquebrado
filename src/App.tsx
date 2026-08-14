@@ -1117,6 +1117,173 @@ function App() {
     );
   }, [transactions.length, totalEntradasMes, totalSaidasMes, saldoAcumulado]);
 
+  // ============================================================
+  // 🔍 ASSISTENTE FINANCEIRO DISCRETO (Etapa 2 — 💡 FAB Esquerdo)
+  // SAIBA MAIS (simetria ESQUERDA=inteligência  ↔  DIREITA=ação +):
+  // - NUNCA abre sozinho. Usuário decide (evita irritação).
+  // - Indicador • aparece apenas se ATENÇÃO ou CRÍTICO.
+  // - CRÍTICO: pulse ÚNICA (1x) no 1º carregamento (sem piscar).
+  // - Dismissed por (mes+status) salvo em localStorage.
+  // ============================================================
+
+  // 2.1 Cálculos mês anterior (para comparação intermensal real)
+  const prevMonthKey = useMemo((): string => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${yy}-${mm}`;
+  }, [selectedMonth]);
+
+  const { prevTotalSaidas, prevTotalEntradas } = useMemo(() => {
+    let saidas = 0;
+    let entradas = 0;
+    for (const tx of transactions) {
+      if (!caiNoMesSelecionado(tx, prevMonthKey)) continue;
+      if (tx.tipo === 'SAIDA') saidas += tx.valor + (tx.juros || 0);
+      else if (tx.tipo === 'ENTRADA') entradas += tx.valor;
+    }
+    return { prevTotalSaidas: saidas, prevTotalEntradas: entradas };
+  }, [transactions, prevMonthKey]);
+
+  // 2.2 Estado reativo do popup (usuario decide quando abre)
+  const [isInsightPopupOpen, setIsInsightPopupOpen] = useState(false);
+  const [hasShownCriticalPulse, setHasShownCriticalPulse] = useState(false);
+
+  // 2.3 dismissed map (nao reaparece o mesmo insight esse mês):
+  // localStorage key "insights_dismissed_v1" = Record<string, true>
+  // keys: `${selectedMonth}|${status}` -> true = usuário já dispensou
+  const dismissKey = (status: string) => `${selectedMonth}|${status}`;
+  const getDismissedMap = (): Record<string, true> => {
+    try {
+      const raw = localStorage.getItem('insights_dismissed_v1');
+      return raw ? (JSON.parse(raw) as Record<string, true>) : {};
+    } catch {
+      return {};
+    }
+  };
+  const [dismissedMap, setDismissedMap] = useState<Record<string, true>>(() => getDismissedMap());
+  const persistDismissedMap = (next: Record<string, true>) => {
+    try { localStorage.setItem('insights_dismissed_v1', JSON.stringify(next)); } catch {}
+    setDismissedMap(next);
+  };
+
+  // 2.4 Cálculo do insight atual (APENAS dados reais)
+  type InsightStatus = 'ok' | 'atencao' | 'critico' | 'nenhum';
+  interface InsightPayload {
+    status: InsightStatus;
+    bold: string;          // "Não. Tá tranquilo." / "Calma aí..." / "Ih... apertou."
+    description: string;   // texto com dados reais e %
+    cta: string | null;    // "Ver gastos" / "Ver o que aconteceu" / null
+    ctaAction: null | (() => void);
+  }
+  const financialInsight = useMemo<InsightPayload>(() => {
+    const hasData = (totalEntradasMes > 0 || totalSaidasMes > 0);
+    if (!hasData) {
+      return {
+        status: 'nenhum',
+        bold: 'Vamos entender como está seu mês.',
+        description: 'Adicione lançamentos que começo a te ajudar.',
+        cta: null,
+        ctaAction: null
+      };
+    }
+
+    // CRÍTICO (prioridade mais alta): despesas > entradas ESTE MÊS
+    if (totalSaidasMes > totalEntradasMes && totalEntradasMes > 0) {
+      const delta = totalSaidasMes - totalEntradasMes;
+      const pctOver = Math.min(999, Math.round(((totalSaidasMes - totalEntradasMes) / totalEntradasMes) * 100));
+      return {
+        status: 'critico',
+        bold: 'Ih... apertou.',
+        description:
+          `Suas despesas já ultrapassaram suas entradas neste mês em R$ ${delta.toFixed(2).replace('.', ',')} (${pctOver}%).`,
+        cta: 'Ver o que aconteceu →',
+        ctaAction: null
+      };
+    }
+
+    // ATENÇÃO (2 alternativas — pega a mais informativa):
+    // A) já gastou >= 78% da renda PREVISTA mês corrente
+    // B) intermensal: saídas do mês >= 10% aMIORES vs mês anterior
+    const gastoPctRenda = totalEntradasMes > 0 ? Math.round((totalSaidasMes / totalEntradasMes) * 100) : 0;
+    if (totalEntradasMes > 0 && gastoPctRenda >= 78) {
+      return {
+        status: 'atencao',
+        bold: 'Calma aí...',
+        description: `Você já gastou ${gastoPctRenda}% da sua renda prevista para o mês.`,
+        cta: 'Ver gastos →',
+        ctaAction: null
+      };
+    }
+
+    const deltaPctSaidas = prevTotalSaidas > 0
+      ? Math.round(((totalSaidasMes - prevTotalSaidas) / prevTotalSaidas) * 100)
+      : 0;
+    if (prevTotalSaidas > 50 && deltaPctSaidas >= 10) {
+      return {
+        status: 'atencao',
+        bold: 'Calma aí...',
+        description:
+          `Seus gastos estão ${deltaPctSaidas}% maiores que no mês passado.`,
+        cta: 'Ver gastos →',
+        ctaAction: null
+      };
+    }
+
+    // POSITIVO (opcional: só mostra mensagem suave, sem indicador •)
+    // 1) queda >= 10% nas saídas vs mês passado
+    if (prevTotalSaidas > 50 && deltaPctSaidas <= -10) {
+      const menos = Math.abs(deltaPctSaidas);
+      return {
+        status: 'ok',
+        bold: 'Não. Tá tranquilo.',
+        description: `Você gastou ${menos}% menos este mês, mandou bem!`,
+        cta: null,
+        ctaAction: null
+      };
+    }
+    // 2) saldo acumulado >= saídas previstas mês
+    if (saldoAcumulado >= totalSaidasMes && totalSaidasMes > 0) {
+      return {
+        status: 'ok',
+        bold: 'Não. Tá tranquilo.',
+        description: 'Você está dentro do seu ritmo financeiro este mês.',
+        cta: null,
+        ctaAction: null
+      };
+    }
+
+    return {
+      status: 'ok',
+      bold: 'Não. Tá tranquilo.',
+      description: 'Até agora, tudo correndo nos trilhos.',
+      cta: null,
+      ctaAction: null
+    };
+  }, [transactions.length, totalEntradasMes, totalSaidasMes, prevTotalSaidas, prevTotalEntradas, saldoAcumulado]);
+
+  // O insight foi dispensado este mês? (usuário clicou em ×)
+  const insightIsDismissed = (() => {
+    if (financialInsight.status === 'ok' || financialInsight.status === 'nenhum') return false;
+    return !!dismissedMap[dismissKey(financialInsight.status)];
+  })();
+
+  // Mostrar indicador • se existir insight relevante e usuário NÃO dispensou
+  const showInsightDot =
+    (financialInsight.status === 'atencao' || financialInsight.status === 'critico') &&
+    !insightIsDismissed;
+
+  // Pulse ÚNICA no estado crítico (só 1x por carregamento)
+  const shouldPlayCriticalPulse =
+    financialInsight.status === 'critico' && !hasShownCriticalPulse && !insightIsDismissed;
+  useEffect(() => {
+    if (shouldPlayCriticalPulse) {
+      const t = setTimeout(() => setHasShownCriticalPulse(true), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [shouldPlayCriticalPulse]);
+
   // Filtered list display
   const displayTransactions = monthTransactions.filter((tx) => {
     const matchesSearch = 
@@ -3901,6 +4068,145 @@ function App() {
                   onAddSubcategory={openAddSubcategoryModal}
                 />
               </>
+            )}
+
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* 🔍 ASSISTENTE FINANCEIRO 💡 FAB (INFERIOR ESQUERDO)            */}
+            {/* SIMETRIA: ESQUERDA = inteligência (assistente)                  */}
+            {/*           DIREITA  = ação (+ registrar lançamento)              */}
+            {/* UX RULES:                                                       */}
+            {/*  • NUNCA abre automaticamente (evita irritação)                 */}
+            {/*  • Usuário decide quando clicar                                 */}
+            {/*  • Indicador • s/ existir insight atencao/critico NÃO dismiss   */}
+            {/*  • Crítico: pulse ÚNICA 1x (sem piscar pra sempre)              */}
+            {/*  • × = dismiss por (mes + status) salvo em localStorage         */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {(activeTab === 'INICIO' || activeTab === 'DIARIAS') && (
+              <div className="absolute bottom-6 left-6 z-20">
+
+                {/* 1) Popup flutuante (SÓ aparece se usuário clicar) */}
+                {isInsightPopupOpen && (
+                  <div
+                    className="absolute bottom-[5.5rem] left-0 w-[288px] sm:w-[320px] select-none animate-fade-in"
+                    style={{ animationDuration: '220ms' }}
+                  >
+                    {/* Triangulo aponta para o botão 💡 */}
+                    <div className="absolute -bottom-1.5 left-5 w-3 h-3 bg-white rotate-45 rounded-sm shadow-[0_2px_6px_rgba(15,23,42,0.08)]" />
+
+                    <div className="relative rounded-2xl bg-white shadow-[0_10px_40px_rgba(15,23,42,0.14)] border border-slate-100 overflow-hidden">
+                      {/* Fechar × */}
+                      <button
+                        onClick={() => {
+                          // dismiss ATÉ no positivo/neutro? só dismiss se status relevante
+                          if (financialInsight.status === 'atencao' || financialInsight.status === 'critico') {
+                            const next = { ...dismissedMap, [dismissKey(financialInsight.status)]: true as const };
+                            persistDismissedMap(next);
+                          }
+                          setIsInsightPopupOpen(false);
+                        }}
+                        className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition z-10 cursor-pointer"
+                        title="Fechar insight"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 6L6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+
+                      <div className="px-4 pt-4 pb-3 space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.18em] block">
+                          tô quebrado?
+                        </span>
+                        <div>
+                          <span
+                            className={`text-[15px] font-black tracking-tight ${
+                              financialInsight.status === 'critico' ? 'text-rose-600' :
+                              financialInsight.status === 'atencao' ? 'text-cyan-700' :
+                              financialInsight.status === 'ok' ? 'text-emerald-600' :
+                              'text-slate-700'
+                            }`}
+                          >
+                            {financialInsight.bold}
+                          </span>
+                        </div>
+                        <p className="text-[13px] leading-snug text-slate-600 font-medium pt-0.5">
+                          {financialInsight.description}
+                        </p>
+                      </div>
+
+                      {financialInsight.cta && (
+                        <div className="px-4 pb-4 pt-1">
+                          <button
+                            onClick={() => {
+                              setIsInsightPopupOpen(false);
+                              // CTA => navegar para filtrar somente SAÍDAS no mês
+                              setFilterType('SAIDA');
+                              setStatusFilter('TODOS');
+                              setActiveTab('INICIO');
+                            }}
+                            className={`w-full text-left text-sm font-semibold px-3.5 py-2 rounded-xl transition cursor-pointer ${
+                              financialInsight.status === 'critico'
+                                ? 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                : 'bg-cyan-50 text-cyan-800 hover:bg-cyan-100'
+                            }`}
+                          >
+                            {financialInsight.cta}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2) Botão 💡 FAB propriamente dito */}
+                <div className="relative">
+                  {/* Crítico: pulse ÚNICA (1x no 1º carregamento — nunca mais) */}
+                  {shouldPlayCriticalPulse && (
+                    <>
+                      <span
+                        className="absolute -inset-2 rounded-full bg-rose-400/30 pointer-events-none"
+                        style={{ animation: 'insight-pulse-once 1.6s cubic-bezier(0,0,0.2,1) forwards' }}
+                      />
+                      <style>{`@keyframes insight-pulse-once { 0% { transform: scale(0.85); opacity: 0.85; } 60% { transform: scale(1.55); opacity: 0.1; } 100% { transform: scale(1.7); opacity: 0; } }`}</style>
+                    </>
+                  )}
+
+                  {/* Glow suave fundo (SOMENTE se existir insight não dismiss) */}
+                  {showInsightDot && (
+                    <span
+                      className={`absolute -inset-2 rounded-full ${
+                        financialInsight.status === 'critico' ? 'bg-rose-400/10' : 'bg-cyan-400/10'
+                      } pointer-events-none`}
+                    />
+                  )}
+
+                  <button
+                    onClick={() => setIsInsightPopupOpen((prev) => !prev)}
+                    className={`relative w-14 h-14 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all z-10 flex items-center justify-center cursor-pointer ${
+                      (financialInsight.status === 'critico' && !insightIsDismissed)
+                        ? 'bg-gradient-to-br from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white shadow-rose-500/30'
+                        : (financialInsight.status === 'atencao' && !insightIsDismissed)
+                          ? 'bg-gradient-to-br from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 text-white shadow-cyan-500/30'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-slate-300/40'
+                    }`}
+                    title="💡 Insight financeiro"
+                  >
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 18h6" />
+                      <path d="M10 22h4" />
+                      <path d="M12 2a7 7 0 0 0-4 12.74V17h8v-2.26A7 7 0 0 0 12 2z" />
+                    </svg>
+
+                    {/* Indicador • (notificação) - só se existir insight não dismiss */}
+                    {showInsightDot && (
+                      <span
+                        className={`absolute top-2 right-2.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
+                          financialInsight.status === 'critico' ? 'bg-rose-200' : 'bg-cyan-200'
+                        }`}
+                      />
+                    )}
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Bottom-Right Circular Highlighted FAB Plus Button (Context Aware - Only for INICIO/DIARIAS) */}
