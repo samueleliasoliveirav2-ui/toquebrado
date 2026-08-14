@@ -193,18 +193,19 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
 
   const getStatusBadge = (tx: Transaction) => {
     const isWorkShift = (tx as any)._isWorkShift === true;
+    const fsBadge = { fontSize: 'clamp(7px, 2.2vw, 9px)' };
     switch (tx.status) {
       case 'RECEBIDO':
         return (
-          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-2xs">
-            <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="px-2 py-0.5 font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-2xs whitespace-nowrap" style={fsBadge}>
+            <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse shrink-0" />
             RECEBIDO
           </span>
         );
       case 'PAGO':
         return (
-          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 shadow-2xs">
-            <span className="w-1 h-1 rounded-full bg-amber-500" />
+          <span className="px-2 py-0.5 font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 shadow-2xs whitespace-nowrap" style={fsBadge}>
+            <span className="w-1 h-1 rounded-full bg-amber-500 shrink-0" />
             {isWorkShift ? 'CUSTO PAGO' : 'PAGO'}
           </span>
         );
@@ -213,28 +214,27 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
           ? tx.dataPostergar.split('-').reverse().slice(0, 2).join('/')
           : '';
         return (
-          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-sky-50 text-sky-700 border border-sky-200 flex flex-col items-center shadow-2xs">
+          <span className="px-2 py-0.5 font-bold rounded-full bg-sky-50 text-sky-700 border border-sky-200 flex flex-col items-center shadow-2xs whitespace-nowrap" style={fsBadge}>
             <span className="flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-sky-500" />
+              <span className="w-1 h-1 rounded-full bg-sky-500 shrink-0" />
               POSTERGADO
             </span>
-            {postDate && <span className="text-[7px] text-sky-600 font-bold">p/ {postDate}</span>}
+            {postDate && <span style={{ fontSize: 'clamp(6px,1.8vw,7px)' }} className="text-sky-600 font-bold">p/ {postDate}</span>}
           </span>
         );
       case 'PENDENTE':
       default:
-        // WorkShift PENDENTE = A_RECEBER (mostra nome "A RECEBER" como no modulo, amarelo relogio).
         if (isWorkShift) {
           return (
-            <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200 flex items-center gap-1 shadow-2xs">
-              <Clock size={8} className="stroke-[3]" />
+            <span className="px-2 py-0.5 font-bold rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200 flex items-center gap-1 shadow-2xs whitespace-nowrap" style={fsBadge}>
+              <Clock size={8} className="stroke-[3] shrink-0" />
               A RECEBER
             </span>
           );
         }
         return (
-          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
-            <span className="w-1 h-1 rounded-full bg-slate-500" />
+          <span className="px-2 py-0.5 font-bold rounded-full bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1 whitespace-nowrap" style={fsBadge}>
+            <span className="w-1 h-1 rounded-full bg-slate-500 shrink-0" />
             PENDENTE
           </span>
         );
@@ -252,7 +252,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
   }
 
   return (
-    <div className="w-full space-y-4 animate-fade-in text-left">
+    <div className="w-full space-y-4 animate-fade-in text-left pb-28">
       {weekGroups.map((group) => {
         const isExpanded = expandedWeeks[group.key] !== false;
         const rangeStr = getWeekRange(group.key).formatted;
@@ -328,15 +328,15 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                           if (isWorkShift) return;
                           onEditTransaction(tx);
                         }}
-                        className={`flex items-center justify-between p-3.5 ${isWorkShift ? '' : 'cursor-pointer'} group`}
+                        className={`flex flex-wrap items-start justify-between p-3 gap-x-3 gap-y-2 w-full ${isWorkShift ? '' : 'cursor-pointer'} group min-w-0`}
                       >
                         {/* Left: Icon and info */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
                           {/* 🔘 ÍCONE DA CATEGORIA → BOTÃO TOGGLE ACCORDION INLINE (clica expande/colapsa) */}
                           <button
                             type="button"
                             onClick={(e) => toggleTxExpand(tx.id, e)}
-                            className={`relative w-10 h-10 rounded-2xl ${catDetails.bg} flex items-center justify-center text-sm shadow-sm transition-all cursor-pointer z-[1]
+                            className={`relative w-10 h-10 shrink-0 rounded-2xl ${catDetails.bg} flex items-center justify-center text-sm shadow-sm transition-all cursor-pointer z-[1]
                                        ${isExpandedTx ? 'ring-2 ring-slate-900/15 ring-offset-1 scale-105' : 'hover:scale-105 active:scale-95 hover:ring-2 hover:ring-slate-900/10 ring-offset-2'}`}
                             aria-label={isExpandedTx ? 'Ocultar detalhes da transação' : 'Ver detalhes da transação'}
                             title={isExpandedTx ? 'Recolher detalhes' : 'Expandir detalhes'}
@@ -349,13 +349,13 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                           </button>
 
                           {/* Mid: Description, Category and Date */}
-                          <div className="flex flex-col text-left">
-                            <span className="text-sm font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1 max-w-[150px]">
+                          <div className="flex flex-col text-left min-w-0 flex-1">
+                            <span className="text-sm font-extrabold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1 min-w-0">
                               {tx.descricao}
                             </span>
                             
-                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              <span className="text-[10px] text-slate-500 font-medium">
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap min-w-0">
+                              <span className="text-[10px] text-slate-500 font-medium min-w-0 truncate">
                                 {activeDate.split('-')[2]} Ago • {tx.categoria}
                                 {tx.subcategory && (
                                   <span className="ml-1 inline-flex items-center gap-1 bg-indigo-100/70 text-indigo-800 px-1.5 py-0.5 rounded-full font-extrabold tracking-tight">
@@ -373,13 +373,19 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                         </div>
 
                         {/* Right: Value and Badge status */}
-                        <div className="flex items-center gap-2.5">
-                          <div className="text-right flex flex-col items-end">
-                            <span className={`text-sm font-black font-mono tracking-tight ${isEntrada ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 min-w-[100px] max-w-full">
+                          <div className="text-right flex flex-col items-end min-w-0">
+                            <span
+                              className={`font-black font-mono tracking-tight ${isEntrada ? 'text-emerald-600' : 'text-rose-600'} whitespace-nowrap`}
+                              style={{ fontSize: 'clamp(12px, 3.8vw, 14px)' }}
+                            >
                               {isEntrada ? '+' : '-'} {formatCurrency(tx.valor)}
                             </span>
                             {!!tx.juros && tx.juros > 0 && (
-                              <span className="block text-[8px] text-rose-600 font-bold">
+                              <span
+                                className="block text-rose-600 font-bold whitespace-nowrap"
+                                style={{ fontSize: 'clamp(7px, 2vw, 8px)' }}
+                              >
                                 +{formatCurrency(tx.juros)} juros
                               </span>
                             )}
@@ -393,7 +399,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                               if (!canToggleStatus) return;
                               onToggleStatus(tx.id);
                             }}
-                            className={`transition-transform relative group/badge flex items-center justify-center ${canToggleStatus ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
+                            className={`transition-transform relative group/badge flex items-center justify-center shrink-0 ${canToggleStatus ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
                           >
                             {getStatusBadge(tx)}
                             <div className="absolute inset-0 bg-white opacity-0 group-hover/badge:opacity-100 flex items-center justify-center rounded-full transition-opacity border border-slate-200">
