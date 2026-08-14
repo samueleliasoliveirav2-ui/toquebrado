@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Camera,
   ChevronRight,
@@ -16,7 +16,9 @@ import {
   Trash2,
   User as UserIcon,
   Mail,
-  Lock
+  Lock,
+  X,
+  FolderOpen
 } from 'lucide-react';
 import type { MOEDAS_PADRAO, TemaVisual, TipoPlanoConta, UserProfile } from '../types';
 import { MOEDAS_PADRAO as MOEDAS } from '../types';
@@ -67,11 +69,6 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
       .join('')
       .toUpperCase();
 
-  const defaultAvatar = useMemo(
-    () => 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-    []
-  );
-
   const planoAtual = userProfile?.tipoPlano || 'PESSOAL';
   const planoMeta = PLANO_META[planoAtual];
 
@@ -79,7 +76,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   const [formNome, setFormNome] = useState(userProfile?.nomeCompleto || userName);
   const [formEmail, setFormEmail] = useState(userProfile?.email || userEmail);
   const [formTelefone, setFormTelefone] = useState(userProfile?.telefone || '');
-  const [formAvatarUrl, setFormAvatarUrl] = useState(userProfile?.avatarUrl || defaultAvatar);
+  const [formAvatarUrl, setFormAvatarUrl] = useState<string | null>(userProfile?.avatarUrl || null);
 
   const [moeda, setMoeda] = useState<typeof MOEDAS_PADRAO[number]['codigo']>(
     userProfile?.moedaPadrao || 'BRL'
@@ -98,6 +95,30 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   const [salvando, setSalvando] = useState(false);
   const [confirmarLogout, setConfirmarLogout] = useState(false);
 
+  // -------------------- Dropdown / Menu de Ações do Avatar --------------------
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const avatarBtnRef = useRef<HTMLButtonElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (avatarBtnRef.current && !avatarBtnRef.current.contains(e.target as Node)) {
+        setAvatarMenuOpen(false);
+      }
+    };
+    const handlerEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAvatarMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('keydown', handlerEsc);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', handlerEsc);
+    };
+  }, [avatarMenuOpen]);
+
   // -------------------- SYNC userProfile incoming --------------------
   useEffect(() => {
     if (!userProfile) return;
@@ -105,6 +126,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
     if (userProfile.email) setFormEmail(userProfile.email);
     if (userProfile.telefone) setFormTelefone(userProfile.telefone);
     if (userProfile.avatarUrl) setFormAvatarUrl(userProfile.avatarUrl);
+    else setFormAvatarUrl(null);
     if (userProfile.moedaPadrao) setMoeda(userProfile.moedaPadrao);
     if (userProfile.temaVisual) setTema(userProfile.temaVisual);
     if (typeof userProfile.ocultarSaldosDefault === 'boolean') {
@@ -113,15 +135,26 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   }, [userProfile]);
 
   // -------------------- Avatar handlers --------------------
+  // Ao escolher arquivo: converte para Base64, fecha dropdown e atualiza preview
   const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = (ev.target?.result as string) || '';
-      if (dataUrl) setFormAvatarUrl(dataUrl);
+      if (dataUrl) {
+        setFormAvatarUrl(dataUrl);
+        setAvatarMenuOpen(false);
+      }
     };
     reader.readAsDataURL(file);
+    // Reseta input para permitir selecionar o mesmo arquivo em seguida
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemoveAvatar = () => {
+    setFormAvatarUrl(null);
+    setAvatarMenuOpen(false);
   };
 
   // -------------------- Save --------------------
@@ -152,7 +185,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
         nomeCompleto: formNome.trim() || undefined,
         email: formEmail.trim() || undefined,
         telefone: formTelefone.trim() || undefined,
-        avatarUrl: formAvatarUrl.trim() || undefined,
+        avatarUrl: formAvatarUrl || undefined,   // undefined = remove a foto do profile
         moedaPadrao: moeda,
         temaVisual: tema,
         ocultarSaldosDefault
@@ -185,31 +218,138 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
         </div>
 
         <div className="relative p-5 flex flex-col items-center gap-3 text-center">
-          {/* Avatar + Camera overlay */}
-          <div className="relative shrink-0">
-            <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/70 shadow-xl bg-white flex items-center justify-center text-[#0e69b2] text-2xl font-black">
-              {formAvatarUrl ? (
-                <img
-                  src={formAvatarUrl}
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = 'none';
-                  }}
+          {/* Avatar Clicável com Dropdown */}
+          <div className="relative shrink-0 z-30">
+            {/* Hidden input de arquivo (acionado via dropdown opção 1) */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarFileUpload}
+            />
+
+            {/* Botão Avatar principal */}
+            <button
+              type="button"
+              ref={avatarBtnRef}
+              onClick={() => setAvatarMenuOpen(o => !o)}
+              className="group block relative focus:outline-none"
+              title="Editar foto de perfil"
+            >
+              <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/70 shadow-xl bg-white flex items-center justify-center text-[#0e69b2] text-2xl font-black transition group-hover:ring-white group-hover:scale-[1.02]">
+                {formAvatarUrl ? (
+                  <img
+                    src={formAvatarUrl}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span className="uppercase">{getInitials(formNome || userName)}</span>
+                )}
+              </div>
+              {/* Overlay câmera/lápis indicando interatividade */}
+              <div className="absolute inset-0 w-24 h-24 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center pointer-events-none">
+                <div className="flex flex-col items-center text-white">
+                  <Camera size={18} strokeWidth={2.5} />
+                  <span className="text-[8px] font-black uppercase tracking-wider mt-0.5">Editar</span>
+                </div>
+              </div>
+              {/* Badge câmera fixo no canto inferior direito (indicador sutil) */}
+              <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white text-[#0e69b2] border-2 border-white/80 shadow-lg flex items-center justify-center">
+                <Camera size={14} strokeWidth={2.5} />
+              </div>
+            </button>
+
+            {/* ========== Dropdown / Menu de Ações FLUTUANTE ========== */}
+            {avatarMenuOpen && (
+              <>
+                {/* Backdrop invisível que captura clique fora em touch devices */}
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setAvatarMenuOpen(false)}
+                  aria-hidden="true"
                 />
-              ) : (
-                getInitials(formNome || userName)
-              )}
-            </div>
-            <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white text-[#0e69b2] border-2 border-white/80 shadow-lg flex items-center justify-center cursor-pointer hover:scale-105 transition">
-              <Camera size={14} strokeWidth={2.5} />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarFileUpload}
-              />
-            </label>
+                <div
+                  className="absolute z-50 left-1/2 -translate-x-1/2 mt-2 w-[240px] origin-top animate-pop-in"
+                  role="menu"
+                  aria-label="Opções de foto do perfil"
+                >
+                  <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-900/15 overflow-hidden ring-1 ring-black/5">
+                    {/* Header opcional: fecha X */}
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50/50">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        Foto de Perfil
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAvatarMenuOpen(false)}
+                        className="p-1 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-slate-800 cursor-pointer"
+                        aria-label="Fechar menu"
+                      >
+                        <X size={12} strokeWidth={2.5} />
+                      </button>
+                    </div>
+
+                    <div className="p-1.5 space-y-1">
+                      {/* Opção 1: Selecionar arquivo */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl hover:bg-blue-50 text-slate-700 hover:text-[#0e69b2] transition-colors group cursor-pointer"
+                        role="menuitem"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-700 border border-slate-200 group-hover:border-blue-200 flex items-center justify-center shrink-0">
+                          <FolderOpen size={14} strokeWidth={2.3} />
+                        </div>
+                        <div className="text-left">
+                          <span className="block text-[11.5px] font-extrabold leading-tight">
+                            📂 Selecionar arquivo
+                          </span>
+                          <span className="block text-[9px] text-slate-500 leading-snug group-hover:text-blue-700/80">
+                            Enviar foto da galeria / celular
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Opção 2: Excluir foto — só aparece se existir uma foto atualmente */}
+                      {formAvatarUrl && (
+                        <>
+                          <div className="h-px bg-slate-100 mx-1" aria-hidden="true" />
+                          <button
+                            type="button"
+                            onClick={handleRemoveAvatar}
+                            className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl hover:bg-rose-50 text-slate-700 hover:text-rose-700 transition-colors group cursor-pointer"
+                            role="menuitem"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-rose-100 text-slate-600 group-hover:text-rose-700 border border-slate-200 group-hover:border-rose-200 flex items-center justify-center shrink-0">
+                              <Trash2 size={14} strokeWidth={2.3} />
+                            </div>
+                            <div className="text-left">
+                              <span className="block text-[11.5px] font-extrabold leading-tight">
+                                🗑️ Excluir foto atual
+                              </span>
+                              <span className="block text-[9px] text-slate-500 leading-snug group-hover:text-rose-700/80">
+                                Voltar para avatar com iniciais
+                              </span>
+                            </div>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Setinha apontando pro avatar */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute left-1/2 -translate-x-1/2 -top-1.5 w-3 h-3 rotate-45 bg-white border-t border-l border-slate-200 z-50"
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Info */}
@@ -282,19 +422,6 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
               onChange={(e) => setFormTelefone(e.target.value)}
               placeholder="(11) 98000-0000"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-xs"
-            />
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold text-slate-500 mb-1">
-              URL do Avatar (cole uma imagem externa ou use a câmera acima)
-            </label>
-            <input
-              type="text"
-              value={formAvatarUrl && formAvatarUrl.startsWith('data:') ? '' : (formAvatarUrl || '')}
-              onChange={(e) => setFormAvatarUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-xs truncate"
             />
           </div>
         </div>
