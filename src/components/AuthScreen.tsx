@@ -54,27 +54,77 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   useEffect(() => { setFeedback(null); }, [step]);
 
   // ============================================================
-  // HANDLERS (LOGICA DEFINTIVA: SEM ADIVINHAR EMAIL EXISTE!)
-  //   - Passo 1 (EMAIL)  -> sempre vai p/ Passo 2 (LOGIN = Senha universal)
-  //   - Passo 2 (SENHA)  -> tenta logar COM A SENHA REAL do usuario.
-  //       * se OK                  -> entra.
-  //       * se "user_not_found"    -> TROCA AUTOMATICA P/ CADASTRO (REGISTER_NAME)
-  //       * se "invalid credenc"   -> email existe, senha errada (msg normal)
-  //   - Passo Cadastro Final (REGISTER_PASSWORD)
-  //       * se "already registered" -> TROCA AUTOMATICA P/ LOGIN (ja existia)
-  // Essa abordagem e a USADA POR GOOGLE / APPLE / NOTION.
-  // Elimina checagens quebradas de RLS e anti-enumeration do Supabase.
+  // HANDLERS (LOGICA EXATA SOLICITADA Pelo USUARIO:
+  //   Passo 1 (EMAIL)
+  //      → supabase.rpc('fn_profile_email_exists')
+  //        [TRUE  = exibe LOGIN (Show de bola te ter de volta por aqui)
+  //        [FALSE = exibe REGISTER_NAME (Opa! Relaxa... Criar conta)
   // ============================================================
+  const checkEmailExists = async (emailTrim: string): Promise<boolean> => {
+    try {
+      // PRIMEIRO: RPC seguro (migration aplicada no Supabase SQL Editor)
+      const { data, error } = await supabase
+        .rpc('fn_profile_email_exists', { p_email: emailTrim });
+      if (!error && (data === true || data === false)) {
+        console.debug('[checkEmail] RPC segura]', emailTrim, ' → existe =', data);
+        return !!data;
+      }
+      if (error) {
+        console.warn('[checkEmail] RPC com erro (migration talvez ainda nao tenha propagou? 60s):', error.message);
+      }
+
+      // FALLBACK (caso a migration ainda nao esteja propagada no Supabase):
+      //  Tenta signIn com senha dummy. Se der user_not_found = FALSE (nao existe)
+      //  (Coisas: email_not_confirmed, invalid_credentials = existe (TRUE)
+      try {
+        const { error: dummyError } = await supabase.auth.signInWithPassword({
+          email: emailTrim,
+          password: '__tq_fallback_check_invalido_xyz123',
+        });
+        const code = String(dummyError?.code || '').toLowerCase();
+        const msg  = String(dummyError?.message || '').toLowerCase();
+        console.debug('[checkEmail] fallback auth code=', code, ' msg=', msg);
+        if (!dummyError) return true;
+        if (code.includes('not_found') || msg.includes('not found') || msg.includes('não encontrado') || msg.includes('nao encontrado')) return false;
+        if (
+          code.includes('invalid_credentials') || code.includes('email_not_confirmed') ||
+          code.includes('invalid_grant') || code.includes('invalid') ||
+          msg.includes('senha') || msg.includes('password') || msg.includes('invalid')
+        ) return true;
+      } catch (authErr: any) {
+        console.warn('[checkEmail] fallback auth error (catch):', authErr?.message || authErr);
+      }
+      return false;
+    } catch (e: any) {
+      console.warn('[checkEmail] excecao geral:', e?.message || e);
+      return false;
+    }
+  };
+
   const handleStepEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     const emailTrim = email.trim().toLowerCase();
     if (!emailTrim) return showFeedback('error', 'Por favor, digite seu e-mail.');
 
-    setEmail(emailTrim);
-    setSenha('');
+    setLoading(true);
     setFeedback(null);
-    setStep('LOGIN');       // Passo 2 = SEMPRE Senha Universal.
-    setSlideKey(k => k + 1);
+    try {
+      const exists = await checkEmailExists(emailTrim);
+      setEmail(emailTrim);
+      setSenha('');
+      setNome('');
+      setIsPassoCriarContaManual(false);
+      if (exists) {
+        setStep('LOGIN');
+      } else {
+        setStep('REGISTER_NAME');
+      }
+      setSlideKey(k => k + 1);
+    } catch (e: any) {
+      showFeedback('error', 'Não consegui verificar seu e-mail agora. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -91,44 +141,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
       if (error) {
         const code = String(error.code || '').toLowerCase();
         const msg  = String(error.message || '').toLowerCase();
-        console.debug('[handleLogin] code=', code, ' msg=', msg);
-
-        // ============================================================
-        // MAGICA: E-MAIL NAO CADASTRADO -> TROCA AUTOMATICA PARA CADASTRO
-        // ============================================================
-        const emailNaoCadastrado =
-          code.includes('not_found') ||
-          msg.includes('not found') ||
-          msg.includes('não encontrado') ||
-          msg.includes('nao encontrado') ||
-          msg.includes('usuário não cadastrado') ||
-          msg.includes('usuario nao cadastrado') ||
-          msg.includes('no user found');
-
-        if (emailNaoCadastrado) {
-          showFeedback('success', 'Ainda não tem conta! Vou te ajudar a criar uma 😉');
-          setNome('');
-          setTimeout(() => {
-            setStep('REGISTER_NAME');
-            setSlideKey(k => k + 1);
-          }, 650);
-          setLoading(false);
-          return;
-        }
-
-        // Demais erros = email EXISTE, credencial errada / confirmar email etc
         if (code.includes('email_not_confirmed') || msg.includes('confirm') || msg.includes('verifique')) {
-          showFeedback('error', 'E-mail cadastrado! Faltando confirmar a caixa de entrada (spam também).');
+          showFeedback('error', 'Faltando confirmar e-mail! Olhe a caixa de entrada ou spam.');
         } else if (
-          code.includes('invalid_credentials') ||
-          msg.includes('invalid') ||
-          msg.includes('credential') ||
-          msg.includes('senha') ||
-          msg.includes('password')
+          code.includes('invalid_credentials') || msg.includes('invalid') ||
+          msg.includes('credential') || msg.includes('senha') || msg.includes('password')
         ) {
-          showFeedback('error', 'Credenciais não batem. Verifique a senha ou troque o e-mail.');
+          showFeedback('error', 'Senha não bate. Verifique ou troque o e-mail.');
         } else {
-          showFeedback('error', error.message || 'Não foi possível entrar. Tente novamente.');
+          showFeedback('error', error.message || 'Não foi possível entrar.');
         }
         return;
       }
@@ -138,7 +159,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
         setTimeout(() => onLoginSuccess(displayName), 750);
       }
     } catch (e: any) {
-      showFeedback('error', 'Erro inesperado ao conectar. Tente novamente.');
+      showFeedback('error', 'Erro inesperado. Tente novamente.');
       console.error(e);
     } finally {
       setLoading(false);
@@ -278,11 +299,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
                 inputPill={inputPill} btnPill={btnPill}
                 loading={loading}
                 voltar={voltarParaEmail}
-                onCriarContaClick={() => {
-                  setSenha(''); setNome('');
-                  setIsPassoCriarContaManual(true);
-                  setStep('REGISTER_NAME'); setSlideKey(k => k + 1);
-                }}
               />
             )}
             {step === 'REGISTER_NAME' && (
@@ -374,24 +390,23 @@ function StepEmailView({
   );
 }
 
-// ---------------- CAMINHO A: LOGIN (Passo 2 SENHA UNIVERSAL) ----------------
+// ---------------- CAMINHO A: LOGIN (Email JÁ CADASTRADO - consulta do banco) ----------------
 function StepLoginView({
-  email, senha, setSenha, senhaRef, inputPill, btnPill, loading, voltar, onCriarContaClick,
+  email, senha, setSenha, senhaRef, inputPill, btnPill, loading, voltar,
 }: ViewBase & {
   email: string;
   senha: string; setSenha: (s: string) => void;
   senhaRef: React.RefObject<HTMLInputElement | null>;
   voltar: () => void;
-  onCriarContaClick: () => void;
 }) {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <p className="text-[20px] sm:text-[22px] leading-[1.35] text-slate-900 font-semibold tracking-tight">
-          <span className="font-black">Show de bola!</span> Agora bora 😉
+          <span className="font-black">Show de bola</span> te ter de volta por aqui! 🙌
         </p>
         <p className="text-[16px] sm:text-[17px] leading-[1.4] text-slate-700 font-medium">
-          Digite sua senha pra ver se a conta fecha:
+          Digite sua senha pra gente ver se a conta fecha:
         </p>
         {/* Chip leve do email (sem borda grossa) */}
         <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100">
@@ -429,7 +444,7 @@ function StepLoginView({
           )}
         </button>
 
-        <div className="text-center pt-0.5 flex flex-col gap-1.5">
+        <div className="text-center pt-0.5">
           <button
             type="button"
             onClick={voltar}
@@ -437,14 +452,6 @@ function StepLoginView({
             className="text-[13px] text-slate-500 hover:text-slate-800 hover:underline underline-offset-4 transition-colors disabled:opacity-50 cursor-pointer"
           >
             Não é você? Trocar e-mail <span className="text-slate-400">({email})</span>
-          </button>
-          <button
-            type="button"
-            onClick={onCriarContaClick}
-            disabled={loading}
-            className="text-[13px] text-slate-600 hover:text-slate-900 hover:underline underline-offset-4 transition-colors disabled:opacity-50 cursor-pointer font-medium"
-          >
-            Ainda não tem conta? <span className="font-black text-[#0B1020]">Criar conta grátis →</span>
           </button>
         </div>
       </div>
@@ -500,7 +507,7 @@ function StepRegisterNomeView({
   );
 }
 
-// ---------------- CAMINHO B2: SENHA ----------------
+// ---------------- CAMINHO B2: SENHA (Cadastro Final) ----------------
 function StepRegisterSenhaView({
   nome, email, senha, setSenha, senhaRef, inputPill, btnPill, loading,
 }: ViewBase & {
@@ -516,7 +523,7 @@ function StepRegisterSenhaView({
           <span className="font-black">Prazer, {primeiroNome}!</span> 🤝
         </p>
         <p className="text-[16px] sm:text-[17px] leading-[1.4] text-slate-700 font-medium">
-          Agora crie uma senha para proteger seu acesso:
+          Pra fechar com chave de ouro, preciso que você crie uma senha firmeza pra proteger o seu bolso:
         </p>
         {/* Chips leves (fundo cinza 100, sem borda pesada) */}
         <div className="mt-2 flex flex-wrap gap-1.5">
