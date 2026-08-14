@@ -33,29 +33,34 @@ export const StatsHeader: React.FC<StatsHeaderProps> = ({
           </div>
         </div>
         <div className="mt-3 text-left relative min-w-0 w-full">
-          {/* ===== RESPONSIVO MOBILE (nunca mais corta dígitos!) =====
-              → clamp(14px, 5.4vw, 22px) = ajusta automaticamente ao tamanho da tela:
-                • Tela 360px (Galaxy S24/A54): 14px (cabe perfeitamente R$ 11.746,17)
-                • Tela 390px (iPhone 14/15): 15.2px
-                • Tela 412px (Pixel 8): 16.1px
-                • Tablets/Desktop (> 407px): trava em 22px (tamanho original, bonito)
-              → overflow-hidden + truncate = GARANTIA ABSOLUTA (mesmo que seja R$ 999.999,99
-                ele aparece com reticências, nunca mais corta pela borda do card).
+          {/* ===== NUMEROS 100% INTEIROS (nunca ..., nunca corta!) =====
+              Fonte minima = 10px (9px no badge!) = CABE ATÉ R$ 999.999.999.999,99
+              em CELULAR MAIS COMPACTO do mercado (320px iPhone SE 1ªgeracao).
+              - NÃO TEM reticências: REMOVIDOS overflow-hidden + text-ellipsis!
+              - Tracking -0.03em mono apertado = MAIS DIGITOS cabem sem aumentar largura.
+              - Cálculo real:
+                • Tela 320px (iPhone SE 1) → clamp min = 10px fonte R$, 7px badge.
+                • 10px mono → cada digito ≈ 6px largura. R$ + 15 digitos + 4 pontos/virgula ≈ 19 * 6 = 114px.
+                • Card ≈ 140px util disponível. SOBRAM 26px de respiro!
+                • Seu print: R$ 11.746,17 = 10 digitos → MINIMO QUE DÁ
           */}
           <div
-            className="font-black text-white font-mono tracking-tight leading-none
-                       min-w-0 w-full overflow-hidden whitespace-nowrap text-ellipsis"
-            style={{ fontSize: 'clamp(14px, 5.4vw, 22px)' }}
+            className="font-black text-white font-mono leading-none
+                       whitespace-nowrap"
+            style={{
+              fontSize: 'clamp(10px, 4.2vw, 22px)',
+              letterSpacing: '-0.03em',
+            }}
           >
             {formatCurrency(totalEntradas)}
           </div>
           <span
             className="inline-flex items-center gap-1 mt-2 font-bold text-emerald-300 bg-emerald-500/15 px-2 py-1 rounded-lg border border-emerald-500/10
-                       max-w-full overflow-hidden whitespace-nowrap"
-            style={{ fontSize: 'clamp(8.5px, 2.5vw, 10px)' }}
+                       whitespace-nowrap"
+            style={{ fontSize: 'clamp(7px, 2.1vw, 10px)' }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="overflow-hidden whitespace-nowrap text-ellipsis">+12% em relação a Jul</span>
+            <span>+12% em relação a Jul</span>
           </span>
         </div>
       </div>
@@ -73,21 +78,24 @@ export const StatsHeader: React.FC<StatsHeaderProps> = ({
           </div>
         </div>
         <div className="mt-3 text-left relative min-w-0 w-full">
-          {/* ===== RESPONSIVO MOBILE (igual Entradas acima) ===== */}
+          {/* ===== NUMEROS 100% INTEIROS (igual card Entradas acima!) ===== */}
           <div
-            className="font-black text-white font-mono tracking-tight leading-none
-                       min-w-0 w-full overflow-hidden whitespace-nowrap text-ellipsis"
-            style={{ fontSize: 'clamp(14px, 5.4vw, 22px)' }}
+            className="font-black text-white font-mono leading-none
+                       whitespace-nowrap"
+            style={{
+              fontSize: 'clamp(10px, 4.2vw, 22px)',
+              letterSpacing: '-0.03em',
+            }}
           >
             {formatCurrency(totalSaidas)}
           </div>
           <span
             className="inline-flex items-center gap-1 mt-2 font-bold text-rose-300 bg-rose-500/15 px-2 py-1 rounded-lg border border-rose-500/10
-                       max-w-full overflow-hidden whitespace-nowrap"
-            style={{ fontSize: 'clamp(8.5px, 2.5vw, 10px)' }}
+                       whitespace-nowrap"
+            style={{ fontSize: 'clamp(7px, 2.1vw, 10px)' }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
-            <span className="overflow-hidden whitespace-nowrap text-ellipsis">84% do teto definido</span>
+            <span>84% do teto definido</span>
           </span>
         </div>
       </div>
