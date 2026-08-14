@@ -29,6 +29,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
 
   // ===== Animação troca passo =====
   const [slideKey, setSlideKey] = useState(0);
+  const [, setIsPassoCriarContaManual] = useState(false);
 
   const showFeedback = (type: 'error' | 'success', message: string) => {
     setFeedback({ type, message });
@@ -53,107 +54,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   useEffect(() => { setFeedback(null); }, [step]);
 
   // ============================================================
-  // PASSO 1: verificar existência do e-mail (CAMADAS EM ORDEM:
-  //   1) RPC segura public.fn_profile_email_exists (MIGRATION NOVA)
-  //   2) Fallback via auth error codes (signInWithPassword dummy)
-  //   3) Fallback antigo from(profiles).select.id (se RLS permitir)
-  // ============================================================
-  const checkEmailExists = async (emailTrim: string): Promise<boolean> => {
-    try {
-      // 1) Tenta PRIMEIRO a função RPC segura (migração já aplicada)
-      try {
-        const { data, error } = await supabase
-          .rpc('fn_profile_email_exists', { p_email: emailTrim });
-        if (!error && (data === true || data === false)) {
-          console.debug('[checkEmail] RPC ok]', emailTrim, '→', data);
-          return !!data;
-        }
-        if (error) {
-          console.warn('[checkEmail] RPC nao disponivel (migration ainda nao aplicada?), fallback...):', error.message);
-        }
-      } catch (rpcErr: any) {
-        console.warn('[checkEmail] RPC falhou, auth fallback...:', rpcErr?.message || rpcErr);
-      }
-
-      //////////////////////////////////////////////////////////////////
-      // 2) FALLBACK CONFIÁVEL (Sistema de auth: signIn com senha invalida
-      //    Analisa o ERROR CODE do Supabase Auth:
-      //      - 'invalid_credentials' = email existe, senha errada
-      //      - 'email_not_confirmed'    = email existe, aguard confirm
-      //      - 'invalid_grant'               = email existe
-      //      - 'user_not_found' (OU mensagem "email ou email not found = NAO CADASTRADO
-      //////////////////////////////////////////////////////////////////
-      try {
-        const { error: dummyError } = await supabase.auth.signInWithPassword({
-          email: emailTrim,
-          password: '__tq_check_placeholder_invalido_xyz123',
-        });
-        const code = String(dummyError?.code || '').toLowerCase();
-        const msg = String(dummyError?.message || '').toLowerCase();
-        console.debug('[checkEmail] auth fallback code=', code, ' msg=', msg);
-        // Email existe se: nao user_not_found e nao fala "nao encontrado
-        if (!dummyError) return true; // IMPOSSIVEL, mas por garantia
-        if (code.includes('not_found') || msg.includes('not found') || msg.includes('não encontrado') || msg.includes('nao encontrado')) {
-          return false;
-        }
-        if (
-          code.includes('invalid_credentials') ||
-          code.includes('email_not_confirmed') ||
-          code.includes('invalid_grant') ||
-          code.includes('invalid') ||
-          code.includes('too_many') ||
-          msg.includes('senha') ||
-          msg.includes('password')
-        ) {
-          return true;
-        }
-        // Código desconhecido: cai pro 3º fallback
-      } catch (authErr: any) {
-        console.warn('[checkEmail] fallback auth error:', authErr?.message || authErr);
-      }
-
-      // 3) Ultimo recurso antigo (RLS normalmente bloqueia, mas por via)
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', emailTrim)
-          .maybeSingle();
-        if (!error) return !!data;
-      } catch (e: any) { console.warn('[checkEmail] antigo RLS bloqueou, deu erro:', e?.message || e);
-        return false;
-      }
-      // default: retorno final segura = assumeNÃO existe a menos que provado)
-      return false;
-    } catch (e: any) {
-      console.warn('[checkEmail] excecao geral:', e?.message || e);
-      return false;
-    }
-  };
-
-  // ============================================================
-  // HANDLERS (TODA A LÓGICA INTACTA)
+  // HANDLERS (LOGICA DEFINTIVA: SEM ADIVINHAR EMAIL EXISTE!)
+  //   - Passo 1 (EMAIL)  -> sempre vai p/ Passo 2 (LOGIN = Senha universal)
+  //   - Passo 2 (SENHA)  -> tenta logar COM A SENHA REAL do usuario.
+  //       * se OK                  -> entra.
+  //       * se "user_not_found"    -> TROCA AUTOMATICA P/ CADASTRO (REGISTER_NAME)
+  //       * se "invalid credenc"   -> email existe, senha errada (msg normal)
+  //   - Passo Cadastro Final (REGISTER_PASSWORD)
+  //       * se "already registered" -> TROCA AUTOMATICA P/ LOGIN (ja existia)
+  // Essa abordagem e a USADA POR GOOGLE / APPLE / NOTION.
+  // Elimina checagens quebradas de RLS e anti-enumeration do Supabase.
   // ============================================================
   const handleStepEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     const emailTrim = email.trim().toLowerCase();
     if (!emailTrim) return showFeedback('error', 'Por favor, digite seu e-mail.');
 
-    setLoading(true);
+    setEmail(emailTrim);
+    setSenha('');
     setFeedback(null);
-    try {
-      const exists = await checkEmailExists(emailTrim);
-      if (exists) {
-        setStep('LOGIN');
-      } else {
-        setStep('REGISTER_NAME');
-      }
-      setSlideKey(k => k + 1);
-    } catch (e: any) {
-      showFeedback('error', 'Não consegui verificar seu e-mail agora. Tente novamente.');
-    } finally {
-      setLoading(false);
-    }
+    setStep('LOGIN');       // Passo 2 = SEMPRE Senha Universal.
+    setSlideKey(k => k + 1);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -168,9 +89,44 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
         password: senha,
       });
       if (error) {
-        const msg = (error.message || '').toLowerCase();
-        if (msg.includes('invalid') || msg.includes('credential') || msg.includes('senha')) {
-          showFeedback('error', 'Senha não bate. Digite novamente ou troque o e-mail.');
+        const code = String(error.code || '').toLowerCase();
+        const msg  = String(error.message || '').toLowerCase();
+        console.debug('[handleLogin] code=', code, ' msg=', msg);
+
+        // ============================================================
+        // MAGICA: E-MAIL NAO CADASTRADO -> TROCA AUTOMATICA PARA CADASTRO
+        // ============================================================
+        const emailNaoCadastrado =
+          code.includes('not_found') ||
+          msg.includes('not found') ||
+          msg.includes('não encontrado') ||
+          msg.includes('nao encontrado') ||
+          msg.includes('usuário não cadastrado') ||
+          msg.includes('usuario nao cadastrado') ||
+          msg.includes('no user found');
+
+        if (emailNaoCadastrado) {
+          showFeedback('success', 'Ainda não tem conta! Vou te ajudar a criar uma 😉');
+          setNome('');
+          setTimeout(() => {
+            setStep('REGISTER_NAME');
+            setSlideKey(k => k + 1);
+          }, 650);
+          setLoading(false);
+          return;
+        }
+
+        // Demais erros = email EXISTE, credencial errada / confirmar email etc
+        if (code.includes('email_not_confirmed') || msg.includes('confirm') || msg.includes('verifique')) {
+          showFeedback('error', 'E-mail cadastrado! Faltando confirmar a caixa de entrada (spam também).');
+        } else if (
+          code.includes('invalid_credentials') ||
+          msg.includes('invalid') ||
+          msg.includes('credential') ||
+          msg.includes('senha') ||
+          msg.includes('password')
+        ) {
+          showFeedback('error', 'Credenciais não batem. Verifique a senha ou troque o e-mail.');
         } else {
           showFeedback('error', error.message || 'Não foi possível entrar. Tente novamente.');
         }
@@ -194,6 +150,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
     const nomeTrim = nome.trim();
     if (!nomeTrim) return showFeedback('error', 'Me diga seu nome pra gente se conhecer melhor 😊');
     setNome(nomeTrim);
+    setSenha('');
     setStep('REGISTER_PASSWORD');
     setSlideKey(k => k + 1);
   };
@@ -247,6 +204,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   const voltarParaEmail = () => {
     setSenha('');
     setNome('');
+    setIsPassoCriarContaManual(false);
     setStep('EMAIL');
     setSlideKey(k => k + 1);
   };
@@ -320,6 +278,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
                 inputPill={inputPill} btnPill={btnPill}
                 loading={loading}
                 voltar={voltarParaEmail}
+                onCriarContaClick={() => {
+                  setSenha(''); setNome('');
+                  setIsPassoCriarContaManual(true);
+                  setStep('REGISTER_NAME'); setSlideKey(k => k + 1);
+                }}
               />
             )}
             {step === 'REGISTER_NAME' && (
@@ -411,20 +374,21 @@ function StepEmailView({
   );
 }
 
-// ---------------- CAMINHO A: LOGIN ----------------
+// ---------------- CAMINHO A: LOGIN (Passo 2 SENHA UNIVERSAL) ----------------
 function StepLoginView({
-  email, senha, setSenha, senhaRef, inputPill, btnPill, loading, voltar,
+  email, senha, setSenha, senhaRef, inputPill, btnPill, loading, voltar, onCriarContaClick,
 }: ViewBase & {
   email: string;
   senha: string; setSenha: (s: string) => void;
   senhaRef: React.RefObject<HTMLInputElement | null>;
   voltar: () => void;
+  onCriarContaClick: () => void;
 }) {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <p className="text-[20px] sm:text-[22px] leading-[1.35] text-slate-900 font-semibold tracking-tight">
-          <span className="font-black">Show de bola</span> te ter de volta por aqui! 🙌
+          <span className="font-black">Show de bola!</span> Agora bora 😉
         </p>
         <p className="text-[16px] sm:text-[17px] leading-[1.4] text-slate-700 font-medium">
           Digite sua senha pra ver se a conta fecha:
@@ -465,7 +429,7 @@ function StepLoginView({
           )}
         </button>
 
-        <div className="text-center pt-0.5">
+        <div className="text-center pt-0.5 flex flex-col gap-1.5">
           <button
             type="button"
             onClick={voltar}
@@ -473,6 +437,14 @@ function StepLoginView({
             className="text-[13px] text-slate-500 hover:text-slate-800 hover:underline underline-offset-4 transition-colors disabled:opacity-50 cursor-pointer"
           >
             Não é você? Trocar e-mail <span className="text-slate-400">({email})</span>
+          </button>
+          <button
+            type="button"
+            onClick={onCriarContaClick}
+            disabled={loading}
+            className="text-[13px] text-slate-600 hover:text-slate-900 hover:underline underline-offset-4 transition-colors disabled:opacity-50 cursor-pointer font-medium"
+          >
+            Ainda não tem conta? <span className="font-black text-[#0B1020]">Criar conta grátis →</span>
           </button>
         </div>
       </div>
