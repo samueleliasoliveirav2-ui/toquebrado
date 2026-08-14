@@ -7,7 +7,7 @@ import { DEFAULT_CATEGORIES } from './categoriesDefaults';
 import { StatsHeader } from './components/StatsHeader';
 import { WeeklyAccordion } from './components/WeeklyAccordion';
 import { TransactionModal } from './components/TransactionModal';
-import { LoginScreen } from './components/LoginScreen';
+import { AuthScreen } from './components/AuthScreen';
 import { ProfileSettings } from './components/ProfileSettings';
 import { WorkShiftDashboard } from './components/WorkShiftDashboard';
 import { WorkShiftModal } from './components/WorkShiftModal';
@@ -3407,7 +3407,7 @@ function App() {
             <span className="text-sm font-semibold font-sans text-slate-405">Carregando carteira...</span>
           </div>
         ) : !currentUser ? (
-          <LoginScreen onLoginSuccess={handleLoginSuccess} />
+          <AuthScreen onLoginSuccess={handleLoginSuccess} />
         ) : (
           <>
             {activeTab === 'INICIO' ? (
