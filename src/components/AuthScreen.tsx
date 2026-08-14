@@ -330,7 +330,7 @@ function StepEmailView({
             inputMode="email"
             autoComplete="email"
             spellCheck={false}
-            placeholder="voce@email.com"
+            placeholder="digite seu e-mail"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
@@ -433,7 +433,7 @@ function StepRegisterNomeView({
           <span className="font-black">Opa!</span> Relaxa que vou te ajudar! 😉
         </p>
         <p className="text-[16px] sm:text-[17px] leading-[1.4] text-slate-700 font-medium">
-          Vamos criar uma conta e ver se a conta fecha... Como posso te chamar?
+          Vamos criar seu cadastro e ver se a conta fecha... Como posso te chamar?
         </p>
       </div>
 
