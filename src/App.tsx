@@ -3355,26 +3355,42 @@ function App() {
             />
 
             {/* Drawer container (slides from left) */}
-            <div className="relative w-64 max-w-[80vw] h-full bg-brand-gradient-drawer text-white flex flex-col p-5 shadow-2xl border-r border-white/10 z-10 animate-slide-right">
+            <div className="relative w-64 max-w-[80vw] h-full bg-brand-gradient-drawer text-white flex flex-col p-5 shadow-2xl border-r border-white/10 z-10 animate-slide-right overflow-hidden">
               {/* Header section with close and branding */}
-              <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                <div className="flex flex-col text-left">
+              <div className="flex items-start justify-between gap-2 pb-4 border-b border-white/10 w-full">
+                <div className="flex flex-col text-left min-w-0 w-full overflow-hidden">
                   {/* ======== LOGO NOVA (knotfin → KOEE, TÔQUEBRADO!) ========
                       Paleta IGUAL ao desenho antigo knotfin:
                         "KOEE,"      = BRANCO PURO (igual "knot")
                         "TÔQUEBRADO!" = LARANJA ÂMBAR (igual "fin")
-                      Fonte: mesmo tamanho/espessura que era o KnotfinLogo "md"
+                      Fonte: clamp() responsivo = NUNCA MAIS VAZA borda direita drawer.
+                      - Mobile compacto (360px → drawer ~288px = max 80vw): minimo 16px → CABE INTEIRO.
+                      - Tablets/Desktop: max 24px (igual text-2xl original 24px).
+                      - truncate + min-w-0 = GARANTIA ANTI-VAZAMENTO ABSOLUTO
+                        (mesmo que nome seja enorme, nao ultrapassa a borda direita).
                   */}
-                  <h1 className="m-0 p-0 text-2xl leading-none tracking-tight font-black font-sans whitespace-nowrap select-none">
+                  <h1
+                    className="m-0 p-0 leading-none font-black font-sans whitespace-nowrap select-none
+                               min-w-0 w-full overflow-hidden text-ellipsis"
+                    style={{
+                      fontSize: 'clamp(16px, 5vw, 24px)',
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
                     <span className="text-white">KOEE,</span>{' '}
                     <span className="text-amber-400">TÔQUEBRADO!</span>
                   </h1>
-                  {/* Workspace → slogan do app */}
-                  <span className="text-[10px] text-white/60 font-bold font-sans mt-1">No final a conta fecha!</span>
+                  {/* Slogan Workspace → "No final a conta fecha!" */}
+                  <span
+                    className="text-white/60 font-bold font-sans mt-1 whitespace-nowrap min-w-0 w-full overflow-hidden text-ellipsis"
+                    style={{ fontSize: 'clamp(9px, 2.7vw, 11px)' }}
+                  >
+                    No final a conta fecha!
+                  </span>
                 </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}
-                  className="p-1.5 rounded-xl hover:bg-white/10 text-white/75 hover:text-white transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl hover:bg-white/10 text-white/75 hover:text-white transition-colors cursor-pointer shrink-0 mt-0.5"
                 >
                   <X size={16} />
                 </button>
