@@ -1,22 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0B1020"/>
-      <stop offset="1" stop-color="#0C1F3A"/>
-    </linearGradient>
-    <linearGradient id="k" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#5EEAD4"/>
-      <stop offset="1" stop-color="#38BDF8"/>
-    </linearGradient>
-  </defs>
+<svg viewBox="0 0 512 512" width="512" height="512" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <!-- ============================================================
+       MARCA COMPLETA KOEE, TÔQUEBRADO!
+       Layout EXATO da imagem enviada pelo usuario:
+       - Fundo BRANCO 100% #FFFFFF
+       - Texto PRETO 100% #000000
+       - KOEE, alinhado a DIREITA (linha de cima)
+       - TÔQUEBRADO! alinhado a ESQUERDA (linha de baixo)
+       - Circunflexo do Ô desenhado manualmente (triangulo isósceles)
+    ============================================================ -->
+  <rect x="0" y="0" width="512" height="512" fill="#FFFFFF"/>
 
-  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#g)"/>
+  <g fill="#000000" font-family="Arial Black, 'Arial Black', 'Helvetica Neue', Helvetica, ui-sans-serif, system-ui, sans-serif" font-weight="900" letter-spacing="-2">
+    <!-- LINHA 1 (cima): KOEE, alinhado a DIREITA -->
+    <text x="500" y="214" text-anchor="end" font-size="132">KOEE,</text>
+    <!-- LINHA 2 (baixo): T_O_ QUEBRADO! - dividido para acento manual -->
+    <text x="26"  y="404" font-size="144" letter-spacing="-2.6">TO</text>
+    <text x="246" y="404" font-size="144" letter-spacing="-2.6">QUEBRADO!</text>
+  </g>
 
-  <rect x="108" y="120" width="296" height="72" rx="32" fill="url(#k)"/>
-  <rect x="220" y="120" width="72" height="272" rx="32" fill="url(#k)"/>
-
-  <circle cx="256" cy="340" r="120" fill="none" stroke="#FFFFFF" stroke-width="60"/>
-  <rect x="336" y="402" width="80" height="60" rx="24" fill="#FFFFFF" transform="rotate(35 376 432)"/>
-
-  <circle cx="420" cy="92" r="26" fill="url(#k)"/>
+  <!-- CIRCUNFLEXO DO Ô (TRIANGULO ISOSCELES GEOMETRICO PRETO)
+       Calculos alinhados ao glyph "O" da linha de baixo:
+       - Largura O: ~72 px; posição horizontal centro = 26 (T ~72px) + 72/2 = ~130 → centro x ≈ 166
+       - Topo letra O (baseline 404, altura glyph 112): 404 - 112 = 292
+       - Base triangulo: 90 px largura, 14 px acima do topo do glyph → y = 278
+       - Ponta triangulo: 32 px acima da base → y = 246
+  -->
+  <polygon fill="#000000" stroke="none" points="166,246 121,278 211,278"/>
 </svg>
