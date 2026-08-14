@@ -1,12 +1,10 @@
 <svg viewBox="0 0 512 512" width="512" height="512" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
   <!-- ============================================================
-       MARCA COMPLETA - FAVICON_2 enviado usuario (GRADIENTE PRATA)
-       Layout EXATO da imagem PNG enviada:
-       - FUNDO GRADIENTE HORIZONTAL: #C5C5C5 (cinza prata, ESQUERDA) → #FFFFFF (branco, DIREITA)
-       - Texto PRETO 100% #000000
-       - KOEE, alinhado a DIREITA (linha de cima)
-       - TÔQUEBRADO! alinhado a ESQUERDA (linha de baixo)
-       - Circunflexo do Ô desenhado manualmente (triangulo isósceles)
+       MARCA COMPLETA - FAVICON_2 (GRADIENTE PRATA + PADDING 5% BORDAS)
+       PADDING: 26px (≈ 5% de 512) em TODOS os lados para:
+        (a) fit contain nunca deixar as letras coladas na borda
+        (b) tamanhos pequenos (16-64px) ter respiro visual sem cortar NADA
+       Gradiente HORIZONTAL match imagem favicon_2 enviada
     ============================================================ -->
   <defs>
     <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
@@ -15,17 +13,21 @@
     </linearGradient>
   </defs>
 
-  <!-- Fundo GRADIENTE PRATA → BRANCO (igual imagem favicon_2) -->
+  <!-- Fundo GRADIENTE PRATA → BRANCO -->
   <rect x="0" y="0" width="512" height="512" fill="url(#bgGrad)"/>
 
+  <!-- ZONA DE CONTEÚDO (padding 26px interno cada lado)
+       area util = 512 - 2*26 = 460px largura
+                   512 - 2*26 = 460px altura
+  -->
   <g fill="#000000" font-family="Arial Black, 'Arial Black', 'Helvetica Neue', Helvetica, ui-sans-serif, system-ui, sans-serif" font-weight="900" letter-spacing="-2">
-    <!-- LINHA 1 (cima): KOEE, alinhado a DIREITA -->
-    <text x="500" y="214" text-anchor="end" font-size="132">KOEE,</text>
-    <!-- LINHA 2 (baixo): T_O_ QUEBRADO! - dividido para acento manual -->
-    <text x="26"  y="404" font-size="144" letter-spacing="-2.6">TO</text>
-    <text x="246" y="404" font-size="144" letter-spacing="-2.6">QUEBRADO!</text>
+    <!-- LINHA 1 (cima): KOEE, alinhado a DIREITA da área útil (x=486=512-26) -->
+    <text x="486" y="226" text-anchor="end" font-size="118">KOEE,</text>
+    <!-- LINHA 2 (baixo): TÔQUEBRADO! inicio em x=26 (padding esquerda) -->
+    <text x="26"  y="398" font-size="128" letter-spacing="-2.4">TO</text>
+    <text x="230" y="398" font-size="128" letter-spacing="-2.4">QUEBRADO!</text>
   </g>
 
-  <!-- CIRCUNFLEXO DO Ô (TRIANGULO ISOSCELES GEOMETRICO PRETO) -->
-  <polygon fill="#000000" stroke="none" points="166,246 121,278 211,278"/>
+  <!-- CIRCUNFLEXO DO Ô - ajustado para nova coordenada baseline y=398 -->
+  <polygon fill="#000000" stroke="none" points="156,258 114,288 198,288"/>
 </svg>
