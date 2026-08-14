@@ -1041,6 +1041,58 @@ function App() {
   // Filtered month work shifts (usa dataRecebimento como vencimento + projeção parcelas)
   const monthWorkShifts = workShifts.filter(e => caiWorkShiftNoMes(e, selectedMonth));
 
+  // ============================================================
+  // v1.7.7 UNIFICA LANCAMENTOS NA LISTAGEM INICIAL
+  // (converte WorkShifts para formato Transaction-like)
+  // → Cards entradas/saídas somam WorkShifts (v1.7.5)
+  // → LISTAGEM SEMANAL agora TAMBÉM MOSTRA WorkShifts (soma consistente!)
+  // Mapeamento STATUS (WorkShift → TransactionStatus):
+  //   WorkShift ENTRADA RECEBIDO  → Transaction RECEBIDO
+  //   WorkShift ENTRADA A_RECEBER → Transaction PENDENTE
+  //   WorkShift SAIDA (qualquer)  → Transaction PAGO (sempre pago na hora, custo rua)
+  // ============================================================
+  const monthWorkShiftsAsTransaction: Transaction[] = monthWorkShifts.map((ws) => {
+    let txStatus: TransactionStatus = 'PENDENTE';
+    if (ws.tipo === 'SAIDA') txStatus = 'PAGO';
+    else if (ws.status === 'RECEBIDO') txStatus = 'RECEBIDO';
+    else /* A_RECEBER ou indefinido */ txStatus = 'PENDENTE';
+
+    const dataVencimento = (ws.dataRecebimento || ws.data).slice(0, 10);
+    const categoriaPadrao = ws.tipo === 'ENTRADA'
+      ? (ws.tipoServico || 'Diária / Trabalho')
+      : (ws.categoria || 'Custos de Rua');
+    const descricaoCompleta = ws.tipo === 'ENTRADA'
+      ? (ws.clienteNome ? `🎟️ ${ws.clienteNome}${ws.tipoServico ? ' · ' + ws.tipoServico : ''}` : (ws.descricao || 'Recebimento de Diária'))
+      : (ws.descricao || categoriaPadrao || 'Custo de rua (trabalho)');
+
+    return {
+      id: `ws__${ws.id}`,
+      userId: ws.userId,
+      descricao: descricaoCompleta,
+      categoria: categoriaPadrao,
+      subcategory: ws.tipoServico || undefined,
+      valor: Number(ws.valor || 0),
+      tipo: ws.tipo,
+      data: dataVencimento,
+      status: txStatus,
+      juros: 0,
+      contaId: ws.contaId || undefined,
+      cartaoId: undefined,
+      categoriaId: undefined,
+      observacao: ws.observacoes,
+      recorrente: false,
+      criadoEm: ws.criadoEm,
+      // Flag custom (nao existe no tipo Transaction — uso apenas runtime para NÃO editar workShift por modal de Transaction pessoal)
+      ...({ _isWorkShift: true, _workShiftId: ws.id } as any),
+    };
+  });
+  // Array UNIFICADO (transactions pessoais + workShifts convertidos) —
+  // é este que entra em filtros (busca/tipo/status) E na listagem semanal.
+  const monthUnifiedTransactions: Transaction[] = [
+    ...monthTransactions,
+    ...monthWorkShiftsAsTransaction,
+  ];
+
   // Cumulative Balance (All-time actual liquid: RECEIVED entries - PAID exits)
   // INCLUI workShifts (Diárias/Trabalhos):
   //  + WorkShift ENTRADA status === "RECEBIDO" (saldo real)
@@ -1301,10 +1353,14 @@ function App() {
   }, [shouldPlayCriticalPulse]);
 
   // Filtered list display
-  const displayTransactions = monthTransactions.filter((tx) => {
+  // v1.7.7: FILTRA array UNIFICADO (monthUnifiedTransactions = transactions + workShifts)
+  // → Nome cliente, categoria, observacao, descricao sao usados na busca.
+  const displayTransactions = monthUnifiedTransactions.filter((tx) => {
     const matchesSearch = 
       tx.descricao.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tx.categoria.toLowerCase().includes(searchQuery.toLowerCase());
+      tx.categoria.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (tx.subcategory || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ((tx as any).observacao || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = filterType === 'TODOS' || tx.tipo === filterType;
     const matchesStatus =
       statusFilter === 'TODOS' || tx.status === statusFilter;
@@ -1322,6 +1378,44 @@ function App() {
   const mockTransactionsCount = mockTransactions.length;
 
   const handleToggleStatus = async (id: string) => {
+    // ==============================================
+    // v1.7.7: WORK SHIFTS tambem aparecem no click badge status.
+    // Detecta ID "ws__XXXX" e se for WorkShift:
+    //   ENTRADA:  A_RECEBER (PENDENTE) ↔ RECEBIDO
+    //   SAIDA:    status sempre PAGO (nao faz toggle, custo sempre pago)
+    // ID que NÃO começa com "ws__" = fluxo Transaction pessoal ANTIGO.
+    // ==============================================
+    if (typeof id === 'string' && id.startsWith('ws__')) {
+      const wsId = id.slice(4);
+      const targetWs = workShifts.find(w => w.id === wsId);
+      if (!targetWs) return;
+      if (targetWs.tipo === 'SAIDA') return; // custo rua sempre pago, nao toggle.
+
+      // WorkShift ENTRADA: A_RECEBER ↔ RECEBIDO (exatamente oposto)
+      const novoStatusWS: 'RECEBIDO' | 'A_RECEBER' =
+        (targetWs.status === 'RECEBIDO') ? 'A_RECEBER' : 'RECEBIDO';
+
+      // 1) Optimistic state update
+      setWorkShifts(prev =>
+        prev.map(w => w.id === wsId ? { ...w, status: novoStatusWS } : w)
+      );
+      // 2) Persist Supabase
+      try {
+        const { error } = await supabase
+          .from('diarias_trabalho')
+          .update({ status: novoStatusWS })
+          .eq('id', wsId);
+        if (error) {
+          console.error('toggle workshift status DB error:', error);
+          fetchWorkShifts();
+        }
+      } catch {
+        fetchWorkShifts();
+      }
+      return;
+    }
+
+    // Fluxo ANTIGO (transactions pessoais):
     const targetTx = transactions.find(t => t.id === id);
     if (!targetTx) return;
 
@@ -2044,6 +2138,11 @@ function App() {
   };
 
   const handleOpenEditModal = (tx: Transaction) => {
+    // v1.7.7: WorkShifts aparecem na listagem, mas NAO sao editaveis por modal de Transaction pessoal.
+    // (WorkShifts tem campos diferentes, usam WorkShiftModal proprio em aba DIARIAS)
+    if ((tx as any)?._isWorkShift) {
+      return;
+    }
     setEditingTransaction(tx);
     setIsModalOpen(true);
   };

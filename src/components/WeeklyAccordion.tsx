@@ -160,7 +160,12 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
     });
 
     const totalRecebido = sortedTxs
-      .filter(tx => tx.tipo === 'ENTRADA' && tx.status === 'RECEBIDO')
+      .filter(tx => tx.tipo === 'ENTRADA' && (
+        tx.status === 'RECEBIDO'
+        // WorkShift ENTRADA status mapeado como PENDENTE quando A_RECEBER.
+        // SaldoSemana = saldo REAL (apenas recebido). WorkShift tem flag _isWorkShift.
+        // Então para WorkShifts de entrada, RECEBIDO mapeia status RECEBIDO.
+      ))
       .reduce((sum, tx) => sum + tx.valor, 0);
 
     const totalPago = sortedTxs
@@ -187,6 +192,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
   };
 
   const getStatusBadge = (tx: Transaction) => {
+    const isWorkShift = (tx as any)._isWorkShift === true;
     switch (tx.status) {
       case 'RECEBIDO':
         return (
@@ -199,7 +205,7 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
         return (
           <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 shadow-2xs">
             <span className="w-1 h-1 rounded-full bg-amber-500" />
-            PAGO
+            {isWorkShift ? 'CUSTO PAGO' : 'PAGO'}
           </span>
         );
       case 'POSTERGAR':
@@ -217,6 +223,15 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
         );
       case 'PENDENTE':
       default:
+        // WorkShift PENDENTE = A_RECEBER (mostra nome "A RECEBER" como no modulo, amarelo relogio).
+        if (isWorkShift) {
+          return (
+            <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200 flex items-center gap-1 shadow-2xs">
+              <Clock size={8} className="stroke-[3]" />
+              A RECEBER
+            </span>
+          );
+        }
         return (
           <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
             <span className="w-1 h-1 rounded-full bg-slate-500" />
@@ -287,6 +302,13 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                   const activeDate = getTransactionActiveDate(tx);
                   const isPostponed = tx.status === 'POSTERGAR' && tx.dataPostergar;
                   const isPaid = tx.status === 'PAGO' || tx.status === 'RECEBIDO';
+                  // v1.7.7: WorkShifts aparecem na listagem, mas NAO abrem modal Transaction pessoal.
+                  const isWorkShift = (tx as any)._isWorkShift === true;
+                  // WorkShift SAIDA = custo rua sempre pago, nao faz toggle status.
+                  // WorkShift SAIDA ou WorkShift RECEBIDO → não toggle (apenas WorkShift A_RECEBER/PENDENTE toggle).
+                  const canToggleStatus = !isWorkShift || (
+                    isEntrada && (tx.status === 'PENDENTE' || tx.status === 'RECEBIDO')
+                  );
                   
                   const catDetails = getCategoryDetails(tx.categoria, tx.tipo);
                   const CatIcon = catDetails.icon;
@@ -297,12 +319,16 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                   return (
                     <div 
                       key={tx.id}
-                      className={`rounded-[20px] bg-white border border-slate-200 transition-all ${isExpandedTx ? 'ring-2 ring-blue-500/20 shadow-lg shadow-slate-900/10' : 'hover:bg-slate-50 active:scale-[0.995]'}`}
+                      className={`rounded-[20px] bg-white border border-slate-200 transition-all ${isExpandedTx ? 'ring-2 ring-blue-500/20 shadow-lg shadow-slate-900/10' : `hover:bg-slate-50 ${!isWorkShift ? 'active:scale-[0.995]' : ''}`}`}
                     >
                       {/* Top row / header do card transação */}
                       <div
-                        onClick={() => onEditTransaction(tx)}
-                        className="flex items-center justify-between p-3.5 cursor-pointer group"
+                        onClick={() => {
+                          // WorkShift: nao abre modal de Transaction pessoal.
+                          if (isWorkShift) return;
+                          onEditTransaction(tx);
+                        }}
+                        className={`flex items-center justify-between p-3.5 ${isWorkShift ? '' : 'cursor-pointer'} group`}
                       >
                         {/* Left: Icon and info */}
                         <div className="flex items-center gap-3">
@@ -364,9 +390,10 @@ export const WeeklyAccordion: React.FC<WeeklyAccordionProps> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (!canToggleStatus) return;
                               onToggleStatus(tx.id);
                             }}
-                            className="hover:scale-105 active:scale-95 transition-transform relative group/badge flex items-center justify-center cursor-pointer"
+                            className={`transition-transform relative group/badge flex items-center justify-center ${canToggleStatus ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
                           >
                             {getStatusBadge(tx)}
                             <div className="absolute inset-0 bg-white opacity-0 group-hover/badge:opacity-100 flex items-center justify-center rounded-full transition-opacity border border-slate-200">
