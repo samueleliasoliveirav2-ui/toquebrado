@@ -4,6 +4,7 @@ import {
   Database,
   Eye,
   EyeOff,
+  FolderKanban,
   Globe2,
   Heart,
   LogOut,
@@ -73,7 +74,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   localAvatarUrl,
   onLocalAvatarChange,
   showInternalHeader = false,
-  categories,
+  categories = [],               // DEFAULT SEGURO contra undefined
   onNewCategory,
   onEditCategory,
   onDeleteCategory,
@@ -361,6 +362,33 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
       </section>
 
       {/* ========================================================
+           GERENCIAR CATEGORIAS & SUBCATEGORIAS
+      ========================================================== */}
+      <section className="glass rounded-2xl p-4 border border-indigo-200/70 bg-gradient-to-br from-indigo-50/40 via-white to-violet-50/30 shadow-sm space-y-4">
+        <header className="flex items-center gap-2">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500/15 to-violet-500/15 text-indigo-600 border border-indigo-500/10">
+            <FolderKanban size={14} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600 leading-none mb-1">
+              Plano de Contas Personalizado
+            </h3>
+            <p className="text-[9px] font-semibold text-slate-500 leading-tight">
+              Receitas 🟢 e Despesas 🔴 — organize categorias e subcategorias como quiser.
+            </p>
+          </div>
+        </header>
+
+        <CategoryListAccordion
+          categories={categories}
+          onNewCategory={onNewCategory}
+          onEditCategory={onEditCategory}
+          onDeleteCategory={onDeleteCategory}
+          onAddSubcategory={onAddSubcategory}
+        />
+      </section>
+
+      {/* ========================================================
            SEGURANÇA E ACESSO
       ========================================================== */}
       <section className="glass rounded-2xl p-4 border border-slate-200/70 bg-white/95 shadow-sm space-y-4">
@@ -429,21 +457,6 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
               {erroSenha}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* ========================================================
-           GERENCIAR CATEGORIAS & SUBCATEGORIAS (NOVO!)
-      ========================================================== */}
-      <section className="space-y-3.5">
-        <div className="glass rounded-2xl p-4 border border-slate-200/60 bg-white/95 shadow-xs">
-          <CategoryListAccordion
-            categories={categories}
-            onNewCategory={onNewCategory}
-            onEditCategory={onEditCategory}
-            onDeleteCategory={onDeleteCategory}
-            onAddSubcategory={onAddSubcategory}
-          />
         </div>
       </section>
 

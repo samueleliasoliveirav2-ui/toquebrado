@@ -29,7 +29,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   onDelete,
   editingTransaction,
   categoriesList,
-  categories,
+  categories = [],                          // DEFAULT SEGURO: impede TypeError undefined.filter
   onAddNewCategory,
   onAddFullCategory,
   accounts = [],

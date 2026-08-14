@@ -13,7 +13,7 @@ interface CategoryListAccordionProps {
 type Tab = 'INCOME' | 'EXPENSE';
 
 export const CategoryListAccordion: React.FC<CategoryListAccordionProps> = ({
-  categories,
+  categories = [],
   onNewCategory,
   onEditCategory,
   onDeleteCategory,

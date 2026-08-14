@@ -3263,7 +3263,7 @@ function App() {
                   {/* Collapsible Content: Balance + Quick Actions */}
                   <div className={`overflow-hidden transition-all duration-500 ease-out ${isHeaderCollapsed ? 'max-h-0 opacity-0 mt-0 pointer-events-none' : 'max-h-[560px] opacity-100 mt-3'}`}>
 
-                    {/* Main Balance Display */}
+                     {/* Main Balance Display */}
                     <div className="text-center space-y-1 mt-2">
                       <div className="flex items-center justify-center space-x-1.5 text-xs text-blue-100 font-bold tracking-wide uppercase font-sans">
                         <span>Conta Principal • BRL</span>
@@ -3281,11 +3281,58 @@ function App() {
                         </h1>
                       </div>
 
-                      <div className="pt-1">
-                        <span className="inline-block px-3 py-0.5 rounded-full glass-pill text-[10px] text-blue-50 font-bold font-sans">
-                          Lançamentos Efetivados
+                      <div className="pt-1 pb-0.5">
+                        <span className="inline-block px-3 py-0.5 rounded-full bg-white/10 text-[10px] text-blue-100 font-bold font-sans">
+                          Saldo Disponível
                         </span>
                       </div>
+
+                      {/* Tô Quebrado? Financial Intelligence Widget */}
+                      {(() => {
+                        let status: 'positivo' | 'atencao' | 'critico' | 'neutro' = 'neutro';
+                        let boldText = 'Vamos entender como está seu mês';
+                        let descriptionText = 'Adicione lançamentos para ver sua análise.';
+
+                        if (transactions.length > 0 && (totalEntradasMes > 0 || totalSaidasMes > 0)) {
+                          if (saldoAcumulado < 0 || (saldoAcumulado < totalSaidasMes)) {
+                            status = 'critico';
+                            boldText = 'Ih... apertou.';
+                            descriptionText = 'Suas despesas previstas superam o saldo disponível.';
+                          } else if (totalSaidasMes > totalEntradasMes) {
+                            status = 'atencao';
+                            boldText = 'Calma aí...';
+                            descriptionText = 'As contas deste mês estão maiores que as receitas.';
+                          } else {
+                            status = 'positivo';
+                            boldText = 'Não. Tá tranquilo.';
+                            descriptionText = 'Você está dentro do seu ritmo financeiro este mês.';
+                          }
+                        }
+
+                        // Colors matching Revolut mesh gradient header
+                        const statusColors = {
+                          positivo: { text: 'text-emerald-300' },
+                          atencao: { text: 'text-amber-300' },
+                          critico: { text: 'text-rose-300' },
+                          neutro: { text: 'text-slate-300' }
+                        };
+
+                        return (
+                          <div className="pt-3.5 mt-2.5 border-t border-white/10 max-w-xs mx-auto text-center space-y-0.5 select-none font-sans">
+                            <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest block">
+                              tô quebrado?
+                            </span>
+                            <div className="flex flex-col items-center justify-center">
+                              <span className={`text-sm font-black tracking-tight ${statusColors[status].text}`}>
+                                {boldText}
+                              </span>
+                              <p className="text-[11px] text-white/80 font-medium max-w-[240px] leading-tight mt-0.5">
+                                "{descriptionText}"
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Quick Action Grid (4 round glass buttons) */}
