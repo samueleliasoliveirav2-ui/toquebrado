@@ -714,39 +714,15 @@ function App() {
     return mesAnoTx === mesAnoSel;
   };
 
-  // ==== WorkShift (Diárias/Eventos): PRIORIDADE = dataRecebimento (vencimento da parcela) ====
-  // Mesma lógica de projeção, mas campos específicos de WorkShift
+  // ==== WorkShift (Diárias/Eventos): FILTRO ESTRITO POR MÊS DE VENCIMENTO ====
+  // ⚠️ A diferença-chave: WorkShifts são 1 ENTRADA POR PARCELA (já individuais no banco!)
+  // NÃO projetamos intervalo (isso é só para Transaction tipo PARCELADO, que é 1 lançamento-mãe).
+  // Apenas verificamos se a DATA DE VENCIMENTO (dataRecebimento, fallback data evento)
+  // cai ESTRITAMENTE dentro do mês/ano selecionado.
+  // NENHUM lançamento de outro mês aparece. NÃO há duplicação.
   const caiWorkShiftNoMes = (e: WorkShiftEntry, mesAnoSel: string): boolean => {
-    // ⚠️ Data PRINCIPAL para filtro/mês: dataRecebimento (vencimento), senão fallback data do evento
     const dataVencimento = e.dataRecebimento || e.data;
     const mesAnoVenc = dataVencimento.slice(0, 7);
-
-    const tipo = (e.tipoRecebimento || 'UNICO').toUpperCase();
-    const totalParcelas = Number(e.totalParcelas) || Number(e.qtdParcelas) || 1;
-    const parcelaAtual = Number(e.parcelaAtual) || 1;
-
-    if (tipo === 'UNICO' || totalParcelas <= 1) {
-      return mesAnoVenc === mesAnoSel;
-    }
-
-    if (tipo === 'PARCELADO') {
-      const mesInicio = dataVencimento.slice(0, 7);
-      // Usa parcelaAtual para calcular a data "base" correta da 1ª parcela (pois pode já ter vencido)
-      // Ex: parcela atual = 2, venc em 20/08 → 1ª parcela foi em 20/07 (1 mês antes)
-      const deltaParaPrimeira = -(parcelaAtual - 1);
-      // Ajusta para periodicidade (hoje MENSAL default)
-      const periodicidade = e.periodicidadeParcelas || 'MENSAL';
-      const mesesPorParcela = periodicidade === 'SEMANAL' ? 1 : periodicidade === 'QUINZENAL' ? 1 : 1;
-      const mesPrimeiraParcela = addMeses(mesInicio, deltaParaPrimeira * mesesPorParcela);
-      const mesUltimaParcela = addMeses(mesPrimeiraParcela, (totalParcelas - 1) * mesesPorParcela);
-      return mesAnoSel >= mesPrimeiraParcela && mesAnoSel <= mesUltimaParcela;
-    }
-
-    if (tipo === 'RECORRENTE') {
-      const mesInicio = dataVencimento.slice(0, 7);
-      return mesAnoSel >= mesInicio;
-    }
-
     return mesAnoVenc === mesAnoSel;
   };
 
