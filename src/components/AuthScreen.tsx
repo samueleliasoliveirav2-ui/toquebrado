@@ -53,22 +53,80 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   useEffect(() => { setFeedback(null); }, [step]);
 
   // ============================================================
-  // PASSO 1: verificar existência do e-mail no profiles
+  // PASSO 1: verificar existência do e-mail (CAMADAS EM ORDEM:
+  //   1) RPC segura public.fn_profile_email_exists (MIGRATION NOVA)
+  //   2) Fallback via auth error codes (signInWithPassword dummy)
+  //   3) Fallback antigo from(profiles).select.id (se RLS permitir)
   // ============================================================
   const checkEmailExists = async (emailTrim: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', emailTrim)
-        .maybeSingle();
-      if (error) {
-        console.warn('[checkEmail] RLS/policy bloqueou, fallback heuristica:', error.message);
+      // 1) Tenta PRIMEIRO a função RPC segura (migração já aplicada)
+      try {
+        const { data, error } = await supabase
+          .rpc('fn_profile_email_exists', { p_email: emailTrim });
+        if (!error && (data === true || data === false)) {
+          console.debug('[checkEmail] RPC ok]', emailTrim, '→', data);
+          return !!data;
+        }
+        if (error) {
+          console.warn('[checkEmail] RPC nao disponivel (migration ainda nao aplicada?), fallback...):', error.message);
+        }
+      } catch (rpcErr: any) {
+        console.warn('[checkEmail] RPC falhou, auth fallback...:', rpcErr?.message || rpcErr);
+      }
+
+      //////////////////////////////////////////////////////////////////
+      // 2) FALLBACK CONFIÁVEL (Sistema de auth: signIn com senha invalida
+      //    Analisa o ERROR CODE do Supabase Auth:
+      //      - 'invalid_credentials' = email existe, senha errada
+      //      - 'email_not_confirmed'    = email existe, aguard confirm
+      //      - 'invalid_grant'               = email existe
+      //      - 'user_not_found' (OU mensagem "email ou email not found = NAO CADASTRADO
+      //////////////////////////////////////////////////////////////////
+      try {
+        const { error: dummyError } = await supabase.auth.signInWithPassword({
+          email: emailTrim,
+          password: '__tq_check_placeholder_invalido_xyz123',
+        });
+        const code = String(dummyError?.code || '').toLowerCase();
+        const msg = String(dummyError?.message || '').toLowerCase();
+        console.debug('[checkEmail] auth fallback code=', code, ' msg=', msg);
+        // Email existe se: nao user_not_found e nao fala "nao encontrado
+        if (!dummyError) return true; // IMPOSSIVEL, mas por garantia
+        if (code.includes('not_found') || msg.includes('not found') || msg.includes('não encontrado') || msg.includes('nao encontrado')) {
+          return false;
+        }
+        if (
+          code.includes('invalid_credentials') ||
+          code.includes('email_not_confirmed') ||
+          code.includes('invalid_grant') ||
+          code.includes('invalid') ||
+          code.includes('too_many') ||
+          msg.includes('senha') ||
+          msg.includes('password')
+        ) {
+          return true;
+        }
+        // Código desconhecido: cai pro 3º fallback
+      } catch (authErr: any) {
+        console.warn('[checkEmail] fallback auth error:', authErr?.message || authErr);
+      }
+
+      // 3) Ultimo recurso antigo (RLS normalmente bloqueia, mas por via)
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', emailTrim)
+          .maybeSingle();
+        if (!error) return !!data;
+      } catch (e: any) { console.warn('[checkEmail] antigo RLS bloqueou, deu erro:', e?.message || e);
         return false;
       }
-      return !!data;
+      // default: retorno final segura = assumeNÃO existe a menos que provado)
+      return false;
     } catch (e: any) {
-      console.warn('[checkEmail] exceção, fallback não-existe:', e?.message || e);
+      console.warn('[checkEmail] excecao geral:', e?.message || e);
       return false;
     }
   };
