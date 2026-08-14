@@ -1062,6 +1062,61 @@ function App() {
     .filter(tx => tx.tipo === 'SAIDA')
     .reduce((sum, tx) => sum + tx.valor + (tx.juros || 0), 0);
 
+  // ============================================================
+  // HERO FINANCEIRO "TÔ QUEBRADO?" (Etapa 1)
+  // Cálculo conservador (só usa dados reais, sem inventar valores).
+  // Estados: positivo / atenção / crítico / neutro.
+  // Posição: abaixo de "Saldo Disponível" na Home.
+  // ============================================================
+  const financialHeroWidget = useMemo(() => {
+    type HeroStatus = 'positivo' | 'atencao' | 'critico' | 'neutro';
+    let status: HeroStatus = 'neutro';
+    let boldText = 'Vamos entender como está seu mês';
+    let descriptionText = 'Vamos entender como está seu mês.';
+
+    const hasAnyData = transactions.length > 0 && (totalEntradasMes > 0 || totalSaidasMes > 0);
+
+    if (hasAnyData) {
+      if (saldoAcumulado < 0 || (totalSaidasMes > 0 && saldoAcumulado < totalSaidasMes * 0.4)) {
+        status = 'critico';
+        boldText = 'Ih... apertou.';
+        descriptionText = 'Suas despesas previstas superam o saldo disponível.';
+      } else if (totalSaidasMes > totalEntradasMes && totalEntradasMes > 0) {
+        status = 'atencao';
+        boldText = 'Calma aí...';
+        descriptionText = 'As contas deste mês estão maiores que as receitas.';
+      } else if (totalEntradasMes > 0 && saldoAcumulado >= totalSaidasMes) {
+        status = 'positivo';
+        boldText = 'Não. Tá tranquilo.';
+        descriptionText = 'Você está dentro do seu ritmo financeiro este mês.';
+      }
+    }
+
+    const accentByStatus: Record<HeroStatus, { text: string; pill: string }> = {
+      positivo: { text: 'text-emerald-300', pill: 'bg-emerald-400/10 text-emerald-200' },
+      atencao:  { text: 'text-cyan-200',    pill: 'bg-cyan-400/10 text-cyan-100'       },
+      critico:  { text: 'text-rose-300',    pill: 'bg-rose-400/10 text-rose-100'       },
+      neutro:   { text: 'text-slate-200',   pill: 'bg-white/10 text-slate-200'         }
+    };
+    const accent = accentByStatus[status];
+
+    return (
+      <div className="pt-3 mt-2 border-t border-white/10 max-w-[252px] mx-auto text-center space-y-0.5 select-none font-sans">
+        <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.18em] block">
+          tô quebrado?
+        </span>
+        <div className="flex flex-col items-center justify-center">
+          <span className={`text-sm font-black tracking-tight ${accent.text}`}>
+            {boldText}
+          </span>
+          <p className={`text-[11px] text-white/80 font-medium max-w-[230px] leading-tight mt-1`}>
+            &ldquo;{descriptionText}&rdquo;
+          </p>
+        </div>
+      </div>
+    );
+  }, [transactions.length, totalEntradasMes, totalSaidasMes, saldoAcumulado]);
+
   // Filtered list display
   const displayTransactions = monthTransactions.filter((tx) => {
     const matchesSearch = 
@@ -3287,52 +3342,8 @@ function App() {
                         </span>
                       </div>
 
-                      {/* Tô Quebrado? Financial Intelligence Widget */}
-                      {(() => {
-                        let status: 'positivo' | 'atencao' | 'critico' | 'neutro' = 'neutro';
-                        let boldText = 'Vamos entender como está seu mês';
-                        let descriptionText = 'Adicione lançamentos para ver sua análise.';
-
-                        if (transactions.length > 0 && (totalEntradasMes > 0 || totalSaidasMes > 0)) {
-                          if (saldoAcumulado < 0 || (saldoAcumulado < totalSaidasMes)) {
-                            status = 'critico';
-                            boldText = 'Ih... apertou.';
-                            descriptionText = 'Suas despesas previstas superam o saldo disponível.';
-                          } else if (totalSaidasMes > totalEntradasMes) {
-                            status = 'atencao';
-                            boldText = 'Calma aí...';
-                            descriptionText = 'As contas deste mês estão maiores que as receitas.';
-                          } else {
-                            status = 'positivo';
-                            boldText = 'Não. Tá tranquilo.';
-                            descriptionText = 'Você está dentro do seu ritmo financeiro este mês.';
-                          }
-                        }
-
-                        // Colors matching Revolut mesh gradient header
-                        const statusColors = {
-                          positivo: { text: 'text-emerald-300' },
-                          atencao: { text: 'text-amber-300' },
-                          critico: { text: 'text-rose-300' },
-                          neutro: { text: 'text-slate-300' }
-                        };
-
-                        return (
-                          <div className="pt-3.5 mt-2.5 border-t border-white/10 max-w-xs mx-auto text-center space-y-0.5 select-none font-sans">
-                            <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest block">
-                              tô quebrado?
-                            </span>
-                            <div className="flex flex-col items-center justify-center">
-                              <span className={`text-sm font-black tracking-tight ${statusColors[status].text}`}>
-                                {boldText}
-                              </span>
-                              <p className="text-[11px] text-white/80 font-medium max-w-[240px] leading-tight mt-0.5">
-                                "{descriptionText}"
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })()}
+                      {/* Tô Quebrado? Financial Intelligence Widget (Etapa 1 Hero) */}
+                      {financialHeroWidget}
                     </div>
 
                     {/* Quick Action Grid (4 round glass buttons) */}
