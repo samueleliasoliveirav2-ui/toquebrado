@@ -16,7 +16,6 @@ import { AccountsDashboard } from './components/AccountsDashboard';
 import { CreditCardsDashboard } from './components/CreditCardsDashboard';
 import { CreditCardModal, BANK_PRESETS } from './components/CreditCardModal';
 import { InvoiceDetailModal } from './components/InvoiceDetailModal';
-import { KnotfinLogo } from './components/KnotfinLogo';
 import { AvatarDropdown } from './components/AvatarDropdown';
 import { CategoryModal } from './components/CategoryModal';
 import { supabase } from './lib/supabaseClient';
@@ -3253,8 +3252,18 @@ function App() {
               {/* Header section with close and branding */}
               <div className="flex items-center justify-between pb-4 border-b border-white/10">
                 <div className="flex flex-col text-left">
-                  <KnotfinLogo size="md" theme="light" />
-                  <span className="text-[10px] text-white/60 font-bold font-sans mt-1">Workspace</span>
+                  {/* ======== LOGO NOVA (knotfin → KOEE, TÔQUEBRADO!) ========
+                      Paleta IGUAL ao desenho antigo knotfin:
+                        "KOEE,"      = BRANCO PURO (igual "knot")
+                        "TÔQUEBRADO!" = LARANJA ÂMBAR (igual "fin")
+                      Fonte: mesmo tamanho/espessura que era o KnotfinLogo "md"
+                  */}
+                  <h1 className="m-0 p-0 text-2xl leading-none tracking-tight font-black font-sans whitespace-nowrap select-none">
+                    <span className="text-white">KOEE,</span>{' '}
+                    <span className="text-amber-400">TÔQUEBRADO!</span>
+                  </h1>
+                  {/* Workspace → slogan do app */}
+                  <span className="text-[10px] text-white/60 font-bold font-sans mt-1">No final a conta fecha!</span>
                 </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}

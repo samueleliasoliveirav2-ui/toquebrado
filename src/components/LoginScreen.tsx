@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Lock, User, Check, ArrowRight, Info } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { KnotfinLogo } from './KnotfinLogo';
 
 interface LoginScreenProps {
   onLoginSuccess: (userName: string) => void;
@@ -127,9 +126,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     <div className="w-full flex-1 flex flex-col justify-between p-6 bg-gradient-to-b from-slate-50 via-white to-slate-100 animate-fade-in">
       {/* Top Section: Title branding */}
       <div className="flex flex-col items-center justify-center pt-10 pb-4 text-center">
-        <KnotfinLogo size="2xl" theme="dark" />
-        <p className="text-slate-500 text-[11px] font-semibold tracking-wide mt-4 max-w-[260px] leading-relaxed">
-          Decisões inteligentes para quem constrói o próprio futuro.
+        <h1 className="m-0 p-0 text-4xl leading-none tracking-tight font-black font-sans whitespace-nowrap select-none">
+          <span className="text-slate-900">KOEE,</span>{' '}
+          <span className="text-amber-500">TÔQUEBRADO!</span>
+        </h1>
+        <p className="text-slate-500 text-[11px] font-bold tracking-wide mt-4 max-w-[260px] leading-relaxed">
+          No final a conta fecha!
         </p>
       </div>
 
