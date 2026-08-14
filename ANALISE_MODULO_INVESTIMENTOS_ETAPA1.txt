@@ -1,0 +1,228 @@
+================================================================================
+TÔ QUEBRADO? — ETAPA 1
+ANÁLISE E PLANEJAMENTO DO MÓDULO DE INVESTIMENTOS (v1 MANUAL)
+Data: 14/08/2026
+Checkpoint seguro: tag backup-before-investments (commit 7a0e3cb)
+================================================================================
+OBS: Nesta etapa NÃO foi implementado NADA, apenas análise e modelagem.
+
+================================================================================
+🛡️ CHECKPOINT SEGURO (ANTES DE QUALQUER COISA)
+================================================================================
+- Working tree Git: LIMPA (sem alterações pendentes)
+- Último commit antes do backup: v1.8.4 (b01d890, filtro status não corta mobile)
+- Backup commit criado: 7a0e3cb ("backup-before-investments v1.8.4 snapshot")
+- Tag anotada PUBLICADA: backup-before-investments (GitHub)
+- Push origin main: SUCESSO (b01d890..7a0e3cb main->main)
+- Voltar para cá a qualquer momento:
+    git reset --hard backup-before-investments
+
+================================================================================
+📐 1. ESTRUTURA ATUAL RELEVANTE
+================================================================================
+1.1 Framework / Stack
+- React 18 + TypeScript (todo frontend)
+- Vite: build/dev (npm run dev / build)
+- Supabase BaaS: Auth (email/senha), Postgres, RLS, Storage
+- TailwindCSS 3: 100% estilos utilitários (clamp responsivo, font-mono)
+- Lucide React: ícones (Tag, ChevronDown, Search, etc.)
+- React Portal (createPortal): Modais / Bottom-sheets (ex: filtro STATUS)
+
+1.2 Estrutura de Pastas
+c:\toquebrado
+├── public/                  # favicon, manifest, ícones PWA
+├── supabase/
+│   └── migrations/          # TODAS migrations SQL (table, RLS, RPC, trigger)
+├── src/
+│   ├── App.tsx              # 90% app (roteamento state, todas seções)
+│   ├── main.tsx             # entry point
+│   ├── index.css            # tailwind + cores brand
+│   ├── types/
+│   │   └── index.ts         # interfaces TS (Transaction, WorkShift, Category...)
+│   └── components/          # UI reutilizável
+│       ├── AuthScreen.tsx              # login conversacional passo RPC email
+│       ├── LoginScreen.tsx             # login legado (fallback)
+│       ├── StatsHeader.tsx             # cards Entradas Saídas clamp
+│       ├── WeeklyAccordion.tsx         # lista semanal expand badges status
+│       ├── CategoryModal.tsx           # modal criar categoria chips
+│       └── CategoryListAccordion.tsx   # plano contas (Ajustes)
+├── index.html               # head meta favicons v=174
+└── package.json
+
+1.3 Banco de Dados (Supabase Postgres) — Tabelas PUBLIC hoje
+Padrão SEMPRE:
+- id UUID PK, userId UUID FK auth.users(id) NOT NULL
+- created_at / updated_at timestamptz (trigger moddatetime atualiza automatico)
+- RLS HABILITADO + policies: USING (auth.uid() = userId) + WITH CHECK igual
+Tabelas hoje: auth.users, public.profiles (perfil estendido), public.transactions,
+public.diarias_trabalho, public.categories.
+
+1.4 ORM: NENHUM. Acesso a dados = supabase-js client DIRETO (select().eq(userId)).
+1.5 Auth: Supabase Auth, onAuthStateChange, user.id = FK global.
+1.6 Rotas: STATELESS no App.tsx (useState currentTab: INICIO/RELATORIOS/WALLETS/CARTOES/TRABALHOS/AJUSTES)
+1.7 UI reutilizável hoje: StatsHeader, WeeklyAccordion, CategoryModal, Badges clamp,
+Bottom sheets createPortal, PillMonthPicker.
+1.8 Dashboard atual (Início): Saldo disponível, StatsHeader, WeeklyAccordion, Hero Financeiro.
+
+================================================================================
+🎯 2. ESTRUTURA PROPOSTA (MÓDULO INVESTIMENTOS v1 MANUAL)
+================================================================================
+Princípios:
+- 100% vinculado userId (RLS tudo)
+- MANUAL (v1): sem CSV, sem API corretora
+- Histórico auditável TOTAL (aportes, retiradas, reajustes)
+- Categorias flexíveis (Tipo Renda → SubCategoria → Custom)
+- Suporte a rentabilidade (cota atual + histórico)
+- Liquidez + Vencimento
+
+================================================================================
+🗃️ 3. MODELOS / TABELAS NECESSÁRIAS (4 tabelas + 2 enums PG)
+================================================================================
+--- Modelo 0: ENUMs PostgreSQL ---
+CREATE TYPE public.tipo_renda_investimento AS ENUM (
+  'RENDA_FIXA','RENDA_VARIAVEL','FUNDOS','CRIPTO','POUPANCA','PREVIDENCIA','OUTROS'
+);
+CREATE TYPE public.status_investimento AS ENUM (
+  'EM_CURSO','RESGATADO','VENCIDO','EM_LIQUIDACAO'
+);
+
+--- Modelo 1: public.investimentos (cadastro mestre 1 linha = 1 investimento) ---
+Campos:
+- id UUID PK gen_random_uuid()
+- userId UUID FK auth.users(id) NOT NULL (RLS)
+- nome VARCHAR(120) NOT NULL (apelido usuario: "CDB Nubank 2026", "FII HGLG")
+- tipoRenda tipo_renda_investimento NOT NULL
+- subCategoria VARCHAR(80) NOT NULL ("CDB","Ação","FII","ETF","BDR","BTC","ETH")
+- instituicao VARCHAR(120) NULL (Nubank, XP, Binance)
+- dataCompra DATE NOT NULL
+- dataVencimento DATE NULL (opcional: RF geral tem, Ação não)
+- valorAportadoInicial NUMERIC(18,4) NOT NULL
+- quantidadeCotas NUMERIC(24,10) NULL (Ação/FIIs/Fundos/Cripto)
+- precoCotaCompra NUMERIC(24,10) NULL
+- valorAtualEstimado NUMERIC(18,4) NOT NULL (atualiza via históricos)
+- taxaAno VARCHAR(80) NULL ("120% CDI", "IPCA +6%", "14,5% a.a.")
+- liquidez VARCHAR(60) NOT NULL ("Diária","Vencimento","D+1","D+30")
+- status status_investimento NOT NULL DEFAULT 'EM_CURSO'
+- observacoes TEXT NULL
+- carteira VARCHAR(60) NULL ("Reserva Emergência","Aposentadoria")
+- created_at / updated_at timestamptz (trigger)
+Índices: (userId, status, tipoRenda, dataVencimento)
+
+--- Modelo 2: public.investimento_movimentacoes (aportes / retiradas) ---
+- id / userId / investimentoId FK investimentos(id) ON DELETE CASCADE
+- tipo ENUM('APORTE','RETIRADA') NOT NULL
+- dataMovimento DATE NOT NULL
+- valor NUMERIC(18,4) NOT NULL
+- quantidadeCotasMovimentadas / precoCotaMovimento (numérico opcional)
+- observacoes TEXT NULL, created_at timestamptz
+Índices: (userId, investimentoId, dataMovimento); (userId, tipo, dataMovimento)
+
+--- Modelo 3: public.investimento_historico_valores (histórico valorização) ---
+- id / userId / investimentoId FK
+- dataReferencia DATE NOT NULL
+- valorPatrimonioLiquido NUMERIC(18,4) NOT NULL
+- quantidadeCotasAtualizada / precoCotaAtual (numérico opcional)
+- fonteDado ENUM('MANUAL','CALCULADO','IMPORTADO_CSV') NOT NULL DEFAULT 'MANUAL'
+- observacoes / created_at
+UNIQUE(userId, investimentoId, dataReferencia) (1 registro por investimento + dia)
+
+--- Modelo 4: public.investimento_categorias_custom (plano contas usuario) ---
+- id / userId
+- nome VARCHAR(80) NOT NULL ("Ações BR", "Cripto Lunar")
+- tipoRenda tipo_renda_investimento NOT NULL
+- ehPadraoSistema BOOL NOT NULL default false
+- created_at timestamptz
+
+================================================================================
+🔗 4. RELAÇÕES (Diagrama)
+================================================================================
+auth.users 1 ── N public.investimentos
+  ├───── N investimento_movimentacoes (FK investimentoId)
+  ├───── N investimento_historico_valores (FK investimentoId)
+  └───── N investimento_categorias_custom
+
+================================================================================
+👤 5. ASSOCIAÇÃO USUÁRIO (IGUAL AO RESTANTE DO SISTEMA)
+================================================================================
+Campo userId + RLS + policies select/insert/update/delete (auth.uid()=userId)
+em TODAS tabelas.
+
+================================================================================
+🔄 6. FUNCIONAMENTO FUTURO (APORTES / RETIRADAS / HISTÓRICO)
+================================================================================
+6.1 Registrar Aporte:
+  INSERT investimento_movimentacoes tipo=APORTE
+  => atualiza investimentos.valorAtualEstimado += valor
+  => INSERT automático investimento_historico_valores fonte=CALCULADO
+
+6.2 Registrar Retirada / Resgate:
+  INSERT movimentacoes tipo=RETIRADA
+  => valorAtualEstimado -= valor; se = 0 auto status='RESGATADO'
+  => histórico CALCULADO
+
+6.3 Atualizar valor manual (1x/mês usu informar):
+  INSERT histórico fonte=MANUAL
+  => atualiza valorAtualEstimado
+  => Hero investimentos calcula rentab % (atual vs total aportado)
+
+================================================================================
+♻️ 7. COMPONENTES EXISTENTES REUTILIZÁVEIS
+================================================================================
+- StatsHeader.tsx → Hero 4 cards investimentos (Total investido / Aportado mês /
+  Rentab mês % / Vencimentos próximos)
+- WeeklyAccordion.tsx → MensalAccordion (aportes retiradas mês)
+- CategoryModal.tsx → Modal cadastrar investimento
+- Bottom sheets createPortal → Filtrar TipoRenda / Atualizar valor / Confirmar
+  Aporte / Resgatar
+- PillMonthPicker → data vencimento / mês aporte
+- Badges clamp status → EM_CURSO / RESGATADO / VENCIDO / EM_LIQUIDACAO
+- Hero Financeiro → Patrimônio investido (separado de Saldo Disponível)
+
+================================================================================
+🛤️ 8. ROTAS / SEÇÕES
+================================================================================
+- Nova aba type TabAtual = 'INVESTIMENTOS'
+- Item Drawer menu: 📈 Investimentos (posição após Carteiras & Contas,
+  antes de Cartões de Crédito)
+- Estrutura interna aba:
+  Hero 4 cards | Barra filtros | Lista cards investimentos | FAB + cadastrar |
+  Menu 3 pontinhos (Aporte, Resgatar, Atualizar valor, Editar, Excluir)
+
+================================================================================
+⚠️ 9. RISCOS (e mitigação)
+================================================================================
+R1 Misturar Patrimônio com Saldo: separar 100% em aba dedicada
+R2 Precisão numérica: NUMERIC(18,4) em tudo, não usar floats
+R3 Concorrência 2 cliques rápido: RPC PostgreSQL SECURITY DEFINER + FOR UPDATE
+R4 Perda histórico exclusão: confirmação dupla, FK CASCADE apenas após confirm
+R5 ENUM engessado: subCategoria VARCHAR livre + tabela categorias_custom
+R6 Histórico duplicado no dia: UNIQUE(userId, investimentoId, dataReferencia)
+
+================================================================================
+📁 10. ARQUIVOS QUE PROVAVELMENTE SERÃO ALTERADOS (implementação futura)
+================================================================================
+1. src/types/index.ts → +4 Interfaces TS + enums
+2. src/App.tsx → +tab INVESTIMENTOS (drawer + switch) + useStates/useEffects
+3. src/components/StatsHeader.tsx → adaptar ou criar InvestimentosHero
+4. src/components/WeeklyAccordion.tsx → adaptar ou criar InvestimentosLista
+5. App.tsx portals → 3 novos modais (Aporte / Resgatar / Atualizar valor)
+6. supabase/migrations/ → 1 arquivo SQL (4 tabelas + RLS + trigger + RPCs)
+
+================================================================================
+🚀 11. ESTRATÉGIA IMPLEMENTAÇÃO (VERSÕES FUTURAS — NÃO FAZER AGORA)
+================================================================================
+v1.9.0   Migration SQL + RLS + policies + trigger updated_at
+v1.9.1   Interfaces TypeScript (src/types/index.ts)
+v1.9.2   Nova aba INVESTIMENTOS no Drawer (rota placeholder "Em breve")
+v1.9.3   Hero 4 cards (StatsHeader adaptado)
+v1.9.4   Cadastrar investimento (Modal + INSERT + lista básica)
+v1.9.5   Editar / Excluir / Cards expand
+v1.9.6   Registrar Aporte (RPC safe transaction + histórico calculado)
+v1.9.7   Registrar Retirada (auto status RESGATADO)
+v1.9.8   Histórico valor manual + curva rentabilidade
+v1.9.9   Filtros (tipoRenda / status / busca nome)
+v2.0.0   Integração Hero Financeiro, release estável final
+
+================================================================================
+FIM DA ETAPA 1 — ANÁLISE. NADA IMPLEMENTADO ALÉM DESTE ARQUIVO.
+================================================================================

@@ -20,6 +20,11 @@ interface TransactionModalProps {
   creditCards?: CreditCard[];
   onInvoiceTransactionSaved?: (cartaoId: string, mesAnoAlocacao: string) => void;
   defaultType?: TransactionType;
+  // ============ NOVOS DEFAULTS (v1.8.5: Aba Cartoes Lançamento Manual) ============
+  // Usado quando usuario clica em "+ Lancar" do cartao ou FAB da aba Cartoes de Credito.
+  defaultFormaPagamento?: 'CONTA' | 'CARTAO';
+  defaultCartaoId?: string;
+  defaultStatus?: TransactionStatus;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -35,7 +40,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   accounts = [],
   creditCards = [],
   onInvoiceTransactionSaved,
-  defaultType
+  defaultType,
+  defaultFormaPagamento, // NOVO v1.8.5
+  defaultCartaoId,       // NOVO v1.8.5
+  defaultStatus,         // NOVO v1.8.5
 }) => {
   const [tipo, setTipo] = useState<TransactionType>('SAIDA');
 
@@ -145,7 +153,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setValor('');
       const today = new Date().toISOString().split('T')[0];
       setData(today);
-      setStatus('PENDENTE');
+      // Status default: prioriza defaultStatus (ex: POSTERGAR para cartao de credito, pois nao paga na hora)
+      setStatus(defaultStatus || 'PENDENTE');
       setDataPostergar('');
       setJuros('');
       setContaId(accounts[0]?.id || '');
@@ -160,6 +169,19 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setNewCategoryName('');
       setShowSaveScopeDialog(false);
       setShowDeleteScopeDialog(false);
+      // ============ Cartao de Credito DEFAULTS (v1.8.5) ============
+      // Se veio da aba Cartoes [+ Lancar] ou FAB cartoes:
+      // formaPagamento = CARTAO, cartaoId = selecionado.
+      // Caso nao tenha nada, cai em CONTA (padrao retrocompatibilidade).
+      if (defaultFormaPagamento === 'CARTAO') {
+        setFormaPagamento('CARTAO');
+        // Valida que defaultCartaoId EXISTE mesmo no array (evitar valor bug)
+        const cartaoExiste = defaultCartaoId && creditCards.some(c => c.id === defaultCartaoId);
+        setCartaoId(cartaoExiste ? defaultCartaoId! : (creditCards[0]?.id || ''));
+      } else {
+        setFormaPagamento('CONTA');
+        setCartaoId('');
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingTransaction, isOpen, accounts]);

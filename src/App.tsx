@@ -127,6 +127,12 @@ function App() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('SAIDA');
+  // ===== NOVOS (v1.8.5: Aba Cartoes Lançamento Manual de Despesa) =====
+  // Usados para passar defaults pro TransactionModal quando usuario clica
+  // no FAB da aba Cartoes ou no botao [+ Lancar] do card do cartao.
+  const [modalDefaultFormaPagamento, setModalDefaultFormaPagamento] = useState<'CONTA' | 'CARTAO'>('CONTA');
+  const [modalDefaultCartaoId, setModalDefaultCartaoId] = useState<string>('');
+  const [modalDefaultStatus, setModalDefaultStatus] = useState<TransactionStatus | undefined>(undefined);
   const [settingsAvatarUrl, setSettingsAvatarUrl] = useState<string | null>(null);
 
   // ============================================================
@@ -405,6 +411,29 @@ function App() {
   const openModalForType = (tipo: 'ENTRADA' | 'SAIDA') => {
     setEditingTransaction(null);
     setModalDefaultType(tipo);
+    // Reseta defaults de cartao (abriu por Dashboard geral, nao aba cartoes)
+    setModalDefaultFormaPagamento('CONTA');
+    setModalDefaultCartaoId('');
+    setModalDefaultStatus(undefined);
+    setIsModalOpen(true);
+  };
+
+  // ============================================================
+  // NOVA FUNCAO (v1.8.5): Lancar DESPESA MANUAL no Cartao de Credito
+  // Chamada quando usuario clica no FAB da aba Cartoes ou no botao
+  // [+ Lancar] do card individual do cartao.
+  // Parametro card opcional: se vier, preenche o cartao selecionado.
+  // Se nao vier (FAB geral), deixa o usuario escolher no modal.
+  // ============================================================
+  const handleAddManualExpenseCartao = (card?: CreditCard) => {
+    setEditingTransaction(null);
+    setModalDefaultType('SAIDA');
+    // Forca forma de pagamento = CARTAO (usuario pediu lancamento em cartao!)
+    setModalDefaultFormaPagamento('CARTAO');
+    setModalDefaultCartaoId(card ? card.id : '');
+    // Status default = POSTERGAR (pois compra em cartao NAO E PAGA NA HORA!
+    // Vai para a fatura do mes seguinte, usuario paga depois.)
+    setModalDefaultStatus('POSTERGAR');
     setIsModalOpen(true);
   };
 
@@ -4188,6 +4217,7 @@ function App() {
                   setPdfImportCartaoId(creditCards[0]?.id || defaultSampleCards[0]?.id || '');
                   setIsPdfImportOpen(true);
                 }}
+                onAddManualExpense={handleAddManualExpenseCartao}
               />
             ) : (
               <>
@@ -4418,6 +4448,9 @@ function App() {
         accounts={accounts}
         creditCards={creditCards}
         defaultType={modalDefaultType}
+        defaultFormaPagamento={modalDefaultFormaPagamento}
+        defaultCartaoId={modalDefaultCartaoId}
+        defaultStatus={modalDefaultStatus}
         onInvoiceTransactionSaved={(cartaoId, mesAno) => {
           const card = creditCards.find((c) => c.id === cartaoId);
           if (!card) return;

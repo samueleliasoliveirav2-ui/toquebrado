@@ -61,6 +61,11 @@ interface CreditCardsDashboardProps {
     invoice: CreditCardInvoice
   ) => void;
   onImportPdfInvoice?: () => void;
+  // ===== NOVO (v1.8.5): Lancamento MANUAL de despesa no cartao =======
+  // Chamado quando usuario clica no FAB geral ou no botao [+ Lancar] do card.
+  // Parametro card opcional: se vier do botao do card, passa o cartao para
+  // o TransactionModal preencher automaticamente formaPagamento=CARTAO.
+  onAddManualExpense?: (card?: CreditCardType) => void;
 }
 
 export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
@@ -75,7 +80,8 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
   onEditCard,
   onViewInvoice,
   onPayInvoice,
-  onImportPdfInvoice
+  onImportPdfInvoice,
+  onAddManualExpense // NOVO v1.8.5: callback lancamento manual
 }) => {
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -504,7 +510,7 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-1.5 pt-1">
+                    <div className="grid grid-cols-4 gap-1.5 pt-1">
                       <button
                         onClick={() => onViewInvoice(card)}
                         className="flex items-center justify-center gap-1 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition-all cursor-pointer"
@@ -531,6 +537,20 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
                         <Edit2 size={11} />
                         Editar
                       </button>
+                      {/* ======== NOVO BOTAO 4: [+ Lancar] despesa no cartao (v1.8.5) ======== */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (typeof onAddManualExpense === 'function') {
+                            onAddManualExpense(card);
+                          }
+                        }}
+                        className="flex items-center justify-center gap-1 py-2 rounded-lg bg-amber-400/15 hover:bg-amber-400/30 text-amber-700 border border-amber-300/30 text-[10px] font-bold transition-all cursor-pointer active:scale-95"
+                        title="Lançar despesa manual neste cartão"
+                      >
+                        <Plus size={11} className="stroke-[2.8]" />
+                        Lançar
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -541,6 +561,22 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
       </div>
 
       </div>
+
+      {/* ================================================================
+           FAB (FLOATING ACTION BUTTON) LARANJA — LANCAR DESPESA MANUAL
+           Padrão igual Dashboard (botão + no canto inferior direito)!
+           v1.8.5: Usuário pediu LANÇAMENTO MANUAL na aba cartoes (nao tinha opcao!)
+          ================================================================ */}
+      {typeof onAddManualExpense === 'function' && (
+        <button
+          onClick={() => onAddManualExpense(undefined)}
+          className="fixed bottom-6 right-5 z-30 w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 active:scale-95 transition-all shadow-[0_12px_30px_-8px_rgba(251,146,60,0.65)] border border-orange-400/50 text-white flex items-center justify-center cursor-pointer group"
+          title="Lançar despesa manual no cartão (sem precisar importar PDF)"
+        >
+          <Plus size={28} className="stroke-[3] group-hover:rotate-90 transition-transform duration-200" />
+        </button>
+      )}
+
     </div>
   );
 };
