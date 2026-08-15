@@ -209,6 +209,22 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   }, [tipo]);
 
+  // =============== v1.8.6 BUG FIX CARTAO ===============
+  // Sempre que usuario ALTERAR FORMA DE PAGAMENTO:
+  //  → CARTAO: apaga contaId (nunca debita da conta!) e fixa status=POSTERGAR
+  //  → CONTA/DINHEIRO: volta contaId para conta padrao (primeira disponivel)
+  useEffect(() => {
+    if (!isOpen || editingTransaction) return; // nao aplica se for edicao
+    if (formaPagamento === 'CARTAO') {
+      setContaId('');
+      setStatus('POSTERGAR');
+      setDataPostergar('');
+    } else if (formaPagamento === 'CONTA' && !contaId && accounts.length > 0) {
+      // Voltou para CONTA: preenche conta padrao se nao tem nenhuma
+      setContaId(accounts[0]?.id || '');
+    }
+  }, [formaPagamento, isOpen, editingTransaction, accounts, contaId]);
+
   if (!isOpen) return null;
 
   const calcularMesAlocacaoFatura = (dataRef: string, card: CreditCard): string => {
@@ -270,9 +286,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       subcategory: finalSubcategory,
       valor: Number(valor),
       data,
-      status,
-      dataPostergar: status === 'POSTERGAR' ? dataPostergar : undefined,
+      // ============ v1.8.6 BUG FIX: Cartao NAO TEM status individual!
+      // Despesa de cartao SEMPRE eh alocada na FATURA (status nao tem PAGO/PENDENTE).
+      // O pagamento real acontece depois no pagamento da FATURA (outra transacao).
+      status: usaCartao ? 'POSTERGAR' : status,
+      dataPostergar: usaCartao
+        ? undefined
+        : (status === 'POSTERGAR' ? dataPostergar : undefined),
       juros: tipo === 'SAIDA' && juros !== '' ? Number(juros) : undefined,
+      // ============ v1.8.6 BUG FIX: Cartao SEM NULO contaId!
+      // Nunca pode debitar da conta. A conta soh eh debitada na hora de PAGAR A FATURA.
       contaId: usaCartao ? undefined : (contaId || undefined),
       frequencia,
       periodicidade: frequencia === 'RECORRENTE' ? periodicidade : undefined,
@@ -292,10 +315,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     if (!descricao.trim()) return alert('Insira uma descrição');
     if (!valor || Number(valor) <= 0) return alert('Insira um valor maior que zero');
     if (!data) return alert('Selecione uma data');
-    if (status === 'POSTERGAR' && !dataPostergar) {
+    const usaCartao = tipo === 'SAIDA' && formaPagamento === 'CARTAO';
+    // v1.8.6: Se for CARTAO, NAO VALIDAMOS status/dataPostergar (cartao sempre cai na fatura)
+    if (!usaCartao && status === 'POSTERGAR' && !dataPostergar) {
       return alert('Informe a data de postergação');
     }
-    const usaCartao = tipo === 'SAIDA' && formaPagamento === 'CARTAO';
     if (!usaCartao && !contaId && accounts.length > 0) {
       return alert('Selecione uma conta ou carteira para esta movimentação');
     }
@@ -824,6 +848,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           )}
 
           {/* Status Selection */}
+          {/* v1.8.6 BUG FIX: DESPESA DE CARTAO NAO TEM STATUS INDIVIDUAL! */}
+          {/* A despesa do cartão sempre vai para a FATURA, e o que tem status é */}
+          {/* o PAGAMENTO DA FATURA (quando você paga a fatura aí sim é outra transação CONTA). */}
+          {/* Por isso ESCODEMOS os pills Pendente/Pago/Postergar se formaPagamento for CARTAO. */}
+          {formaPagamento !== 'CARTAO' && (
           <div>
             <label className="block text-slate-500 text-xs font-bold uppercase mb-1.5">Status</label>
             <div className="grid grid-cols-3 gap-2">
@@ -878,9 +907,22 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </button>
             </div>
           </div>
+          )}
 
-          {/* Conditional Input: Postergar Date */}
-          {status === 'POSTERGAR' && (
+          {/* v1.8.6: Aviso AMIGAVEL quando for CARTAO → usuario entende pq nao tem status */}
+          {formaPagamento === 'CARTAO' && (
+            <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-xl animate-fade-in shadow-2xs">
+              <div className="flex items-start gap-2 text-[11px] leading-tight text-amber-800 font-medium">
+                <CreditCardIcon size={14} className="mt-0.5 shrink-0 text-amber-600" />
+                <div>
+                  <span className="font-extrabold">Despesa de cartão:</span> esse lançamento já vai direto para a <span className="font-extrabold">fatura do mês</span> (não debita da sua conta agora!). O pagamento real acontece quando você pagar a fatura.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Conditional Input: Postergar Date (apenas NAO-CARTAO) */}
+          {formaPagamento !== 'CARTAO' && status === 'POSTERGAR' && (
             <div className="bg-sky-50 border border-sky-100 p-3.5 rounded-xl space-y-1.5 animate-fade-in shadow-2xs">
               <label className="block text-sky-700 text-xs font-bold uppercase">Nova Data de Vencimento</label>
               <input

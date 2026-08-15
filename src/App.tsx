@@ -1134,7 +1134,12 @@ function App() {
   // INCLUI workShifts (Diárias/Trabalhos):
   //  + WorkShift ENTRADA status === "RECEBIDO" (saldo real)
   //  - WorkShift SAIDA (custos de rua, saída sempre confirmada, nao tem status pendente)
+  // =============== v1.8.6 BUG FIX CARTAO ===============
+  // TRANSACOES DE CARTAO (tx.cartaoId) NUNCA DEVEM ENTRAR NO SALDO DA CONTA!
+  // A compra no cartão so gera divida pro banco, DINHEIRO NAO SAI DA CONTA.
+  // O dinheiro só sai QUANDO VOCE PAGA A FATURA (outra transacao SAIDA em CONTA, sem cartaoId).
   const saldoAcumulado = transactions.reduce((sum, tx) => {
+    if (tx.cartaoId) return sum; // Ignora TUDO que for cartao no saldo liquido
     if (tx.tipo === 'ENTRADA' && tx.status === 'RECEBIDO') {
       return sum + tx.valor;
     } else if (tx.tipo === 'SAIDA' && tx.status === 'PAGO') {
@@ -1143,11 +1148,9 @@ function App() {
     return sum;
   }, 0) + workShifts.reduce((sum, ws) => {
     if (ws.tipo === 'ENTRADA' && (ws.status === 'RECEBIDO' || !ws.status)) {
-      // RECEBIDO ou sem status (antigos default RECEBIDO)
       return sum + ws.valor;
     }
     if (ws.tipo === 'SAIDA') {
-      // WorkShift SAIDA = custo rua sempre pago (nao tem status)
       return sum - ws.valor;
     }
     return sum;
@@ -1156,14 +1159,19 @@ function App() {
   // Projected Income this month (All ENTRADAs in selected month)
   // INCLUI workShifts ENTRADA (qualquer status: RECEBIDO + A_RECEBER = projetado, igual transacoes pessoais)
   const totalEntradasMes = (
-    monthTransactions.filter(tx => tx.tipo === 'ENTRADA').reduce((sum, tx) => sum + tx.valor, 0)
+    monthTransactions.filter(tx => !tx.cartaoId && tx.tipo === 'ENTRADA').reduce((sum, tx) => sum + tx.valor, 0)
     + monthWorkShifts.filter(ws => ws.tipo === 'ENTRADA').reduce((sum, ws) => sum + ws.valor, 0)
   );
 
   // Projected Expenses this month (All SAIDAs in selected month + their juros)
   // INCLUI workShifts SAIDA (custos de rua, sempre do mes selecionado, sem juros)
+  // =============== v1.8.6 BUG FIX CARTAO ===============
+  // RETIRAMOS do totalSaidasMes os gastos de CARTAO (cartaoId existe)!
+  // Porque gasto de cartao NAO E SAIDA DE DINHEIRO DA CONTA (e divida, pagamento depois).
+  // A SAIDA REAL so aparece AQUI QUANDO A PAGAMENTO DA FATURA E LANCADO (transacao CONTA, sem cartaoId).
+  // Isso resolve o bug "lancamento cartao estava debitando na conta principal"
   const totalSaidasMes = (
-    monthTransactions.filter(tx => tx.tipo === 'SAIDA').reduce((sum, tx) => sum + tx.valor + (tx.juros || 0), 0)
+    monthTransactions.filter(tx => !tx.cartaoId && tx.tipo === 'SAIDA').reduce((sum, tx) => sum + tx.valor + (tx.juros || 0), 0)
     + monthWorkShifts.filter(ws => ws.tipo === 'SAIDA').reduce((sum, ws) => sum + ws.valor, 0)
   );
 
@@ -1585,7 +1593,10 @@ function App() {
           status: payload.status,
           data_postergar: payload.dataPostergar || null,
           juros: payload.juros || 0,
-          conta_id: payload.contaId || null,
+          // =============== v1.8.6 BUG FIX CARTAO ===============
+          // Se é transação de CARTÃO (cartaoId existe), CONTA_ID DEVE SER NULL!
+          // Não pode debitar da conta. A conta só é debitada quando PAGA a FATURA.
+          conta_id: payload.cartaoId ? null : (payload.contaId || null),
           frequencia: payload.frequencia || 'AVULSO',
           periodicidade: payload.periodicidade || null,
           parcela_atual: payload.parcelaAtual || null,
@@ -1675,7 +1686,9 @@ function App() {
           status: payload.status,
           data_postergar: payload.dataPostergar || null,
           juros: payload.juros || 0,
-          conta_id: payload.contaId || null,
+          // =============== v1.8.6 BUG FIX CARTAO ===============
+          // Se é CARTÃO, conta_id SEMPRE NULL. A conta só paga a FATURA depois.
+          conta_id: payload.cartaoId ? null : (payload.contaId || null),
           frequencia: 'AVULSO',
           periodicidade: null,
           parcela_atual: null,
@@ -1724,10 +1737,13 @@ function App() {
             categoria: payload.categoria,
             tipo: payload.tipo,
             valor: payload.valor,
-            status: statusInicial,
-            data_postergar: i === 0 ? (payload.dataPostergar || null) : null,
+            // =============== v1.8.6 BUG FIX CARTAO: Recorrente tambem sem status individual
+            status: payload.cartaoId ? 'POSTERGAR' : statusInicial,
+            data_postergar: payload.cartaoId ? null : (i === 0 ? (payload.dataPostergar || null) : null),
             juros: i === 0 ? (payload.juros || 0) : 0,
-            conta_id: payload.contaId || null,
+            // =============== v1.8.6 BUG FIX CARTAO ===============
+            // Se CARTÃO, conta_id NULL sempre!
+            conta_id: payload.cartaoId ? null : (payload.contaId || null),
             frequencia: 'RECORRENTE',
             periodicidade,
             parcela_atual: null,
@@ -1781,10 +1797,13 @@ function App() {
             categoria: payload.categoria,
             tipo: payload.tipo,
             valor: valorParcela,
-            status: statusInicial,
-            data_postergar: i === 1 ? (payload.dataPostergar || null) : null,
+            // =============== v1.8.6 BUG FIX CARTAO: Parcelado tambem sem status individual
+            status: payload.cartaoId ? 'POSTERGAR' : statusInicial,
+            data_postergar: payload.cartaoId ? null : (i === 1 ? (payload.dataPostergar || null) : null),
             juros: i === 1 ? (payload.juros || 0) : 0,
-            conta_id: payload.contaId || null,
+            // =============== v1.8.6 BUG FIX CARTAO ===============
+            // Se CARTÃO, conta_id NULL sempre!
+            conta_id: payload.cartaoId ? null : (payload.contaId || null),
             frequencia: 'PARCELADO',
             periodicidade: null,
             parcela_atual: i,
