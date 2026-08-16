@@ -211,13 +211,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   // =============== v1.8.6 BUG FIX CARTAO ===============
   // Sempre que usuario ALTERAR FORMA DE PAGAMENTO:
-  //  → CARTAO: apaga contaId (nunca debita da conta!) e fixa status=POSTERGAR
+  //  → CARTAO: apaga contaId (nunca debita da conta!) e fixa status=PENDENTE
+  //    (v1.8.8: Usuario pediu PENDENTE, nao POSTERGAR, ateh pagar fatura)
   //  → CONTA/DINHEIRO: volta contaId para conta padrao (primeira disponivel)
   useEffect(() => {
     if (!isOpen || editingTransaction) return; // nao aplica se for edicao
     if (formaPagamento === 'CARTAO') {
       setContaId('');
-      setStatus('POSTERGAR');
+      setStatus('PENDENTE');
       setDataPostergar('');
     } else if (formaPagamento === 'CONTA' && !contaId && accounts.length > 0) {
       // Voltou para CONTA: preenche conta padrao se nao tem nenhuma
@@ -286,10 +287,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       subcategory: finalSubcategory,
       valor: Number(valor),
       data,
-      // ============ v1.8.6 BUG FIX: Cartao NAO TEM status individual!
-      // Despesa de cartao SEMPRE eh alocada na FATURA (status nao tem PAGO/PENDENTE).
-      // O pagamento real acontece depois no pagamento da FATURA (outra transacao).
-      status: usaCartao ? 'POSTERGAR' : status,
+      // ============ v1.8.8 BUG FIX: Status cartao eh PENDENTE (nao POSTERGAR!)
+      // Usuario pediu: lancamento de cartao = PENDENTE ateh confirmar pagamento da fatura.
+      // (Anteriormente estava forçando POSTERGAR, usuario reclamou do badge "POSTERGADO")
+      status: usaCartao ? 'PENDENTE' : status,
       dataPostergar: usaCartao
         ? undefined
         : (status === 'POSTERGAR' ? dataPostergar : undefined),

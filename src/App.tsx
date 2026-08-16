@@ -431,9 +431,10 @@ function App() {
     // Forca forma de pagamento = CARTAO (usuario pediu lancamento em cartao!)
     setModalDefaultFormaPagamento('CARTAO');
     setModalDefaultCartaoId(card ? card.id : '');
-    // Status default = POSTERGAR (pois compra em cartao NAO E PAGA NA HORA!
-    // Vai para a fatura do mes seguinte, usuario paga depois.)
-    setModalDefaultStatus('POSTERGAR');
+    // =============== v1.8.8 BUG FIX: Status PENDENTE (nao POSTERGAR!)
+    // Usuario reclamou que status estava POSTERGADO.
+    // Padrao: PENDENTE ateh usuario confirmar PAGAMENTO DA FATURA!
+    setModalDefaultStatus('PENDENTE');
     setIsModalOpen(true);
   };
 
@@ -1119,7 +1120,17 @@ function App() {
   };
 
   // Filtered month transactions (com projeção de parcelas e recorrentes)
-  const monthTransactions = transactions.filter(tx => caiNoMesSelecionado(tx, selectedMonth));
+  // =============== v1.8.8 BUG FIX (Agrupamento Cartao Dashboard) ===============
+  // TRANSACOES DE CARTAO INDIVIDUAIS (tx.cartaoId existe) NAO APARECEM NA LISTA SEMANAL!
+  // Motivo: Usuario reclamou que lancamentos de cartao apareciam DESAGRUPADOS (soltos)
+  // no Dashboard (ex: "Supermercado 12,48 POSTERGADO", "Supermercado 30,35 POSTERGADO" etc)
+  // poluindo a lista semanal.
+  // - Compras individuais do cartao JA aparecem NA ABA "CARTOES" agrupadas por cartao/fatura.
+  // - O que aparece no Dashboard (Home) é apenas o PAGAMENTO REAL da fatura
+  //   (transacao handlePayInvoice linha 2704-2713 que NAO TEM cartaoId, tem contaId = conta bancaria debitada!)
+  // Isso deixa a lista semanal LIMPA e 100% consistente com os cards de totalizador
+  // (que ja tinham esse filtro desde v1.8.6).
+  const monthTransactions = transactions.filter(tx => !tx.cartaoId && caiNoMesSelecionado(tx, selectedMonth));
 
   // Filtered month work shifts (usa dataRecebimento como vencimento + projeção parcelas)
   const monthWorkShifts = workShifts.filter(e => caiWorkShiftNoMes(e, selectedMonth));
@@ -1791,8 +1802,8 @@ function App() {
             categoria: payload.categoria,
             tipo: payload.tipo,
             valor: payload.valor,
-            // =============== v1.8.6 BUG FIX CARTAO: Recorrente tambem sem status individual
-            status: payload.cartaoId ? 'POSTERGAR' : statusInicial,
+            // =============== v1.8.8 BUG FIX: Recorrente cartao = PENDENTE (nao POSTERGAR!)
+            status: payload.cartaoId ? 'PENDENTE' : statusInicial,
             data_postergar: payload.cartaoId ? null : (i === 0 ? (payload.dataPostergar || null) : null),
             juros: i === 0 ? (payload.juros || 0) : 0,
             // =============== v1.8.6 BUG FIX CARTAO ===============
@@ -1851,8 +1862,8 @@ function App() {
             categoria: payload.categoria,
             tipo: payload.tipo,
             valor: valorParcela,
-            // =============== v1.8.6 BUG FIX CARTAO: Parcelado tambem sem status individual
-            status: payload.cartaoId ? 'POSTERGAR' : statusInicial,
+            // =============== v1.8.8 BUG FIX: Parcelado cartao = PENDENTE (nao POSTERGAR!)
+            status: payload.cartaoId ? 'PENDENTE' : statusInicial,
             data_postergar: payload.cartaoId ? null : (i === 1 ? (payload.dataPostergar || null) : null),
             juros: i === 1 ? (payload.juros || 0) : 0,
             // =============== v1.8.6 BUG FIX CARTAO ===============
@@ -2711,6 +2722,27 @@ function App() {
         contaId: accountId
       };
       await handleSaveTransaction(despesa);
+
+      // =============== v1.8.8 BUG FIX (Status compras cartao) ===============
+      // Quando usuario CONFIRMA O PAGAMENTO DA FATURA, ATUALIZAMOS tambem
+      // TODAS as compras INDIVIDUAIS do cartao naquela fatura (status PENDENTE → PAGO).
+      // Isso deixa a ABA "CARTOES" (fatura detalhada) 100% consistente com o pagamento real!
+      // (Antes, as compras individuais ficavam PENDENTES/POSTERGADAS para sempre,
+      //  mesmo apos usuario ter pago a fatura.)
+      try {
+        const idsCompraCartaoFatura: string[] = transactions
+          .filter(tx => tx.faturaId === invoiceId && tx.tipo === 'SAIDA' && tx.cartaoId === card.id)
+          .map(tx => tx.id);
+        if (idsCompraCartaoFatura.length > 0) {
+          const { error: errUpdTxs } = await supabase
+            .from('transactions')
+            .update({ status: 'PAGO' })
+            .in('id', idsCompraCartaoFatura);
+          if (errUpdTxs) throw errUpdTxs;
+        }
+      } catch (err: any) {
+        console.error('Error updating cartao individual txs status to PAGO (after invoice pay):', err);
+      }
 
       await fetchCreditCardInvoices();
       await fetchTransactions();
