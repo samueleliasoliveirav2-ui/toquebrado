@@ -1020,31 +1020,85 @@ function App() {
 
   const selectedMonthLabel = months.find(m => m.key === selectedMonth)?.label ?? formatarMesLabel(selectedMonth);
 
+  // ================================================================
+  // v1.8.7 NOVA FUNCAO AUXILIAR: Mes de ALOCACAO na FATURA do cartao
+  // ================================================================
+  // Regra de negocio do cartao de credito:
+  //  → Compra ANTES do diaFechamento (inclusive dia fechamento? Vamos usar >= como estava antes = igual TransactionModal)
+  //    → Vai para PROXIMA fatura (mes++)
+  //  → Compra ANTES do diaFechamento → Fatura MES ATUAL
+  // Essa funcao e USADA NO LUGAR DE tx.data.slice(0,7) para FILTRAR LANÇAMENTO DE CARTAO
+  // no Dashboard / totalizadores / listagem semanal.
+  // Resolve BUG: "Lancamento apos fechamento entrava no mes vigente (mes errado), nao na proxima fatura."
+  const calcularMesAlocacaoFatura = (dataRef: string, cc: CreditCard | undefined): string | null => {
+    if (!cc) return null;
+    if (!dataRef || dataRef.length < 10) return null;
+    try {
+      const d = new Date(dataRef + 'T12:00:00');
+      if (isNaN(d.getTime())) return null;
+      const dia = d.getDate();
+      let mes = d.getMonth();
+      let ano = d.getFullYear();
+      if (dia >= cc.diaFechamento) {
+        mes++;
+        if (mes > 11) { mes = 0; ano++; }
+      }
+      return `${ano}-${String(mes + 1).padStart(2, '0')}`;
+    } catch {
+      return null;
+    }
+  };
+
   // ===== Projeção de lançamentos: Avulso (exato) | Parcelado | Recorrente =====
   // Devolve true se a transação cai (ou tem parcela prevista) no mês selecionado
   // Usa data de vencimento/postergar como PRIORIDADE sobre data do evento
   const caiNoMesSelecionado = (tx: Transaction, mesAnoSel: string): boolean => {
-    const activeDate = (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data;
-    const mesAnoTx = activeDate.slice(0, 7);
-
     const freq = (tx.frequencia || 'AVULSO').toUpperCase();
 
-    // === AVULSO: somente se data exata bater ===
+    // ================================================================
+    // v1.8.7 BUG FIX: LANCAMENTO DE CARTAO USA MES DE ALOCACAO DA FATURA
+    // ================================================================
+    // Se a transacao TEM cartaoId (foi pago no cartao), NAO USAMOS tx.data!
+    // Calculamos o MES DA FATURA onde esse lancamento vai aparecer,
+    // usando a regra diaFechamento (>= fecha: proxima fatura / < fecha: atual).
+    const ehCartao = !!tx.cartaoId;
+    const cartaoTx = ehCartao ? creditCards.find(c => c.id === tx.cartaoId) : undefined;
+    let mesAnoTx: string; // Mes que usaremos para decidir em qual mes do dashboard cai
+
+    if (ehCartao && cartaoTx) {
+      // Data preferencial p/ calcular alocacao = dataCompra (data real da compra)
+      // se nao tiver (antigos), usa tx.data mesmo (fallback seguro)
+      const dataCompraRef = tx.dataCompra || tx.data;
+      const mesAloc = calcularMesAlocacaoFatura(dataCompraRef, cartaoTx);
+      mesAnoTx = mesAloc ?? (tx.status === 'POSTERGAR' && tx.dataPostergar ? tx.dataPostergar.slice(0, 7) : tx.data.slice(0, 7));
+    } else {
+      // NAO cartao → regra antiga, normal (prioridade: postergar > data)
+      const activeDate = (tx.status === 'POSTERGAR' && tx.dataPostergar) ? tx.dataPostergar : tx.data;
+      mesAnoTx = activeDate.slice(0, 7);
+    }
+
+    // ==========================
+    // AVULSO (lancamento unico)
+    // ==========================
     if (freq === 'AVULSO') return mesAnoTx === mesAnoSel;
 
-    // === PARCELADO: 1ª parcela = mesAnoTx; última = +(totalParcelas-1) meses ===
+    // ==========================
+    // PARCELADO
+    // ==========================
     if (freq === 'PARCELADO') {
       const total = Number(tx.totalParcelas) || Number(tx.parcelaAtual) || 1;
       if (total <= 1) return mesAnoTx === mesAnoSel;
-      const mesInicio = activeDate.slice(0, 7);
+      // mesInicio = mes da PRIMEIRA parcela
+      const mesInicio = mesAnoTx;
       const mesFim = addMeses(mesInicio, total - 1);
-      // Comparação alfabética funciona em YYYY-MM
       return mesAnoSel >= mesInicio && mesAnoSel <= mesFim;
     }
 
-    // === RECORRENTE: todo mês a partir da data inicial (sem limite no futuro) ===
+    // ==========================
+    // RECORRENTE (todo mes sem fim)
+    // ==========================
     if (freq === 'RECORRENTE' || freq === 'RECORRENCIA') {
-      const mesInicio = activeDate.slice(0, 7);
+      const mesInicio = mesAnoTx;
       return mesAnoSel >= mesInicio;
     }
 
