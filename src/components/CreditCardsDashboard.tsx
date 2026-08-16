@@ -71,6 +71,7 @@ interface CreditCardsDashboardProps {
 export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
   cards,
   invoices,
+  _transactions, // v1.9.0: FINALMENTE usando essa prop. Era recebida mas nunca desestruturada!
   selectedMonth,
   months,
   onMonthChange,
@@ -99,13 +100,35 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
     0
   );
 
+  // ================ v1.9.0 BUG FIX (Limite cartao NAO DIMINUIA!) ================
+  // FUNCAO AUXILIAR NOVAAAA: QUANTO JA GASTEI TOTAL NO CARTAO (em TEMPO REAL,
+  //                           pegando todas transacoes do array _transactions!)
+  // - Nao depende de selectedMonth (mes que o usuario ta vendo)
+  // - Nao depende de existir fatura cadastrada no banco (invoice.valorTotal)
+  // - Nao depende de recalcInvoiceTotals ter sido finalizado (async)
+  //
+  // Regra: Soma TODO valor de transacao SAIDA que tem cartaoId = este cartao
+  // (qualquer mes, qualquer status, qualquer frequencia: avulso, parcelado, recorrente)
+  //
+  // ANTERIORMENTE (bug): usavamos invoice.valorTotal da fatura do selectedMonth.
+  // Resultado: se usuario estava vendo mes agosto e lancava compra dia 15/08
+  // (que cai na fatura de setembro, depois do fechamento) → nao achava a invoice
+  // de agosto → valorFatura=0 → limite NUNCA abaixava!
+  const calcularTotalGastoNoCartao = (cardId: string): number => {
+    if (!_transactions || _transactions.length === 0) return 0;
+    return _transactions.reduce((acc, tx) => {
+      if (tx.tipo !== 'SAIDA') return acc;
+      if (tx.cartaoId !== cardId) return acc;
+      return acc + Number(tx.valor || 0);
+    }, 0);
+  };
+
+  // Total LIMITE DISPONIVEL = limiteTotal - totalGasto (agora em tempo real!)
   const totalLimiteDisponivel = cards.reduce((sum, card) => {
-    const invoiceAberta = invoices.find(
-      (inv) => inv.cartaoId === card.id && inv.mesAno === selectedMonth &&
-        (resolvedInvoiceStatus(inv) === 'ABERTA' || resolvedInvoiceStatus(inv) === 'FECHADA')
-    );
-    const usado = invoiceAberta ? Number(invoiceAberta.valorTotal) : 0;
-    return sum + (Number(card.limiteTotal) - usado);
+    const usado = calcularTotalGastoNoCartao(card.id);
+    const limite = Number(card.limiteTotal);
+    const disponivel = Math.max(0, limite - usado);
+    return sum + disponivel;
   }, 0);
 
   const totalFaturaAtual = invoices
@@ -381,11 +404,19 @@ export const CreditCardsDashboard: React.FC<CreditCardsDashboardProps> = ({
         ) : (
           <div className="space-y-4">
             {cards.map((card) => {
-              const invoice = getInvoiceForCard(card.id);
-              const valorFatura = invoice ? Number(invoice.valorTotal) : 0;
+              const invoice = getInvoiceForCard(card.id); // Mantemos invoice para STATUS e VER FATURA (botao).
+
+              // ================ v1.9.0 BUG FIX (Limite cartao NAO DIMINUIA!) ================
+              // Valor usado do cartao calculado EM TEMPO REAL (transacoes), NAO depende mais
+              // de invoice.valorTotal (que estava olhando apenas fatura do selectedMonth).
+              // Isso resolve: compra apos fechamento que ia para proxima fatura,
+              // o limite nao abaixava pois nao havia invoice do proximo mes aqui.
+              const totalGastoNoCartao = calcularTotalGastoNoCartao(card.id);
+              const limiteTotal = Number(card.limiteTotal);
+              const valorFatura = totalGastoNoCartao; // <- Trocado!
               const limiteUsadoPct = Math.min(
                 100,
-                (valorFatura / Number(card.limiteTotal)) * 100
+                limiteTotal > 0 ? (valorFatura / limiteTotal) * 100 : 0
               );
               const bandeira = getBandeiraDisplay(card.bandeira);
               const invoiceResolvedStatus = invoice ? resolvedInvoiceStatus(invoice) : null;
