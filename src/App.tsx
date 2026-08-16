@@ -1188,11 +1188,93 @@ function App() {
     (txLike as any)._workShiftId = ws.id;
     return txLike;
   });
-  // Array UNIFICADO (transactions pessoais + workShifts convertidos) —
+
+  // ============================================================
+  // v1.8.9 NOVO: FATURAS DE CARTAO NO DASHBOARD (na SEMANA DO VENCIMENTO!)
+  // ============================================================
+  // O usuario reclamou que a fatura do cartao NAO APARECIA na lista semanal
+  // (aparecia so as compras individuais de cartao, que foram removidas na v1.8.8,
+  //  ou entao aparecia soh "Pagamento Fatura X" no DIA QUE PAGAVA, nao o dia do
+  // vencimento, que era o problema).
+  //
+  // SOLUCAO: Criamos um array de "transacoes FICTICIAS (APENAS PARA EXIBICAO!
+  //  - Pegamos TODAS faturas de cartao que tem vencimento NO MES SELECIONADO
+  //  - Colocamos ESEM SEMANA = invoice.dataVencimento (assim WeeklyAccordion coloca
+  //    na semana CORRETA do vencimento!)
+  //  - Status: PAGA se invoice ja foi paga, PENDENTE se ainda deve.
+  //  - Valor: valor RESTANTE (valorTotal - valorPago) = quanto ainda falta pagar
+  //  - Usamos flag _isInvoice booleana para identificar depois (e nao permitir
+  //    que o usuario clique em "editar/remover" transacao de fatura diretamente)
+  //  - Nao gravamos NADA no banco! E tudo convertido em tempo de render!
+  // ============================================================
+  const monthInvoicesAsTransaction: Transaction[] = creditCardInvoices
+    .filter((inv: CreditCardInvoice) => {
+      // =============== v1.8.9: REGRA DE EXIBICAO DA FATURA NO DASHBOARD ===============
+      // Motivo: Precisamos garantir que NUNCA aparecera DUPLICADO (fatura ficticia +
+      // transacao real "Pagamento Fatura X" que handleSaveTransaction salva no banco!)
+      //
+      // LOGICA:
+      // → Se a fatura ja esta PAGA (invStatus === 'PAGA'): REMOVEMOS a fatura ficticia!
+      //   Porque a transacao REAL (criada no handlePayInvoice) eh o que deve aparecer
+      //   no Dashboard (transacao PAGA da conta debitada). Ela tem SEM CARTaoId, entao
+      //   passa no filtro monthTransactions. E usamos data=invoice.dataVencimento.
+      // → Se a fatura NAO PAGA (ABERTA, FECHADA, ATRASADA, POSTERGADA, PARCIAL):
+      //   Incluimos a fatura ficticia, para aparecer na semana do vencimento.
+      if (!inv.dataVencimento || inv.dataVencimento.length < 7) return false;
+      const mesAnoVenc = inv.dataVencimento.slice(0, 7);
+      if (mesAnoVenc !== selectedMonth) return false;
+
+      const invStatus = computeInvoiceDerivedStatus(inv);
+      if (invStatus === 'PAGA') return false; // SEM PAGA! (para nao duplicar com transacao real)
+      return true;
+    })
+    .map((inv: CreditCardInvoice) => {
+      const card = creditCards.find(c => c.id === inv.cartaoId);
+      const valorPago = Number(inv.valorPago || 0);
+      const valorRestante = Math.max(0, Number(inv.valorTotal || 0) - valorPago);
+      const invStatus = computeInvoiceDerivedStatus(inv);
+      // Transacao de saida (fatura de cartao sempre saida)
+      let statusTx: TransactionStatus = 'PENDENTE';
+      if (invStatus === 'PAGA') statusTx = 'PAGO';
+      else if (invStatus === 'ATRASADA') statusTx = 'POSTERGAR'; // Atrasado = vermelho
+      else if (invStatus === 'POSTERGADA') statusTx = 'POSTERGAR';
+      // se ABERTA ou FECHADA ainda = PENDENTE (normal)
+
+      const valorASerExibido = (invStatus === 'PAGA') ? Number(inv.valorTotal || 0) : valorRestante;
+
+      const baseId = `inv__${inv.id}`;
+      const descricao = `💳 Fatura ${card?.nome || 'Cartao'} - ${inv.mesAno}`;
+      const txLike: Transaction & { _isInvoice?: boolean; _invoiceId?: string } = {
+        id: baseId,
+        data: inv.dataVencimento, // <- CHAVE PRINCIPAL! SEMANA DO VENCIMENTO!
+        descricao,
+        categoria: 'Fatura Cartão',
+        categoriaId: undefined,
+        subcategory: inv.mesAno,
+        tipo: 'SAIDA',
+        valor: Number(valorASerExibido.toFixed(2)),
+        status: statusTx,
+        juros: 0,
+        contaId: undefined, // fatura tem que pagar
+        cartaoId: undefined, // NAO tem cartaoId pois ja foi excluir da lista de excluir cartaoId! (NAO exclui do dashboard)
+        frequencia: 'AVULSO',
+        periodicidade: undefined,
+        parcelaAtual: undefined,
+        totalParcelas: undefined,
+        grupoRecorrenciaId: undefined,
+      } as any;
+      (txLike as any)._isInvoice = true;        // Marcaçao
+      (txLike as any)._invoiceId = inv.id;
+      (txLike as any)._invoiceMesAno = inv.mesAno;
+      return txLike;
+    });
+  // Array UNIFICADO (transactions pessoais + workShifts convertidos + FATURAS DE CARTAO) —
   // é este que entra em filtros (busca/tipo/status) E na listagem semanal.
+  // (Faturas aparecem SEMANA do seu vencimento!)
   const monthUnifiedTransactions: Transaction[] = [
     ...monthTransactions,
     ...monthWorkShiftsAsTransaction,
+    ...monthInvoicesAsTransaction, // <
   ];
 
   // Cumulative Balance (All-time actual liquid: RECEIVED entries - PAID exits)
@@ -2712,13 +2794,21 @@ function App() {
         .eq('id', invoiceId);
       if (errUpd) throw errUpd;
 
+      // =============== v1.8.9: Data do pagamento = DATA DE VENCIMENTO da fatura!
+      // Assim cai na SEMANA CORRETA do vencimento (que é o que o usuário pediu!)
+      // Antes usava data de HOJE (dia que o usuario pagou), mas aparecia na semana
+      // errada se o usuario pagasse adiantado ou atrasado.
+      //
+      // Tambem: se pagamento for PARCIAL (ainda nao pagou tudo), status = PENDENTE.
+      // Soh status PAGO quando realmente for o pagamento total (novoStatus === 'PAGA').
+      const pagamentoTotal = novoStatus === 'PAGA';
       const despesa: Omit<Transaction, 'id'> = {
         tipo: 'SAIDA',
-        descricao: `Pagamento Fatura ${card.nome} - ${invoice.mesAno}`,
+        descricao: `Pagamento Fatura ${card.nome} - ${invoice.mesAno}${pagamentoTotal ? '' : ' (Parcial)'}`,
         categoria: 'Outros',
         valor: Number(valorPago.toFixed(2)),
-        data: hoje,
-        status: 'PAGO',
+        data: invoice.dataVencimento || hoje, // <- CHAVE PRINCIPAL! Usa data de VENCIMENTO
+        status: pagamentoTotal ? 'PAGO' : 'PENDENTE',
         contaId: accountId
       };
       await handleSaveTransaction(despesa);
